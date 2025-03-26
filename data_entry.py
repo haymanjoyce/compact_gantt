@@ -1,26 +1,25 @@
 """
-Purpose: Defines DataEntryWindow, handles user input via tabs and file management.
-Why: Manages multiple data tables and metadata for a complex Gantt chart, using JSON for persistence.
+Purpose: Defines DataEntryWindow, handles user input via tabs and UI interactions.
+Why: Provides a clean interface for Gantt chart data entry, relying on ProjectData for logic.
 """
 
-from PyQt5.QtWidgets import QMainWindow, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, QFileDialog, QTabWidget, QMenuBar, QAction, QApplication, QToolBar
+from PyQt5.QtWidgets import QMainWindow, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, QFileDialog, QTabWidget, QAction, QApplication, QToolBar, QMessageBox
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import QDate
 from svg_display import SVGDisplayWindow
 from svg_generator import generate_svg
+from data_model import ProjectData
 import json
-from datetime import datetime
 
 class DataEntryWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Gantt Chart Data Entry")
         self.setGeometry(100, 100, 800, 500)
+        self.project_data = ProjectData()
 
         # Menu bar setup
         self.menu_bar = self.menuBar()
-
-        # File menu
         self.file_menu = self.menu_bar.addMenu("File")
         self.save_action = QAction("Save Project", self)
         self.save_action.triggered.connect(self.save_to_json)
@@ -29,7 +28,6 @@ class DataEntryWindow(QMainWindow):
         self.load_action.triggered.connect(self.load_from_json)
         self.file_menu.addAction(self.load_action)
 
-        # Tools menu
         self.tools_menu = self.menu_bar.addMenu("Tools")
         self.add_row_action = QAction("Add Row to Current Tab", self)
         self.add_row_action.triggered.connect(self.add_row)
@@ -43,17 +41,14 @@ class DataEntryWindow(QMainWindow):
 
         # Toolbar setup
         self.toolbar = QToolBar("Tools")
-        self.addToolBar(self.toolbar)  # Adds it below the menu bar by default
-        style = QApplication.style()  # Get app’s style for standard icons
-
+        self.addToolBar(self.toolbar)
+        style = QApplication.style()
         self.add_row_tool = QAction(QIcon(style.standardIcon(style.SP_FileIcon)), "Add Row", self)
         self.add_row_tool.triggered.connect(self.add_row)
         self.toolbar.addAction(self.add_row_tool)
-
         self.remove_row_tool = QAction(QIcon(style.standardIcon(style.SP_TrashIcon)), "Remove Row", self)
         self.remove_row_tool.triggered.connect(self.remove_row)
         self.toolbar.addAction(self.remove_row_tool)
-
         self.generate_tool = QAction(QIcon(style.standardIcon(style.SP_ArrowRight)), "Generate Gantt Chart", self)
         self.generate_tool.triggered.connect(self.generate_and_show_svg)
         self.toolbar.addAction(self.generate_tool)
@@ -72,116 +67,108 @@ class DataEntryWindow(QMainWindow):
         self.tasks_table.setHorizontalHeaderLabels(["Task Name", "Start Date", "Duration (days)"])
         self.tabs.addTab(self.tasks_table, "Tasks")
 
-        # Pipes table (vertical bars)
+        # Pipes table
         self.pipes_table = QTableWidget(3, 2)
         self.pipes_table.setHorizontalHeaderLabels(["Pipe Name", "Date"])
         self.tabs.addTab(self.pipes_table, "Pipes")
 
-        # Curtains table (shaded areas)
+        # Curtains table
         self.curtains_table = QTableWidget(3, 4)
-        self.curtains_table.setHorizontalHeaderLabels(["Curtain Name", "Start Pipe", "End Pipe", "Color"])
+        self.curtains_table.setHorizontalHeaderLabels(["Curtain Name", "Start Date", "End Date", "Color"])
         self.tabs.addTab(self.curtains_table, "Curtains")
 
-        # Initialize svg_window
         self.svg_window = None
+        self._load_initial_data()
+
+    def _load_initial_data(self):
+        """Populate tables with default or loaded data."""
+        for table, data, tab_name in [
+            (self.tasks_table, self.project_data.get_table_data("tasks"), "tasks"),
+            (self.pipes_table, self.project_data.get_table_data("pipes"), "pipes"),
+            (self.curtains_table, self.project_data.get_table_data("curtains"), "curtains")
+        ]:
+            table.setRowCount(len(data))
+            for row_idx, row_data in enumerate(data):
+                for col_idx, value in enumerate(row_data):
+                    table.setItem(row_idx, col_idx, QTableWidgetItem(value))
 
     def add_row(self):
-        """Add a row to the current tab’s table."""
+        """Add a row to the current tab’s table and update ProjectData."""
         current_table = self.tabs.currentWidget()
         current_rows = current_table.rowCount()
         current_table.insertRow(current_rows)
+        today = QDate.currentDate().toString("yyyy-MM-dd")
         if current_table == self.tasks_table:
             current_table.setItem(current_rows, 0, QTableWidgetItem(f"Task {current_rows + 1}"))
-            current_table.setItem(current_rows, 1, QTableWidgetItem(QDate.currentDate().toString("yyyy-MM-dd")))
+            current_table.setItem(current_rows, 1, QTableWidgetItem(today))
             current_table.setItem(current_rows, 2, QTableWidgetItem("1"))
         elif current_table == self.pipes_table:
             current_table.setItem(current_rows, 0, QTableWidgetItem(f"Pipe {current_rows + 1}"))
-            current_table.setItem(current_rows, 1, QTableWidgetItem(QDate.currentDate().toString("yyyy-MM-dd")))
+            current_table.setItem(current_rows, 1, QTableWidgetItem(today))
         elif current_table == self.curtains_table:
             current_table.setItem(current_rows, 0, QTableWidgetItem(f"Curtain {current_rows + 1}"))
-            current_table.setItem(current_rows, 1, QTableWidgetItem("Pipe 1"))
-            current_table.setItem(current_rows, 2, QTableWidgetItem("Pipe 2"))
-            current_table.setItem(current_rows, 3, QTableWidgetItem("rgba(255, 0, 0, 0.3)"))
+            current_table.setItem(current_rows, 1, QTableWidgetItem(today))
+            current_table.setItem(current_rows, 2, QTableWidgetItem(today))
+            current_table.setItem(current_rows, 3, QTableWidgetItem("red"))  # SVG-compatible color
+        self._sync_data()
 
     def remove_row(self):
-        """Remove the last row from the current tab’s table."""
+        """Remove the last row from the current tab’s table and update ProjectData."""
         current_table = self.tabs.currentWidget()
         if current_table.rowCount() > 1:
             current_table.removeRow(current_table.rowCount() - 1)
+            self._sync_data()
 
-    def _get_table_data(self, table):
-        """Extract and validate data from a given table."""
+    def _extract_table_data(self, table):
+        """Extract data from a given table."""
         data = []
         for row in range(table.rowCount()):
             row_data = []
             for col in range(table.columnCount()):
                 item = table.item(row, col)
                 row_data.append(item.text() if item else "")
-            if table == self.tasks_table:
-                try:
-                    if row_data[1]:  # Start Date
-                        datetime.strptime(row_data[1], "%Y-%m-%d")
-                    if row_data[2]:  # Duration
-                        float(row_data[2])
-                except ValueError as e:
-                    print(f"Invalid task data in row {row + 1}: {e}")
-                    return None
-            elif table == self.pipes_table:
-                try:
-                    if row_data[1]:  # Date
-                        datetime.strptime(row_data[1], "%Y-%m-%d")
-                except ValueError as e:
-                    print(f"Invalid pipe data in row {row + 1}: {e}")
-                    return None
             data.append(row_data)
         return data
 
+    def _sync_data(self):
+        """Sync table data with ProjectData."""
+        try:
+            self.project_data.update_from_table("tasks", self._extract_table_data(self.tasks_table))
+            self.project_data.update_from_table("pipes", self._extract_table_data(self.pipes_table))
+            self.project_data.update_from_table("curtains", self._extract_table_data(self.curtains_table))
+        except ValueError as e:
+            QMessageBox.critical(self, "Error", str(e))
+
     def generate_and_show_svg(self):
-        """Generate and display the Gantt chart."""
-        data = {
-            "tasks": self._get_table_data(self.tasks_table),
-            "pipes": self._get_table_data(self.pipes_table),
-            "curtains": self._get_table_data(self.curtains_table)
-        }
-        if None in data.values():
-            print("Cannot generate SVG due to invalid data.")
-            return
-        svg_path = generate_svg(data, output_folder="svg", output_filename="gantt_chart.svg")
-        self.svg_window = SVGDisplayWindow(svg_path)
-        self.svg_window.show()
+        """Generate and display the Gantt chart using ProjectData."""
+        try:
+            self._sync_data()
+            svg_path = generate_svg(self.project_data.to_json(), output_folder="svg", output_filename="gantt_chart.svg")
+            self.svg_window = SVGDisplayWindow(svg_path)
+            self.svg_window.show()
+        except ValueError as e:
+            QMessageBox.critical(self, "Error", f"Cannot generate SVG: {e}")
 
     def save_to_json(self):
-        """Save all table data to a JSON file."""
+        """Save ProjectData to a JSON file."""
         file_path, _ = QFileDialog.getSaveFileName(self, "Save Project", "", "JSON Files (*.json)")
         if file_path:
             try:
-                data = {
-                    "tasks": self._get_table_data(self.tasks_table),
-                    "pipes": self._get_table_data(self.pipes_table),
-                    "curtains": self._get_table_data(self.curtains_table)
-                }
-                if None in data.values():
-                    print("Cannot save due to invalid data.")
-                    return
+                self._sync_data()
+                json_str = json.dumps(self.project_data.to_json(), indent=4)
                 with open(file_path, 'w') as jsonfile:
-                    json.dump(data, jsonfile, indent=4)
+                    jsonfile.write(json_str)
             except Exception as e:
-                print(f"Error saving JSON: {e}")
+                QMessageBox.critical(self, "Error", f"Error saving JSON: {e}")
 
     def load_from_json(self):
-        """Load table data from a JSON file."""
+        """Load data into ProjectData and refresh tables."""
         file_path, _ = QFileDialog.getOpenFileName(self, "Open Project", "", "JSON Files (*.json)")
         if file_path:
             try:
                 with open(file_path, 'r') as jsonfile:
                     data = json.load(jsonfile)
-                for table_name, table in [("tasks", self.tasks_table), ("pipes", self.pipes_table), ("curtains", self.curtains_table)]:
-                    table_data = data.get(table_name, [])
-                    if table_data:
-                        table.setRowCount(len(table_data))
-                        for row_idx, row_data in enumerate(table_data):
-                            for col_idx, value in enumerate(row_data):
-                                table.setItem(row_idx, col_idx, QTableWidgetItem(value))
+                self.project_data = ProjectData.from_json(data)
+                self._load_initial_data()
             except Exception as e:
-                print(f"Error loading JSON: {e}")
-
+                QMessageBox.critical(self, "Error", f"Error loading JSON: {e}")

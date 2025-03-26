@@ -19,22 +19,18 @@ if __name__ == "__main__":
 
 
 # TODO:
-#  output svg to svg folder
-#  load and save to json
+#  architecture review
 #  import and export xlsx
-#  Start adding non-tabular UI for project start/end dates
+#  non-tabular UI for project start/end dates
 #  error dialogues
-#  Add “New Project” or “Exit” to the File menu
-#  File Management: Auto-name CSV/SVG files or add a "Save As" history.
-#  Validation: Check CSV dimensions against table size before importing.
+#  add “New Project” or “Exit” to the File menu
+#  auto-name CSV/SVG files or add a "Save As" history.
+#  Validation: Check table dimensions against table size before importing.
 #  UI Feedback: Use QMessageBox for errors instead of print.
 #  Table Flexibility: Let users resize the table (add/remove rows/columns).
-#  Menu Bar: Move import/export to a File menu (self.menuBar().addMenu("File")) for a cleaner UI.
-#  Next?: Add shortcuts (e.g., Ctrl+R for “Add Row”), non-tabular UI, or start the Gantt SVG?
+#  Add shortcuts (e.g., Ctrl+R for “Add Row”), non-tabular UI, or start the Gantt SVG?
 #  svg calculations
-#  tabs
 #  interface for non tabular data
-#  menu bar
 #  dynamic update
 #  export raster and pdf
 #  print
