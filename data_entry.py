@@ -10,6 +10,7 @@ from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import QDate, pyqtSignal
 from data_model import ProjectData, FrameConfig
 from config import Config
+from datetime import datetime, timedelta
 import json
 
 class DataEntryWindow(QMainWindow):
@@ -265,11 +266,18 @@ class DataEntryWindow(QMainWindow):
         row_count = self.time_frames_table.rowCount()
         self.time_frames_table.insertRow(row_count)
         today = QDate.currentDate().toString("yyyy-MM-dd")
-        self.time_frames_table.setItem(row_count, 0, QTableWidgetItem(today))
-        self.time_frames_table.setItem(row_count, 1, QTableWidgetItem(today))
-        self.time_frames_table.setItem(row_count, 2, QTableWidgetItem("50"))
-        self.time_frames_table.setItem(row_count, 3, QTableWidgetItem("Days"))
-        self.time_frames_table.setItem(row_count, 4, QTableWidgetItem("Weeks"))
+        if row_count == 0:
+            start_date = today
+            end_date = (datetime.strptime(today, "%Y-%m-%d") + timedelta(days=7)).strftime("%Y-%m-%d")
+        else:
+            last_end = self.time_frames_table.item(row_count - 1, 1).text()
+            start_date = (datetime.strptime(last_end, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+            end_date = (datetime.strptime(start_date, "%Y-%m-%d") + timedelta(days=7)).strftime("%Y-%m-%d")
+        self.time_frames_table.setItem(row_count, 0, QTableWidgetItem(start_date))
+        self.time_frames_table.setItem(row_count, 1, QTableWidgetItem(end_date))
+        self.time_frames_table.setItem(row_count, 2, QTableWidgetItem(str(100 / (row_count + 1))))
+        self.time_frames_table.setItem(row_count, 3, QTableWidgetItem("months"))
+        self.time_frames_table.setItem(row_count, 4, QTableWidgetItem("weeks"))
         self._sync_data()
 
     def _remove_time_frame_row(self):
@@ -345,14 +353,12 @@ class DataEntryWindow(QMainWindow):
             self._sync_data()
 
     def _load_initial_data(self):
-        # Tasks (placeholder - will need data model update)
-        self.tasks_table.setRowCount(1)
-        today = QDate.currentDate().toString("yyyy-MM-dd")
-        self.tasks_table.setItem(0, 0, QTableWidgetItem("1"))
-        self.tasks_table.setItem(0, 1, QTableWidgetItem("Sample Task"))
-        self.tasks_table.setItem(0, 2, QTableWidgetItem(today))
-        self.tasks_table.setItem(0, 3, QTableWidgetItem(today))
-        self.tasks_table.setItem(0, 4, QTableWidgetItem("1"))
+        # Tasks
+        tasks_data = self.project_data.get_table_data("tasks")
+        self.tasks_table.setRowCount(len(tasks_data))
+        for row_idx, row_data in enumerate(tasks_data):
+            for col_idx, value in enumerate(row_data):
+                self.tasks_table.setItem(row_idx, col_idx, QTableWidgetItem(value))
 
         # Layout
         self.outer_width_input.setText(str(self.project_data.frame_config.outer_width))
@@ -372,20 +378,54 @@ class DataEntryWindow(QMainWindow):
         self.vertical_gridlines_input.setChecked(self.project_data.frame_config.vertical_gridlines)
 
         # Time Frames
-        self.time_frames_table.setRowCount(len(self.project_data.time_frames))
-        for i, tf in enumerate(self.project_data.time_frames):
-            self.time_frames_table.setItem(i, 0, QTableWidgetItem(tf.start_date))
-            self.time_frames_table.setItem(i, 1, QTableWidgetItem(tf.end_date))
-            self.time_frames_table.setItem(i, 2, QTableWidgetItem(str(tf.width_proportion * 100)))  # As percentage
-            self.time_frames_table.setItem(i, 3, QTableWidgetItem("Days"))  # Placeholder
-            self.time_frames_table.setItem(i, 4, QTableWidgetItem("Weeks"))  # Placeholder
+        tf_data = self.project_data.get_table_data("time_frames")
+        self.time_frames_table.setRowCount(len(tf_data) if tf_data else 1)
+        if tf_data:
+            for row_idx, row_data in enumerate(tf_data):
+                for col_idx, value in enumerate(row_data):
+                    self.time_frames_table.setItem(row_idx, col_idx, QTableWidgetItem(value))
+        else:
+            today = QDate.currentDate().toString("yyyy-MM-dd")
+            self.time_frames_table.setItem(0, 0, QTableWidgetItem(today))
+            self.time_frames_table.setItem(0, 1, QTableWidgetItem(today))
+            self.time_frames_table.setItem(0, 2, QTableWidgetItem("100"))
+            self.time_frames_table.setItem(0, 3, QTableWidgetItem("days"))
+            self.time_frames_table.setItem(0, 4, QTableWidgetItem("weeks"))
 
-        # Other tabs start empty
-        self.connectors_table.setRowCount(0)
-        self.swimlanes_table.setRowCount(0)
-        self.pipes_table.setRowCount(0)
-        self.curtains_table.setRowCount(0)
-        self.text_boxes_table.setRowCount(0)
+        # Connectors
+        conn_data = self.project_data.get_table_data("connectors")
+        self.connectors_table.setRowCount(len(conn_data))
+        for row_idx, row_data in enumerate(conn_data):
+            for col_idx, value in enumerate(row_data):
+                self.connectors_table.setItem(row_idx, col_idx, QTableWidgetItem(value))
+
+        # Swimlanes
+        sl_data = self.project_data.get_table_data("swimlanes")
+        self.swimlanes_table.setRowCount(len(sl_data))
+        for row_idx, row_data in enumerate(sl_data):
+            for col_idx, value in enumerate(row_data):
+                self.swimlanes_table.setItem(row_idx, col_idx, QTableWidgetItem(value))
+
+        # Pipes
+        pipes_data = self.project_data.get_table_data("pipes")
+        self.pipes_table.setRowCount(len(pipes_data))
+        for row_idx, row_data in enumerate(pipes_data):
+            for col_idx, value in enumerate(row_data):
+                self.pipes_table.setItem(row_idx, col_idx, QTableWidgetItem(value))
+
+        # Curtains
+        curtains_data = self.project_data.get_table_data("curtains")
+        self.curtains_table.setRowCount(len(curtains_data))
+        for row_idx, row_data in enumerate(curtains_data):
+            for col_idx, value in enumerate(row_data):
+                self.curtains_table.setItem(row_idx, col_idx, QTableWidgetItem(value))
+
+        # Text Boxes
+        tb_data = self.project_data.get_table_data("text_boxes")
+        self.text_boxes_table.setRowCount(len(tb_data))
+        for row_idx, row_data in enumerate(tb_data):
+            for col_idx, value in enumerate(row_data):
+                self.text_boxes_table.setItem(row_idx, col_idx, QTableWidgetItem(value))
 
     def _extract_table_data(self, table):
         data = []
@@ -399,8 +439,7 @@ class DataEntryWindow(QMainWindow):
 
     def _sync_data(self):
         try:
-            # This is a placeholder sync - full implementation needs data model updates
-            self.project_data.update_from_table("tasks", self._extract_table_data(self.tasks_table))
+            # Sync Layout
             margins = (
                 float(self.top_margin_input.text() or 0),
                 float(self.right_margin_input.text() or 0),
@@ -421,13 +460,58 @@ class DataEntryWindow(QMainWindow):
                 self.horizontal_gridlines_input.isChecked(),
                 self.vertical_gridlines_input.isChecked()
             )
+
+            # Sync and validate Time Frames
+            tf_data = self._extract_table_data(self.time_frames_table)
+            if not tf_data:
+                raise ValueError("At least one time frame is required")
+
+            # Convert to datetime and sort by start date
+            time_frames = []
+            for row in tf_data:
+                start = row[0] or "2025-01-01"
+                end = row[1] or "2025-01-01"
+                width = float(row[2] or 0) / 100
+                upper = row[3] or "days"
+                lower = row[4] or "days"
+                start_dt = datetime.strptime(start, "%Y-%m-%d")
+                end_dt = datetime.strptime(end, "%Y-%m-%d")
+                if end_dt < start_dt:
+                    raise ValueError(f"Time frame '{start}' to '{end}' has end date before start date")
+                time_frames.append((start_dt, end_dt, width, upper, lower))
+            time_frames.sort(key=lambda x: x[0])  # Sort by start date
+
+            # Check for overlaps and continuity
+            total_width = 0
+            for i, (start_dt, end_dt, width, upper, lower) in enumerate(time_frames):
+                total_width += width
+                # Overlap check
+                for j, (other_start, other_end, _, _, _) in enumerate(time_frames):
+                    if i != j and not (end_dt < other_start or start_dt > other_end):
+                        raise ValueError(f"Time frame '{start_dt.strftime('%Y-%m-%d')}' to '{end_dt.strftime('%Y-%m-%d')}' overlaps with another time frame")
+                # Continuity check
+                if i > 0:
+                    prev_end = time_frames[i-1][1]
+                    expected_start = prev_end + timedelta(days=1)
+                    if start_dt != expected_start:
+                        raise ValueError(f"Time frame '{start_dt.strftime('%Y-%m-%d')}' does not start immediately after previous end '{prev_end.strftime('%Y-%m-%d')}'")
+            if total_width > 1.0:
+                raise ValueError(f"Total time frame width ({total_width*100}%) exceeds 100%")
+
+            # Add validated time frames
             self.project_data.time_frames.clear()
-            for row in range(self.time_frames_table.rowCount()):
-                start = self.time_frames_table.item(row, 0).text() if self.time_frames_table.item(row, 0) else ""
-                end = self.time_frames_table.item(row, 1).text() if self.time_frames_table.item(row, 1) else ""
-                width = float(self.time_frames_table.item(row, 2).text() or 0) / 100  # Convert % to proportion
-                mag = 1.0  # Placeholder until we model intervals
-                self.project_data.add_time_frame(start, end, width, mag)
+            for start_dt, end_dt, width, upper, lower in time_frames:
+                self.project_data.add_time_frame(start_dt.strftime("%Y-%m-%d"), end_dt.strftime("%Y-%m-%d"),
+                                                width, upper, lower)
+
+            # Sync other tables
+            self.project_data.update_from_table("tasks", self._extract_table_data(self.tasks_table))
+            self.project_data.update_from_table("connectors", self._extract_table_data(self.connectors_table))
+            self.project_data.update_from_table("swimlanes", self._extract_table_data(self.swimlanes_table))
+            self.project_data.update_from_table("pipes", self._extract_table_data(self.pipes_table))
+            self.project_data.update_from_table("curtains", self._extract_table_data(self.curtains_table))
+            self.project_data.update_from_table("text_boxes", self._extract_table_data(self.text_boxes_table))
+
             self.data_updated.emit(self.project_data.to_json())
         except ValueError as e:
             QMessageBox.critical(self, "Error", str(e))

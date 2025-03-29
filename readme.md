@@ -20,23 +20,14 @@ The problems that I have with existing tools include, for example:
 ### Layout Components
 
  - outer_frame - control of overall dimensions of inked area; user can apply un-inked margins (i.e. offsets)
-
  - header - sits at top of outer_frame; full width of outer_frame; only one header row available (design decision)
-
  - footer - sits at bottom of outer_frame; full width of outer_frame; only one footer row available (design decision)
-
  - inner_frame - sits between header_frame and footer_frame; full width of outer_frame
- - 
  - time_frame - sits inside inner_frame; time_frames show chart at different levels of magnification
-
  - upper_scale - sits inside time_frame; shows the timescale; full width of time_frame; placed at top of time_frame
-
  - lower_scale - sits inside time_frame; shows the timescale; full width of time_frame; placed below upper_scale
-
  - row_frame - sits inside a time_frame; contains rows; full width of inner_frame; placed below lower_scale
- - 
  - row - sits inside row_frame; can be multiple rows; full width of row_frame; users defines number of rows
-
  - swimlane - sits in inner_frame; can be used to group rows visually; full width of inner_frame
 
 ### Subcomponents
