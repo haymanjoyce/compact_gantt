@@ -25,27 +25,40 @@ class TimeFrame:
 
 @dataclass
 class FrameConfig:
-    outer_width: float   # Total width in pixels
-    outer_height: float  # Total height in pixels
-    header_height: float # Height of header_frame
-    footer_height: float # Height of footer_frame
+    outer_width: float
+    outer_height: float
+    header_height: float
+    footer_height: float
     margins: tuple[float, float, float, float]  # (top, right, bottom, left)
+    num_rows: int
+    upper_scale_height: float
+    lower_scale_height: float
+    header_text: str = ""  # New
+    footer_text: str = ""  # New
+    horizontal_gridlines: bool = False  # New
+    vertical_gridlines: bool = False  # New
 
     @property
     def inner_height(self):
-        return self.outer_height - self.header_height - self.footer_height - self.margins[0] - self.margins[2]
+        return (self.outer_height - self.header_height - self.footer_height -
+                self.margins[0] - self.margins[2] - self.upper_scale_height - self.lower_scale_height)
 
     def validate(self):
         assert self.outer_width > 0 and self.outer_height > 0
         assert 0 <= self.header_height < self.outer_height
         assert 0 <= self.footer_height < self.outer_height
-        assert self.inner_height > 0
+        assert self.num_rows > 0 and isinstance(self.num_rows, int)
+        assert self.upper_scale_height >= 0
+        assert self.lower_scale_height >= 0
+        assert self.inner_height > 0, "Inner height must be positive after accounting for scales and margins"
+        assert isinstance(self.header_text, str) and isinstance(self.footer_text, str)
+        assert isinstance(self.horizontal_gridlines, bool) and isinstance(self.vertical_gridlines, bool)
 
 class ProjectData:
     def __init__(self):
-        self.frame_config = FrameConfig(outer_width=800, outer_height=600, header_height=50, footer_height=50, margins=(10, 10, 10, 10))
-        self.time_frames = []  # List of TimeFrame objects
-        self.tasks = []  # List of dicts: {"name": str, "start": str, "duration": float}
+        self.frame_config = FrameConfig(800, 600, 50, 50, (10, 10, 10, 10), 1, 20.0, 20.0, "", "", False, False)
+        self.time_frames = []
+        self.tasks = []
 
     def add_time_frame(self, start_date, end_date, width_proportion, magnification=1.0):
         """Add a time frame with validation."""
@@ -68,14 +81,20 @@ class ProjectData:
             raise ValueError(f"Invalid task data: {e}")
 
     def to_json(self):
-        """Serialize data to JSON-compatible dict."""
         return {
             "frame_config": {
                 "outer_width": self.frame_config.outer_width,
                 "outer_height": self.frame_config.outer_height,
                 "header_height": self.frame_config.header_height,
                 "footer_height": self.frame_config.footer_height,
-                "margins": list(self.frame_config.margins)  # Convert tuple to list for JSON
+                "margins": list(self.frame_config.margins),
+                "num_rows": self.frame_config.num_rows,
+                "upper_scale_height": self.frame_config.upper_scale_height,
+                "lower_scale_height": self.frame_config.lower_scale_height,
+                "header_text": self.frame_config.header_text,
+                "footer_text": self.frame_config.footer_text,
+                "horizontal_gridlines": self.frame_config.horizontal_gridlines,
+                "vertical_gridlines": self.frame_config.vertical_gridlines
             },
             "time_frames": [
                 {"start_date": tf.start_date, "end_date": tf.end_date,
@@ -87,20 +106,25 @@ class ProjectData:
 
     @classmethod
     def from_json(cls, data):
-        """Load data from JSON dict."""
         instance = cls()
         margins = data["frame_config"]["margins"]
-        if not (isinstance(margins, (list, tuple)) and len(margins) == 4 and all(isinstance(x, (int, float)) for x in margins)):
+        if not (isinstance(margins, (list, tuple)) and len(margins) == 4 and all(
+                isinstance(x, (int, float)) for x in margins)):
             raise ValueError("Margins must be a tuple of 4 floats")
         instance.frame_config = FrameConfig(
             data["frame_config"]["outer_width"], data["frame_config"]["outer_height"],
             data["frame_config"]["header_height"], data["frame_config"]["footer_height"],
-            (float(margins[0]), float(margins[1]), float(margins[2]), float(margins[3]))  # Explicitly cast to satisfy type hint
+            (float(margins[0]), float(margins[1]), float(margins[2]), float(margins[3])),
+            data["frame_config"].get("num_rows", 1),
+            data["frame_config"].get("upper_scale_height", 20.0),
+            data["frame_config"].get("lower_scale_height", 20.0),
+            data["frame_config"].get("header_text", ""),
+            data["frame_config"].get("footer_text", ""),
+            data["frame_config"].get("horizontal_gridlines", False),
+            data["frame_config"].get("vertical_gridlines", False)
         )
-        instance.time_frames = [
-            TimeFrame(tf["start_date"], tf["end_date"], tf["width_proportion"], tf["magnification"])
-            for tf in data.get("time_frames", [])
-        ]
+        instance.time_frames = [TimeFrame(tf["start_date"], tf["end_date"], tf["width_proportion"], tf["magnification"])
+                                for tf in data.get("time_frames", [])]
         instance.tasks = data.get("tasks", [])
         for task in instance.tasks:
             if "start" in task and task["start"]:
