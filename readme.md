@@ -1,19 +1,29 @@
 # Project Planning Tool
 
 ## Purpose
+This tool helps users create compact, visually rich Gantt charts, packing extensive project-planning details into a single, customizable page.
 
-The purpose of the tool is to enable me, the user, to squeeze as much project-planning related information onto one page as possible.
+## Quick Start
+1. Ensure Python 3.8+ and PyQt5 are installed: `pip install PyQt5 svgwrite`.
+2. Clone the repo: `git clone <repo-url>`.
+3. Navigate to the directory: `cd haymanjoyce-gantt_02`.
+4. Run the tool: `python main.py`.
+5. Use the "Generate Gantt Chart" toolbar button to see your chart in SVG.
+
+## Requirements
+- Python 3.8+
+- PyQt5 (`pip install PyQt5`)
+- svgwrite (`pip install svgwrite`)
 
 ## Problem
+Existing tools fall short because:
 
-The problems that I have with existing tools include, for example:
-
- - I can only fit one task per row
- - I cannot change magnification at points on the scale (so I cannot show tasks in distant future at a lower magnification)
- - I cannot be selective about applying (and placing) labels and logic (i.e., connectors)
- - I lack fine control over dimensions and so it's often hard to get a chart to fit on the desired paper or slide
- - I have to hand draw my charts (using PowerPoint, for example) which is time-consuming and error-prone
- - Planning tool Gantt charts are generally pretty ugly which makes them less engaging to look at
+- Only one task fits per row.
+- Magnification can’t vary across the timeline.
+- Labels and connectors lack selective placement.
+- Dimensions are hard to control for paper/slide fit.
+- Hand-drawn charts (e.g., in PowerPoint) are slow and error-prone.
+- Typical Gantt charts are visually unappealing.
 
 ## Chart Design
 
@@ -47,8 +57,9 @@ The problems that I have with existing tools include, for example:
  - The width of the time_frame is defined by the user as a proportion of the inner_frame width
  - The first time_frame from the left will, typically, be the most detailed (i.e., highest magnification)
  - All time_frames must have the same number of rows 
- - The user can define the number of rows
- - The first part of a task might appear in one time_frame and the second part in a neighbouring time_frame
+ - The user can define the number of rows in the row_frame
+ - First time frame (leftmost) is typically the most detailed (highest magnification)
+ - Subsequent time frames may use lower magnification for broader overviews
  - A curtain may start in one time_frame and end in another
  - Time frames are contiguous (i.e., no gaps between them)
  - Time frames cannot overlap
@@ -110,6 +121,36 @@ The problems that I have with existing tools include, for example:
  - data_entry.py: Emits data_updated with self.project_data.to_json() whenever data is synced (e.g., after adding/removing rows, saving, or generating the chart).
  - svg_generator.py: Receives this JSON dict via generate_svg and renders it into an SVG, emitting svg_generated.
  - svg_display.py: Updates the display based on the SVG path from svg_generated.
+
+## Files
+
+ - main.py: Entry point for the application.
+ - data_model.py: Defines the data model for the project data.
+ - data_entry.py: Handles the data entry window and user input.
+ - svg_generator.py: Generates the SVG file based on user input.
+ - svg_display.py: Displays the generated SVG file.
+ - config.py: Configuration settings for the application.
+ - .gitignore: Specifies files to ignore in version control.
+ - LICENSE: License information for the project.
+ - requirements.txt: Lists the required Python packages for the project.
+ - README.md: Documentation for the project.
+
+## Folders
+
+ - gantt_02/: Main project directory.
+ - docs/: Directory for additional documentation.
+ - tests/: Directory for unit tests.
+ - assets/: Directory for assets like icons and images.
+ - resources/: Directory for resources like SVG templates or stylesheets.
+ - examples/: Directory for example SVG files or screenshots.
+ - scripts/: Directory for utility scripts or command-line tools.
+ - data/: Directory for sample data files or templates.
+ - logs/: Directory for log files.
+ - svg/: Directory for generated SVG files.
+
+## License
+
+TBD (To be determined — see Packaging & Distribution for plans).
 
 ## To Do
 
