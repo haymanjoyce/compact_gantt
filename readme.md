@@ -104,3 +104,65 @@ The problems that I have with existing tools include, for example:
      - x coordinate - float
      - y coordinate - float
      - colour - string
+
+## Signals & Slots Notes
+
+ - data_entry.py: Emits data_updated with self.project_data.to_json() whenever data is synced (e.g., after adding/removing rows, saving, or generating the chart).
+ - svg_generator.py: Receives this JSON dict via generate_svg and renders it into an SVG, emitting svg_generated.
+ - svg_display.py: Updates the display based on the SVG path from svg_generated.
+
+## To Do
+
+### Chart Design
+
+ - [x] layout (outer_frame, header, footer, inner_frame, upper_scale, lower_scale, row_frame, row)
+ - [x] timeframes
+ - [ ] scales
+ - [x] gridlines
+ - [ ] tasks
+ - [ ] milestones
+ - [ ] connectors
+ - [ ] text boxes
+ - [ ] curtains
+ - [ ] pipes
+ - [ ] swimlanes
+
+### User Interface
+
+ - [x] data entry window
+ - [x] data entry tabs
+ - [x] data entry tables
+ - [ ] data entry fields
+ - [x] data entry buttons
+ - [ ] table sorting
+ - [ ] table filtering
+ - [ ] table searching
+ - [ ] table editing (add, edit, delete)
+ - [ ] window resizing
+ - [ ] window scrolling
+ - [x] window zooming
+ - [ ] shortcuts
+
+### File Input & Output
+
+ - [x] import and export JSON
+ - [ ] import and export xlsx
+ - [ ] import and export svg
+ - [ ] print to pdf
+ - [ ] print to raster
+
+### Production
+
+ - [ ] logging
+ - [ ] testing
+ - [ ] error handling (including try and except)
+
+### Packaging & Distribution
+
+ - [ ] windows executable
+ - [ ] PyPI package
+ - [ ] documentation
+ - [ ] versioning
+ - [ ] licensing
+ - [ ] internationalization
+ - [ ] accessibility
