@@ -4,7 +4,7 @@ Why: Centralizes data logic, making it reusable and easier to maintain/test.
 """
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 
 @dataclass
@@ -15,48 +15,39 @@ class FrameConfig:
     footer_height: float
     margins: tuple[float, float, float, float]  # (top, right, bottom, left)
     num_rows: int
-    upper_scale_height: float
-    lower_scale_height: float
     header_text: str
     footer_text: str
     horizontal_gridlines: bool
     vertical_gridlines: bool
+    chart_start_date: str  # YYYY-MM-DD
+    intervals: str  # "years", "months", "weeks"
 
     @property
     def inner_height(self):
+        from config import Config
         return (self.outer_height - self.header_height - self.footer_height -
-                self.margins[0] - self.margins[2] - self.upper_scale_height - self.lower_scale_height)
+                self.margins[0] - self.margins[2]) * (1 - Config.UPPER_SCALE_PROPORTION - Config.LOWER_SCALE_PROPORTION)
 
     def validate(self):
         assert self.outer_width > 0 and self.outer_height > 0
         assert 0 <= self.header_height < self.outer_height
         assert 0 <= self.footer_height < self.outer_height
         assert self.num_rows > 0 and isinstance(self.num_rows, int)
-        assert self.upper_scale_height >= 0
-        assert self.lower_scale_height >= 0
         assert self.inner_height > 0, "Inner height must be positive after accounting for scales and margins"
         assert isinstance(self.header_text, str) and isinstance(self.footer_text, str)
         assert isinstance(self.horizontal_gridlines, bool) and isinstance(self.vertical_gridlines, bool)
+        datetime.strptime(self.chart_start_date, "%Y-%m-%d")
+        assert self.intervals in ["years", "months", "weeks"]
 
 @dataclass
 class TimeFrame:
-    start_date: str  # YYYY-MM-DD
-    end_date: str  # YYYY-MM-DD
+    finish_date: str  # YYYY-MM-DD
     width_proportion: float  # 0.0 to 1.0
-    upper_scale_intervals: str  # e.g., "days", "weeks", "months", "years"
-    lower_scale_intervals: str  # e.g., "days", "weeks", "months", "years"
 
     def validate(self):
         try:
-            datetime.strptime(self.start_date, "%Y-%m-%d")
-            datetime.strptime(self.end_date, "%Y-%m-%d")
+            datetime.strptime(self.finish_date, "%Y-%m-%d")
             assert 0 <= self.width_proportion <= 1.0
-            valid_intervals = ["days", "weeks", "months", "years"]
-            assert self.upper_scale_intervals in valid_intervals
-            assert self.lower_scale_intervals in valid_intervals
-            interval_order = {"days": 1, "weeks": 2, "months": 3, "years": 4}
-            assert interval_order[self.lower_scale_intervals] <= interval_order[self.upper_scale_intervals], \
-                "Lower scale intervals must be shorter than or equal to upper scale intervals"
         except (ValueError, AssertionError) as e:
             raise ValueError(f"Invalid TimeFrame data: {e}")
 
@@ -135,7 +126,7 @@ class TextBox:
 
 class ProjectData:
     def __init__(self):
-        self.frame_config = FrameConfig(800, 600, 50, 50, (10, 10, 10, 10), 1, 20.0, 20.0, "", "", False, False)
+        self.frame_config = FrameConfig(800, 600, 50, 50, (10, 10, 10, 10), 1, "", "", False, False, "2025-01-01", "weeks")
         self.time_frames = []
         self.tasks = []
         self.connectors = []
@@ -144,8 +135,8 @@ class ProjectData:
         self.curtains = []
         self.text_boxes = []
 
-    def add_time_frame(self, start_date, end_date, width_proportion, upper_scale_intervals, lower_scale_intervals):
-        tf = TimeFrame(start_date, end_date, width_proportion, upper_scale_intervals, lower_scale_intervals)
+    def add_time_frame(self, finish_date, width_proportion):
+        tf = TimeFrame(finish_date, width_proportion)
         tf.validate()
         if sum(tf.width_proportion for tf in self.time_frames) + width_proportion > 1.0:
             raise ValueError("Total width proportion exceeds 1.0")
@@ -190,18 +181,15 @@ class ProjectData:
                 "footer_height": self.frame_config.footer_height,
                 "margins": list(self.frame_config.margins),
                 "num_rows": self.frame_config.num_rows,
-                "upper_scale_height": self.frame_config.upper_scale_height,
-                "lower_scale_height": self.frame_config.lower_scale_height,
                 "header_text": self.frame_config.header_text,
                 "footer_text": self.frame_config.footer_text,
                 "horizontal_gridlines": self.frame_config.horizontal_gridlines,
-                "vertical_gridlines": self.frame_config.vertical_gridlines
+                "vertical_gridlines": self.frame_config.vertical_gridlines,
+                "chart_start_date": self.frame_config.chart_start_date,
+                "intervals": self.frame_config.intervals
             },
             "time_frames": [
-                {"start_date": tf.start_date, "end_date": tf.end_date,
-                 "width_proportion": tf.width_proportion,
-                 "upper_scale_intervals": tf.upper_scale_intervals,
-                 "lower_scale_intervals": tf.lower_scale_intervals}
+                {"finish_date": tf.finish_date, "width_proportion": tf.width_proportion}
                 for tf in self.time_frames
             ],
             "tasks": [
@@ -245,16 +233,15 @@ class ProjectData:
             data["frame_config"]["header_height"], data["frame_config"]["footer_height"],
             (float(margins[0]), float(margins[1]), float(margins[2]), float(margins[3])),
             data["frame_config"].get("num_rows", 1),
-            data["frame_config"].get("upper_scale_height", 20.0),
-            data["frame_config"].get("lower_scale_height", 20.0),
             data["frame_config"].get("header_text", ""),
             data["frame_config"].get("footer_text", ""),
             data["frame_config"].get("horizontal_gridlines", False),
-            data["frame_config"].get("vertical_gridlines", False)
+            data["frame_config"].get("vertical_gridlines", False),
+            data["frame_config"].get("chart_start_date", "2025-01-01"),
+            data["frame_config"].get("intervals", "weeks")
         )
         instance.time_frames = [
-            TimeFrame(tf["start_date"], tf["end_date"], tf["width_proportion"],
-                      tf["upper_scale_intervals"], tf["lower_scale_intervals"])
+            TimeFrame(tf["finish_date"], tf["width_proportion"])
             for tf in data.get("time_frames", [])
         ]
         instance.tasks = [
@@ -288,8 +275,7 @@ class ProjectData:
             return [[str(t.task_id), t.task_name, t.start_date, t.finish_date, str(t.row_number)]
                     for t in self.tasks]
         elif table_type == "time_frames":
-            return [[tf.start_date, tf.end_date, str(tf.width_proportion * 100),
-                     tf.upper_scale_intervals, tf.lower_scale_intervals]
+            return [[tf.finish_date, str(tf.width_proportion * 100)]
                     for tf in self.time_frames]
         elif table_type == "connectors":
             return [[str(c.from_task_id), str(c.to_task_id)] for c in self.connectors]
@@ -306,17 +292,11 @@ class ProjectData:
         return []
 
     def update_from_table(self, table_type, table_data):
-        if table_type == "tasks":
-            self.tasks.clear()
-            for row in table_data:
-                self.add_task(int(row[0] or 1), row[1] or "Unnamed", row[2] or "2025-01-01",
-                              row[3] or "2025-01-01", int(row[4] or 1))
-        elif table_type == "time_frames":
+        if table_type == "time_frames":
             self.time_frames.clear()
             for row in table_data:
-                width = float(row[2] or 0) / 100  # Convert percentage to proportion
-                self.add_time_frame(row[0] or "2025-01-01", row[1] or "2025-01-01",
-                                    width, row[3] or "days", row[4] or "weeks")
+                width = float(row[1] or 0) / 100  # Convert percentage to proportion
+                self.add_time_frame(row[0] or "2025-01-01", width)
         elif table_type == "connectors":
             self.connectors.clear()
             for row in table_data:

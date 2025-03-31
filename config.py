@@ -16,6 +16,10 @@ class Config:
     SVG_OUTPUT_FOLDER = "svg"
     SVG_OUTPUT_FILENAME = "gantt_chart.svg"
 
+    # Scale proportions (relative to inner_frame height)
+    UPPER_SCALE_PROPORTION = 0.1  # 10% of inner_frame height
+    LOWER_SCALE_PROPORTION = 0.05  # 5% of inner_frame height
+
     # Default table row counts
     TASKS_ROWS = 5
     PIPES_ROWS = 3

@@ -10,7 +10,6 @@ import os
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot
 from config import Config
 
-
 class GanttChartGenerator(QObject):
     svg_generated = pyqtSignal(str)
 
@@ -21,47 +20,44 @@ class GanttChartGenerator(QObject):
         self.output_filename = output_filename
         self.dwg = None
         self.data = {"frame_config": {}, "time_frames": [], "tasks": []}  # type: dict
-        self.start_date = None  # Only keep start_date
+        self.start_date = None
 
     def generate_svg(self, data):
         try:
             self.data = data
-            print("Data received:", self.data)  # Debug: Check incoming data
+            print("Data received:", self.data)
             width = self.data["frame_config"].get("outer_width", 800)
             height = self.data["frame_config"].get("outer_height", 600)
             self.dwg = svgwrite.Drawing(filename=os.path.abspath(os.path.join(self.output_folder, self.output_filename)),
                                         size=(width, height))
-            self.start_date = self._set_time_scale()  # Only set start_date
-            print("Start date set:", self.start_date)  # Debug
+            self.start_date = self._set_time_scale()
+            print("Start date set:", self.start_date)
             self.render()
             svg_path = os.path.abspath(os.path.join(self.output_folder, self.output_filename))
-            print("SVG path:", svg_path)  # Debug
+            print("SVG path:", svg_path)
             self.svg_generated.emit(svg_path)
             return svg_path
         except Exception as e:
-            print(f"SVG generation failed: {e}")  # Debug: Catch and log errors
+            print(f"SVG generation failed: {e}")
             raise ValueError(f"SVG generation failed: {e}")
 
     def _calculate_time_range(self):
         if not (self.data["time_frames"] or self.data["tasks"]):
             return datetime.now(), datetime.now() + timedelta(days=7)
-        dates = []
+        dates = [datetime.strptime(self.data["frame_config"]["chart_start_date"], "%Y-%m-%d")]
         for tf in self.data.get("time_frames", []):
-            dates.append(datetime.strptime(tf["start_date"], "%Y-%m-%d"))
-            dates.append(datetime.strptime(tf["end_date"], "%Y-%m-%d"))
+            dates.append(datetime.strptime(tf["finish_date"], "%Y-%m-%d"))
         for task in self.data.get("tasks", []):
             dates.append(datetime.strptime(task["start_date"], "%Y-%m-%d"))
             dates.append(datetime.strptime(task["finish_date"], "%Y-%m-%d"))
-        if not dates:
-            return datetime.now(), datetime.now() + timedelta(days=7)
-        min_date = min(dates)
-        max_date = max(dates)
-        return min_date - timedelta(days=1), max_date + timedelta(days=1)
+        if len(dates) == 1:
+            return dates[0], dates[0] + timedelta(days=7)
+        return min(dates), max(dates) + timedelta(days=1)
 
     def _set_time_scale(self):
-        start_date, end_date = self._calculate_time_range()
-        print("Time range:", start_date, end_date)  # Debug
-        return start_date  # Only return start_date
+        start_date, _ = self._calculate_time_range()
+        print("Time range:", start_date, _)
+        return start_date
 
     def render_outer_frame(self):
         width = self.data["frame_config"].get("outer_width", 800)
@@ -111,26 +107,27 @@ class GanttChartGenerator(QObject):
                         self.data["frame_config"].get("header_height", 50) -
                         self.data["frame_config"].get("footer_height", 50) - margins[0] - margins[2])
         x_offset = margins[3]
+        chart_start = datetime.strptime(self.data["frame_config"]["chart_start_date"], "%Y-%m-%d")
+        prev_end = chart_start
 
         for tf in self.data.get("time_frames", []):
             tf_width = inner_width * tf.get("width_proportion", 1.0)
+            tf_end = datetime.strptime(tf["finish_date"], "%Y-%m-%d")
             self.dwg.add(self.dwg.rect(insert=(x_offset, inner_y), size=(tf_width, inner_height),
                                        fill="none", stroke="red", stroke_width=1))
-            self.render_scales_and_rows(x_offset, inner_y, tf_width, inner_height, tf)
+            self.render_scales_and_rows(x_offset, inner_y, tf_width, inner_height, prev_end, tf_end)
             x_offset += tf_width
+            prev_end = tf_end + timedelta(days=1)
 
     def render_tasks(self):
-        pass  # Tasks moved to render_scales_and_rows
+        pass
 
-    def render_scales_and_rows(self, x, y, width, height, time_frame):
-        print(f"Rendering scales and rows for time_frame: {time_frame}")  # Debug
-        upper_height = self.data["frame_config"].get("upper_scale_height", 20.0)
-        lower_height = self.data["frame_config"].get("lower_scale_height", 20.0)
+    def render_scales_and_rows(self, x, y, width, height, start_date, end_date):
+        upper_height = height * Config.UPPER_SCALE_PROPORTION
+        lower_height = height * Config.LOWER_SCALE_PROPORTION
         row_frame_height = height - upper_height - lower_height
         num_rows = self.data["frame_config"].get("num_rows", 1)
         row_height = row_frame_height / num_rows if num_rows > 0 else row_frame_height
-        start_date = datetime.strptime(time_frame["start_date"], "%Y-%m-%d")
-        end_date = datetime.strptime(time_frame["end_date"], "%Y-%m-%d")
         total_days = max((end_date - start_date).days, 1)
         tf_time_scale = width / total_days if total_days > 0 else width
 
@@ -156,7 +153,7 @@ class GanttChartGenerator(QObject):
                 row_num = min(task.get("row_number", 1) - 1, num_rows - 1)
                 x_start = x + max((task_start - start_date).days, 0) * tf_time_scale
                 x_end = x + min((task_finish - start_date).days, total_days) * tf_time_scale
-                width_task = max(x_end - x_start, 0)  # Prevent negative width
+                width_task = max(x_end - x_start, 0)
                 y_task = row_y + row_num * row_height
                 if width_task > 0 and x_start < x + width:
                     self.dwg.add(self.dwg.rect(insert=(x_start, y_task), size=(width_task, row_height * 0.8), fill="blue"))
@@ -168,12 +165,12 @@ class GanttChartGenerator(QObject):
         def next_period(date, interval):
             if interval == "days":
                 return date + timedelta(days=1)
-            elif interval == "weeks":  # Next Sunday
+            elif interval == "weeks":
                 days_to_sunday = (6 - date.weekday()) % 7
                 if days_to_sunday == 0:
                     days_to_sunday = 7
                 return date + timedelta(days=days_to_sunday)
-            elif interval == "months":  # Last day of month
+            elif interval == "months":
                 year, month = date.year, date.month
                 last_day = calendar.monthrange(year, month)[1]
                 month_end = datetime(year, month, last_day)
@@ -185,12 +182,15 @@ class GanttChartGenerator(QObject):
                     last_day = calendar.monthrange(year, month)[1]
                     month_end = datetime(year, month, last_day)
                 return month_end
-            elif interval == "years":  # Dec 31
+            elif interval == "years":
                 year_end = datetime(date.year, 12, 31)
                 if year_end <= date:
                     year_end = datetime(date.year + 1, 12, 31)
                 return year_end
             return date
+
+        upper_interval = self.data["frame_config"].get("intervals", "weeks")
+        lower_interval = {"years": "months", "months": "weeks", "weeks": "days"}[upper_interval]
 
         if self.data["frame_config"].get("horizontal_gridlines", False):
             for i in range(num_rows + 1):
@@ -200,7 +200,6 @@ class GanttChartGenerator(QObject):
         if self.data["frame_config"].get("vertical_gridlines", False):
             # Upper scale gridlines
             current_date = start_date
-            upper_interval = time_frame.get("upper_scale_intervals", "days")
             current_date = next_period(current_date, upper_interval)
             while current_date <= end_date:
                 x_pos = x + (current_date - start_date).days * tf_time_scale
@@ -212,12 +211,12 @@ class GanttChartGenerator(QObject):
             # Upper scale labels
             current_date = start_date
             current_date = next_period(current_date, upper_interval)
-            last_upper_x = -50  # Initial buffer
+            last_upper_x = -50
             while current_date <= end_date:
                 x_pos = x + (current_date - start_date).days * tf_time_scale
-                if x <= x_pos <= x + width and x_pos - last_upper_x > 50:  # Min 50px gap for labels
+                if x <= x_pos <= x + width and x_pos - last_upper_x > 50:
                     label = (current_date.strftime("%Y") if upper_interval == "years" else
-                             current_date.strftime("%b %d" if upper_interval in ["days", "weeks"] else "%b %Y"))
+                             current_date.strftime("%b %d" if upper_interval == "weeks" else "%b %Y"))
                     self.dwg.add(self.dwg.text(label, insert=(x_pos, max(y - 2, 0)), text_anchor="middle",
                                                font_size="12", font_weight="bold"))
                     last_upper_x = x_pos
@@ -225,7 +224,6 @@ class GanttChartGenerator(QObject):
 
             # Lower scale gridlines
             current_date = start_date
-            lower_interval = time_frame.get("lower_scale_intervals", "days")
             current_date = next_period(current_date, lower_interval)
             while current_date <= end_date:
                 x_pos = x + (current_date - start_date).days * tf_time_scale
@@ -237,10 +235,10 @@ class GanttChartGenerator(QObject):
             # Lower scale labels
             current_date = start_date
             current_date = next_period(current_date, lower_interval)
-            last_lower_x = -50  # Initial buffer
+            last_lower_x = -50
             while current_date <= end_date:
                 x_pos = x + (current_date - start_date).days * tf_time_scale
-                if x <= x_pos <= x + width and x_pos - last_lower_x > 50:  # Min 50px gap for labels
+                if x <= x_pos <= x + width and x_pos - last_lower_x > 50:
                     label = current_date.strftime("%d" if lower_interval == "days" else "%b %d")
                     self.dwg.add(self.dwg.text(label, insert=(x_pos, max(y + upper_height - 2, 0)),
                                                text_anchor="middle", font_size="10"))
@@ -249,13 +247,13 @@ class GanttChartGenerator(QObject):
 
     def render(self):
         os.makedirs(self.output_folder, exist_ok=True)
-        self.start_date = self._set_time_scale()  # Update to assign start_date
-        print("Starting render")  # Debug
+        self.start_date = self._set_time_scale()
+        print("Starting render")
         self.render_outer_frame()
         self.render_header()
         self.render_footer()
         self.render_inner_frame()
         self.render_time_frames()
-        self.render_tasks()  # Now empty, tasks handled in render_scales_and_rows
+        self.render_tasks()
         self.dwg.save()
         print(f"SVG saved to: {os.path.join(self.output_folder, self.output_filename)}")

@@ -5,9 +5,9 @@ Why: Provides a clean interface for Gantt chart data entry, relying on ProjectDa
 
 from PyQt5.QtWidgets import (QMainWindow, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
                              QFileDialog, QTabWidget, QAction, QApplication, QToolBar, QMessageBox,
-                             QLineEdit, QLabel, QGridLayout, QPushButton, QCheckBox)
+                             QLineEdit, QLabel, QGridLayout, QPushButton, QCheckBox, QDateEdit, QComboBox)
 from PyQt5.QtGui import QIcon
-from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot, QDate
+from PyQt5.QtCore import QDate, pyqtSignal
 from data_model import ProjectData, FrameConfig
 from config import Config
 from datetime import datetime, timedelta
@@ -89,21 +89,6 @@ class DataEntryWindow(QMainWindow):
 
         self._load_initial_data()
 
-    def setup_tasks_tab(self):
-        tasks_layout = QVBoxLayout()
-        self.tasks_table = QTableWidget(5, 5)
-        self.tasks_table.setHorizontalHeaderLabels(["Task ID", "Task Name", "Start Date", "Finish Date", "Row Number"])
-        tasks_layout.addWidget(self.tasks_table)
-        btn_layout = QGridLayout()
-        add_btn = QPushButton("Add Task")
-        remove_btn = QPushButton("Remove Task")
-        add_btn.clicked.connect(self._add_task_row)
-        remove_btn.clicked.connect(self._remove_task_row)
-        btn_layout.addWidget(add_btn, 0, 0)
-        btn_layout.addWidget(remove_btn, 0, 1)
-        tasks_layout.addLayout(btn_layout)
-        self.tasks_tab.setLayout(tasks_layout)
-
     def setup_layout_tab(self):
         layout = QGridLayout()
         layout.addWidget(QLabel("Outer Width:"), 0, 0)
@@ -136,30 +121,32 @@ class DataEntryWindow(QMainWindow):
         layout.addWidget(QLabel("Footer Text:"), 9, 0)
         self.footer_text_input = QLineEdit(self.project_data.frame_config.footer_text)
         layout.addWidget(self.footer_text_input, 9, 1)
-        layout.addWidget(QLabel("Upper Scale Height:"), 10, 0)
-        self.upper_scale_height_input = QLineEdit(str(self.project_data.frame_config.upper_scale_height))
-        layout.addWidget(self.upper_scale_height_input, 10, 1)
-        layout.addWidget(QLabel("Lower Scale Height:"), 11, 0)
-        self.lower_scale_height_input = QLineEdit(str(self.project_data.frame_config.lower_scale_height))
-        layout.addWidget(self.lower_scale_height_input, 11, 1)
-        layout.addWidget(QLabel("Number of Rows:"), 12, 0)
+        layout.addWidget(QLabel("Number of Rows:"), 10, 0)
         self.num_rows_input = QLineEdit(str(self.project_data.frame_config.num_rows))
-        layout.addWidget(self.num_rows_input, 12, 1)
-        layout.addWidget(QLabel("Horizontal Gridlines:"), 13, 0)
+        layout.addWidget(self.num_rows_input, 10, 1)
+        layout.addWidget(QLabel("Horizontal Gridlines:"), 11, 0)
         self.horizontal_gridlines_input = QCheckBox()
         self.horizontal_gridlines_input.setChecked(self.project_data.frame_config.horizontal_gridlines)
-        layout.addWidget(self.horizontal_gridlines_input, 13, 1)
-        layout.addWidget(QLabel("Vertical Gridlines:"), 14, 0)
+        layout.addWidget(self.horizontal_gridlines_input, 11, 1)
+        layout.addWidget(QLabel("Vertical Gridlines:"), 12, 0)
         self.vertical_gridlines_input = QCheckBox()
         self.vertical_gridlines_input.setChecked(self.project_data.frame_config.vertical_gridlines)
-        layout.addWidget(self.vertical_gridlines_input, 14, 1)
+        layout.addWidget(self.vertical_gridlines_input, 12, 1)
+        layout.addWidget(QLabel("Chart Start Date:"), 13, 0)
+        self.chart_start_date_input = QDateEdit()
+        self.chart_start_date_input.setDate(QDate.fromString(self.project_data.frame_config.chart_start_date, "yyyy-MM-dd"))
+        layout.addWidget(self.chart_start_date_input, 13, 1)
+        layout.addWidget(QLabel("Intervals:"), 14, 0)
+        self.intervals_input = QComboBox()
+        self.intervals_input.addItems(["years", "months", "weeks"])
+        self.intervals_input.setCurrentText(self.project_data.frame_config.intervals)
+        layout.addWidget(self.intervals_input, 14, 1)
         self.layout_tab.setLayout(layout)
 
     def setup_time_frames_tab(self):
         tf_layout = QVBoxLayout()
-        self.time_frames_table = QTableWidget(2, 5)
-        self.time_frames_table.setHorizontalHeaderLabels(["Start Date", "Finish Date", "Width (%)",
-                                                         "Upper Scale Intervals", "Lower Scale Intervals"])
+        self.time_frames_table = QTableWidget(2, 2)
+        self.time_frames_table.setHorizontalHeaderLabels(["Finish Date", "Width (%)"])
         tf_layout.addWidget(self.time_frames_table)
         btn_layout = QGridLayout()
         add_btn = QPushButton("Add Time Frame")
@@ -170,6 +157,21 @@ class DataEntryWindow(QMainWindow):
         btn_layout.addWidget(remove_btn, 0, 1)
         tf_layout.addLayout(btn_layout)
         self.time_frames_tab.setLayout(tf_layout)
+
+    def setup_tasks_tab(self):
+        tasks_layout = QVBoxLayout()
+        self.tasks_table = QTableWidget(5, 5)
+        self.tasks_table.setHorizontalHeaderLabels(["Task ID", "Task Name", "Start Date", "Finish Date", "Row Number"])
+        tasks_layout.addWidget(self.tasks_table)
+        btn_layout = QGridLayout()
+        add_btn = QPushButton("Add Task")
+        remove_btn = QPushButton("Remove Task")
+        add_btn.clicked.connect(self._add_task_row)
+        remove_btn.clicked.connect(self._remove_task_row)
+        btn_layout.addWidget(add_btn, 0, 0)
+        btn_layout.addWidget(remove_btn, 0, 1)
+        tasks_layout.addLayout(btn_layout)
+        self.tasks_tab.setLayout(tasks_layout)
 
     def setup_connectors_tab(self):
         conn_layout = QVBoxLayout()
@@ -267,17 +269,12 @@ class DataEntryWindow(QMainWindow):
         self.time_frames_table.insertRow(row_count)
         today = QDate.currentDate().toString("yyyy-MM-dd")
         if row_count == 0:
-            start_date = today
             end_date = (datetime.strptime(today, "%Y-%m-%d") + timedelta(days=7)).strftime("%Y-%m-%d")
         else:
-            last_end = self.time_frames_table.item(row_count - 1, 1).text()
-            start_date = (datetime.strptime(last_end, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
-            end_date = (datetime.strptime(start_date, "%Y-%m-%d") + timedelta(days=7)).strftime("%Y-%m-%d")
-        self.time_frames_table.setItem(row_count, 0, QTableWidgetItem(start_date))
-        self.time_frames_table.setItem(row_count, 1, QTableWidgetItem(end_date))
-        self.time_frames_table.setItem(row_count, 2, QTableWidgetItem(str(100 / (row_count + 1))))
-        self.time_frames_table.setItem(row_count, 3, QTableWidgetItem("months"))
-        self.time_frames_table.setItem(row_count, 4, QTableWidgetItem("weeks"))
+            last_end = self.time_frames_table.item(row_count - 1, 0).text()
+            end_date = (datetime.strptime(last_end, "%Y-%m-%d") + timedelta(days=7)).strftime("%Y-%m-%d")
+        self.time_frames_table.setItem(row_count, 0, QTableWidgetItem(end_date))
+        self.time_frames_table.setItem(row_count, 1, QTableWidgetItem(str(100 / (row_count + 1))))
         self._sync_data()
 
     def _remove_time_frame_row(self):
@@ -371,11 +368,11 @@ class DataEntryWindow(QMainWindow):
         self.left_margin_input.setText(str(self.project_data.frame_config.margins[3]))
         self.header_text_input.setText(self.project_data.frame_config.header_text)
         self.footer_text_input.setText(self.project_data.frame_config.footer_text)
-        self.upper_scale_height_input.setText(str(self.project_data.frame_config.upper_scale_height))
-        self.lower_scale_height_input.setText(str(self.project_data.frame_config.lower_scale_height))
         self.num_rows_input.setText(str(self.project_data.frame_config.num_rows))
         self.horizontal_gridlines_input.setChecked(self.project_data.frame_config.horizontal_gridlines)
         self.vertical_gridlines_input.setChecked(self.project_data.frame_config.vertical_gridlines)
+        self.chart_start_date_input.setDate(QDate.fromString(self.project_data.frame_config.chart_start_date, "yyyy-MM-dd"))
+        self.intervals_input.setCurrentText(self.project_data.frame_config.intervals)
 
         # Time Frames
         tf_data = self.project_data.get_table_data("time_frames")
@@ -387,10 +384,7 @@ class DataEntryWindow(QMainWindow):
         else:
             today = QDate.currentDate().toString("yyyy-MM-dd")
             self.time_frames_table.setItem(0, 0, QTableWidgetItem(today))
-            self.time_frames_table.setItem(0, 1, QTableWidgetItem(today))
-            self.time_frames_table.setItem(0, 2, QTableWidgetItem("100"))
-            self.time_frames_table.setItem(0, 3, QTableWidgetItem("days"))
-            self.time_frames_table.setItem(0, 4, QTableWidgetItem("weeks"))
+            self.time_frames_table.setItem(0, 1, QTableWidgetItem("100"))
 
         # Connectors
         conn_data = self.project_data.get_table_data("connectors")
@@ -453,12 +447,12 @@ class DataEntryWindow(QMainWindow):
                 float(self.footer_height_input.text() or 0),
                 margins,
                 int(self.num_rows_input.text() or 1),
-                float(self.upper_scale_height_input.text() or 0),
-                float(self.lower_scale_height_input.text() or 0),
                 self.header_text_input.text(),
                 self.footer_text_input.text(),
                 self.horizontal_gridlines_input.isChecked(),
-                self.vertical_gridlines_input.isChecked()
+                self.vertical_gridlines_input.isChecked(),
+                self.chart_start_date_input.date().toString("yyyy-MM-dd"),
+                self.intervals_input.currentText()
             )
 
             # Sync and validate Time Frames
@@ -466,43 +460,25 @@ class DataEntryWindow(QMainWindow):
             if not tf_data:
                 raise ValueError("At least one time frame is required")
 
-            # Convert to datetime and sort by start date
             time_frames = []
-            for row in tf_data:
-                start = row[0] or "2025-01-01"
-                end = row[1] or "2025-01-01"
-                width = float(row[2] or 0) / 100
-                upper = row[3] or "days"
-                lower = row[4] or "days"
-                start_dt = datetime.strptime(start, "%Y-%m-%d")
+            chart_start = datetime.strptime(self.project_data.frame_config.chart_start_date, "%Y-%m-%d")
+            prev_end = chart_start
+            for i, row in enumerate(tf_data):
+                end = row[0] or "2025-01-01"
+                width = float(row[1] or 0) / 100
                 end_dt = datetime.strptime(end, "%Y-%m-%d")
-                if end_dt < start_dt:
-                    raise ValueError(f"Time frame '{start}' to '{end}' has end date before start date")
-                time_frames.append((start_dt, end_dt, width, upper, lower))
-            time_frames.sort(key=lambda x: x[0])  # Sort by start date
+                if end_dt < prev_end:
+                    raise ValueError(f"Time frame {i+1} finish date '{end}' is before previous end '{prev_end.strftime('%Y-%m-%d')}'")
+                time_frames.append((prev_end, end_dt, width))
+                prev_end = end_dt + timedelta(days=1)
 
-            # Check for overlaps and continuity
-            total_width = 0
-            for i, (start_dt, end_dt, width, upper, lower) in enumerate(time_frames):
-                total_width += width
-                # Overlap check
-                for j, (other_start, other_end, _, _, _) in enumerate(time_frames):
-                    if i != j and not (end_dt < other_start or start_dt > other_end):
-                        raise ValueError(f"Time frame '{start_dt.strftime('%Y-%m-%d')}' to '{end_dt.strftime('%Y-%m-%d')}' overlaps with another time frame")
-                # Continuity check
-                if i > 0:
-                    prev_end = time_frames[i-1][1]
-                    expected_start = prev_end + timedelta(days=1)
-                    if start_dt != expected_start:
-                        raise ValueError(f"Time frame '{start_dt.strftime('%Y-%m-%d')}' does not start immediately after previous end '{prev_end.strftime('%Y-%m-%d')}'")
+            total_width = sum(tf[2] for tf in time_frames)
             if total_width > 1.0:
                 raise ValueError(f"Total time frame width ({total_width*100}%) exceeds 100%")
 
-            # Add validated time frames
             self.project_data.time_frames.clear()
-            for start_dt, end_dt, width, upper, lower in time_frames:
-                self.project_data.add_time_frame(start_dt.strftime("%Y-%m-%d"), end_dt.strftime("%Y-%m-%d"),
-                                                width, upper, lower)
+            for _, end_dt, width in time_frames:
+                self.project_data.add_time_frame(end_dt.strftime("%Y-%m-%d"), width)
 
             # Sync other tables
             self.project_data.update_from_table("tasks", self._extract_table_data(self.tasks_table))
@@ -518,7 +494,6 @@ class DataEntryWindow(QMainWindow):
 
     def _emit_data_updated(self):
         self._sync_data()
-        print("Emitting data:", self.project_data.to_json())  # Debug
 
     def save_to_json(self):
         file_path, _ = QFileDialog.getSaveFileName(self, "Save Project", "", "JSON Files (*.json)")

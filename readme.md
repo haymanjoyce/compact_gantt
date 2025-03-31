@@ -42,12 +42,12 @@ Existing tools fall short because:
 
 ### Subcomponents
 
- - gridlines - applied to row_frame; can be horizontal, vertical, or both
+ - gridlines - applied to time_frame [changed from row_frame]; can be horizontal, vertical, or both
  - task - multiple tasks can be assigned to a row
  - milestone - assigned to a row
  - connector - line showing flow of logic between a task and/or milestone
  - text_box - user defined text boxes; can be placed anywhere
- - curtain - user defined time interval; can be placed anywhere inside a row_frame
+ - curtain - user defined time interval; can be placed anywhere inside a time_frame [changed from row_frame]
  - pipe - user defined time point; can be placed anywhere inside a row_frame
 
 ### Design Notes
@@ -63,6 +63,14 @@ Existing tools fall short because:
  - A curtain may start in one time_frame and end in another
  - Time frames are contiguous (i.e., no gaps between them)
  - Time frames cannot overlap
+ - There are two scales (upper and lower) in each time_frame (design decision). 
+ - The intervals for the upper scale are defined globally for all time frames via the "Intervals" setting (design decision) [changed]. 
+ - The intervals available for the upper scale are: years, months, and weeks (design decision). 
+ - The intervals used in the lower scale depend on the upper scale setting (design decision):
+   - If the upper scale is set to years, then the lower scale is set to months. 
+   - If the upper scale is set to months, then the lower scale is set to weeks. 
+   - If the upper scale is set to weeks, then the lower scale is set to days. 
+ - Consistent intervals across all time frames improve chart readability (design decision) [new].
 
 ## User Interface Requirements
 
@@ -78,17 +86,14 @@ Existing tools fall short because:
      - footer height - integer
      - header text - string
      - footer text - string
-     - upper scale height - integer
-     - lower scale height - integer
      - number of rows - integer
      - horizontal gridlines - yes/no
      - vertical gridlines - yes/no
-   - time frames tab (table)
      - start date - date
+     - intervals - years, months, or weeks (defines upper scale intervals)
+   - time frames tab (table)
      - finish date - date
      - width - percentage
-     - upper scale intervals - for example, days, weeks, months, years
-     - lower scale intervals - for example, days, weeks, months, years
    - tasks tab (table)
      - task id - integer
      - task name - string
@@ -156,10 +161,10 @@ TBD (To be determined — see Packaging & Distribution for plans).
 
 ### Chart Design
 
- - [x] layout (outer_frame, header, footer, inner_frame, upper_scale, lower_scale, row_frame, row)
- - [x] timeframes
+ - [ ] layout (outer_frame, header, footer, inner_frame, upper_scale, lower_scale, time_frame, row_frame, row)
+ - [ ] time frames
  - [ ] scales
- - [x] gridlines
+ - [ ] gridlines
  - [ ] tasks
  - [ ] milestones
  - [ ] connectors
