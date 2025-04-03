@@ -106,7 +106,7 @@ The GUI offers tabs for input, some planned but not yet implemented:
 - [x] Scales [May need a different solution for when they get overly dense]
 - [x] Gridlines [May need a solution for when they get overly dense]
 - [x] Tasks [Need to work on the task label placement]
-- [ ] Milestones
+- [ ] Milestones [Change shape to diamond or triangle with rounded corners]
 - [ ] Connectors
 - [ ] Text Boxes
 - [ ] Curtains
@@ -122,7 +122,7 @@ The GUI offers tabs for input, some planned but not yet implemented:
 - [ ] Table Filtering
 - [ ] Table Searching
 - [ ] Table Editing (add, edit, delete)
-- [ ] Window Resizing
+- [ ] Window Resizing [Display window to scale proportionally]
 - [ ] Window Scrolling
 - [ ] Window Zooming
 - [ ] Shortcuts
