@@ -18,7 +18,6 @@ class FrameConfig:
 
 class Task:
     def __init__(self, task_id, task_name, start_date, finish_date, row_number, is_milestone=False):
-        print(f"Task init: id={task_id}, name={task_name}, start={start_date}, finish={finish_date}, row={row_number}, milestone={is_milestone}")
         self.task_id = task_id
         self.task_name = task_name
         self.start_date = start_date
@@ -41,10 +40,7 @@ class ProjectData:
         self.time_frames.append({"finish_date": finish_date, "width_proportion": width_proportion})
 
     def add_task(self, task_id, task_name, start_date, finish_date, row_number, is_milestone=False):
-        print(f"add_task called: id={task_id}")
-        task = Task(task_id, task_name, start_date, finish_date, row_number, is_milestone)
-        self.tasks.append(task)
-        print(f"Task {task_id} appended to tasks")
+        self.tasks.append(Task(task_id, task_name, start_date, finish_date, row_number, is_milestone))
 
     def update_from_table(self, key, data):
         setattr(self, key, data)
@@ -52,6 +48,8 @@ class ProjectData:
     def get_table_data(self, key):
         if key == "tasks":
             return [[t.task_id, t.task_name, t.start_date, t.finish_date, str(t.row_number)] for t in self.tasks]
+        elif key == "time_frames":
+            return [[tf["finish_date"], str(tf["width_proportion"] * 100)] for tf in self.time_frames]
         return getattr(self, key, [])
 
     def to_json(self):

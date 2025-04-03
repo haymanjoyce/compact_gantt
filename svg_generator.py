@@ -126,7 +126,8 @@ class GanttChartGenerator(QObject):
                 row_num = min(max(task.get("row_number", 1) - 1, 0), num_rows - 1)
                 x_start = x + max((task_start - start_date).days, 0) * tf_time_scale
                 x_end = x + min((task_finish - start_date).days, total_days) * tf_time_scale
-                width_task = max(x_end - x_start, 1)  # Ensure minimum width of 1 pixel
+                # For single-day tasks, ensure width spans one day; otherwise, use calculated width
+                width_task = tf_time_scale if task_start == task_finish else max(x_end - x_start, tf_time_scale)
                 y_task = y + row_num * row_height
 
                 is_milestone = task.get("is_milestone", False)
@@ -149,7 +150,6 @@ class GanttChartGenerator(QObject):
                                                insert=(center_x + radius + 5, y_task + row_height * 0.5),
                                                font_size="10", fill="black"))
                 else:
-                    # Remove width_task > 0 check, always draw if in bounds
                     if x_start < x + width:
                         self.dwg.add(self.dwg.rect(insert=(x_start, y_task), size=(width_task, task_height),
                                                    fill="blue"))

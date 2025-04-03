@@ -19,7 +19,6 @@ class DataEntryWindow(QMainWindow):
         self.project_data = ProjectData()
         self._initializing = True
 
-        # Menu bar
         self.menu_bar = self.menuBar()
         self.file_menu = self.menu_bar.addMenu("File")
         self.save_action = QAction("Save Project", self)
@@ -29,7 +28,6 @@ class DataEntryWindow(QMainWindow):
         self.load_action.triggered.connect(self.load_from_json)
         self.file_menu.addAction(self.load_action)
 
-        # Toolbar
         self.toolbar = QToolBar("Tools")
         self.addToolBar(self.toolbar)
         style = QApplication.style()
@@ -37,14 +35,12 @@ class DataEntryWindow(QMainWindow):
         self.generate_tool.triggered.connect(self._emit_data_updated)
         self.toolbar.addAction(self.generate_tool)
 
-        # Central widget and tabs
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
         self.layout = QVBoxLayout(self.central_widget)
         self.tabs = QTabWidget()
         self.layout.addWidget(self.tabs)
 
-        # Setup tabs
         self.layout_tab = QWidget()
         self.setup_layout_tab()
         self.tabs.addTab(self.layout_tab, "Layout")
@@ -256,27 +252,16 @@ class DataEntryWindow(QMainWindow):
             self._sync_data_if_not_initializing()
 
     def _add_task_row(self):
-        print("_add_task_row started")
         row_count = self.tasks_table.rowCount()
-        print(f"Current row_count: {row_count}")
         self.tasks_table.insertRow(row_count)
-        print(f"Inserted row at {row_count}")
         today = QDate.currentDate().toString("yyyy-MM-dd")
-        # Disconnect signal to prevent premature sync
         self.tasks_table.itemChanged.disconnect(self._sync_data_if_not_initializing)
         self.tasks_table.setItem(row_count, 0, QTableWidgetItem(f"Task {row_count + 1}"))
-        print(f"Set Task Name at {row_count}, 0")
         self.tasks_table.setItem(row_count, 1, QTableWidgetItem(today))
-        print(f"Set Start Date at {row_count}, 1")
         self.tasks_table.setItem(row_count, 2, QTableWidgetItem(today))
-        print(f"Set Finish Date at {row_count}, 2")
         self.tasks_table.setItem(row_count, 3, QTableWidgetItem("1"))
-        print(f"Set Row Number at {row_count}, 3")
-        # Reconnect signal after all items are set
         self.tasks_table.itemChanged.connect(self._sync_data_if_not_initializing)
-        print("_add_task_row calling _sync_data_if_not_initializing")
         self._sync_data_if_not_initializing()
-        print("_add_task_row completed")
 
     def _remove_task_row(self):
         if self.tasks_table.rowCount() > 1:
@@ -351,7 +336,6 @@ class DataEntryWindow(QMainWindow):
             self._sync_data_if_not_initializing()
 
     def _sync_data(self):
-        print("_sync_data started")
         try:
             margins = (
                 float(self.top_margin_input.text() or 0),
@@ -372,7 +356,6 @@ class DataEntryWindow(QMainWindow):
                 self.vertical_gridlines_input.isChecked(),
                 self.chart_start_date_input.date().toString("yyyy-MM-dd")
             )
-            print("Layout synced")
 
             tf_data = self._extract_table_data(self.time_frames_table)
             if not tf_data:
@@ -392,20 +375,15 @@ class DataEntryWindow(QMainWindow):
             self.project_data.time_frames.clear()
             for _, end_dt, width in time_frames:
                 self.project_data.add_time_frame(end_dt.strftime("%Y-%m-%d"), width)
-            print("Time frames synced")
 
             tasks_data = self._extract_table_data(self.tasks_table)
-            print(f"Extracted tasks_data: {tasks_data}")
             self.project_data.tasks.clear()
-            print("Tasks cleared")
             for i, row in enumerate(tasks_data):
                 task_id = i + 1
-                print(f"Processing task {task_id}: {row}")
                 task_name = row[0] or "Unnamed"
                 start_date_raw = row[1] or ""
                 finish_date_raw = row[2] or ""
                 row_number = int(row[3] or 1)
-                print(f"Raw data: name={task_name}, start={start_date_raw}, finish={finish_date_raw}, row={row_number}")
 
                 if not start_date_raw and not finish_date_raw:
                     raise ValueError(f"Task {task_id}: Must provide at least one date")
@@ -413,39 +391,27 @@ class DataEntryWindow(QMainWindow):
                 is_milestone = bool(start_date_raw) != bool(finish_date_raw)
                 start_date = start_date_raw if start_date_raw else finish_date_raw
                 finish_date = finish_date_raw if finish_date_raw else start_date_raw
-                print(f"Adjusted: start={start_date}, finish={finish_date}, is_milestone={is_milestone}")
 
                 start_dt = datetime.strptime(start_date, "%Y-%m-%d")
                 finish_dt = datetime.strptime(finish_date, "%Y-%m-%d")
-                print(f"Parsed: start_dt={start_dt}, finish_dt={finish_dt}")
                 if start_dt > finish_dt:
                     raise ValueError(f"Task {task_id}: Start date '{start_date}' is after finish date '{finish_date}'")
                 if row_number > self.project_data.frame_config.num_rows:
                     raise ValueError(
                         f"Task {task_id}: Row number {row_number} exceeds {self.project_data.frame_config.num_rows}")
-                print(f"Calling add_task for Task {task_id}")
                 self.project_data.add_task(task_id, task_name, start_date, finish_date, row_number, is_milestone)
-                print(f"Task {task_id} added")
-            print("Tasks synced")
 
             self.project_data.update_from_table("connectors", self._extract_table_data(self.connectors_table))
             self.project_data.update_from_table("swimlanes", self._extract_table_data(self.swimlanes_table))
             self.project_data.update_from_table("pipes", self._extract_table_data(self.pipes_table))
             self.project_data.update_from_table("curtains", self._extract_table_data(self.curtains_table))
             self.project_data.update_from_table("text_boxes", self._extract_table_data(self.text_boxes_table))
-            print("Other tables synced")
 
             self.data_updated.emit(self.project_data.to_json())
-            print("_sync_data completed")
         except ValueError as e:
             QMessageBox.critical(self, "Error", str(e))
-            print(f"_sync_data error: {e}")
-        except Exception as e:
-            print(f"_sync_data unexpected error: {e}")
-            raise
 
     def _sync_data_if_not_initializing(self):
-        print("_sync_data_if_not_initializing called")
         if not self._initializing:
             self._sync_data()
 
