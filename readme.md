@@ -54,7 +54,12 @@ The GUI offers tabs for input, some planned but not yet implemented:
   - `start date` - Date (e.g., 2025-01-05)
   - `finish date` - Date (e.g., 2025-01-15)
   - `row number` - Integer (e.g., 1)
-  - `label hide` - Yes/No (e.g., "No", default is "No") [proposed]
+  - `label placement` - String (e.g., "Inside", "To left", "To right", "Above", "Below")
+  - `label hide` - Yes/No (e.g., "No", default is "No")
+  - `label alignment` - String (e.g., "Left", "Centre", "Right")
+  - `label horizontal offset` - Float (e.g., 1.0)
+  - `label vertical offset` - Float (e.g., 0.5)
+  - `label text colour` - String (e.g., "#FF0000" for red)
 - **Connectors Tab** (table, planned):
   - `from task id` - Integer
   - `to task id` - Integer
