@@ -38,4 +38,5 @@ class Config:
     # Default task and milestone label settings
     LEADER_LINE_VERTICAL_DEFAULT = 0.5  # For Above/Below
     LEADER_LINE_HORIZONTAL_DEFAULT = 1.0  # For To left/To right
-    LABEL_VERTICAL_OFFSET_FACTOR = 0.5  # Factor of font_size to shift text down for vertical centering
+    LABEL_VERTICAL_OFFSET_FACTOR = 0.3  # Factor of font_size to shift text down for vertical centering
+    LABEL_HORIZONTAL_OFFSET_FACTOR = 0.0  # Factor of font_size to shift text right for horizontal centering

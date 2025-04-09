@@ -154,60 +154,60 @@ class GanttChartGenerator(QObject):
             width_task = tf_time_scale if task_start == task_finish else max(x_end - x_start, tf_time_scale)
             y_task = y + row_num * row_height
 
-            label_width = len(task_name) * font_size * 0.5
+            label_width = len(task_name) * font_size * Config.LABEL_HORIZONTAL_OFFSET_FACTOR  # New constant
 
             if is_milestone:
                 half_size = task_height / 2
                 center_x = x_end if finish_date_str else x_start
                 center_y = y_task + row_height * 0.5
-                # [Milestone overlap logic unchanged]
                 points = [
                     (center_x, center_y - half_size),
                     (center_x + half_size, center_y),
                     (center_x, center_y + half_size),
                     (center_x - half_size, center_y)
                 ]
-                self.dwg.add(self.dwg.polygon(points=points, fill="red", stroke="black", stroke_width=1))
                 if not label_hide and label_placement != "Inside":
-                    label_y_base = center_y - font_size * Config.LABEL_VERTICAL_OFFSET_FACTOR
+                    label_y_base = center_y + font_size * Config.LABEL_VERTICAL_OFFSET_FACTOR
                     if label_placement == "To left":
                         label_x = center_x - label_horizontal_offset * tf_time_scale - label_width
                         label_y = label_y_base
                         self.dwg.add(self.dwg.text(task_name, insert=(label_x, label_y), font_size="10", fill="black",
                                                    text_anchor="end"))
-                        self.dwg.add(
-                            self.dwg.line((label_x + label_width, center_y), (center_x, center_y), stroke="black",
-                                          stroke_width=1))
+                        self.dwg.add(self.dwg.line((label_x + label_width, center_y), (center_x - half_size, center_y),
+                                                   stroke="black", stroke_width=1))
                     elif label_placement == "To right":
                         label_x = center_x + label_horizontal_offset * tf_time_scale
                         label_y = label_y_base
                         self.dwg.add(self.dwg.text(task_name, insert=(label_x, label_y), font_size="10", fill="black",
                                                    text_anchor="start"))
                         self.dwg.add(
-                            self.dwg.line((label_x, center_y), (center_x, center_y), stroke="black", stroke_width=1))
+                            self.dwg.line((label_x, center_y), (center_x + half_size, center_y), stroke="black",
+                                          stroke_width=1))
                     elif label_placement == "Above":
                         label_x = center_x if label_alignment == "Centre" else center_x - label_width if label_alignment == "Left" else center_x + label_width
-                        label_y = center_y - half_size - label_vertical_offset * row_height - font_size * Config.LABEL_VERTICAL_OFFSET_FACTOR
+                        label_y = center_y - half_size - label_vertical_offset * row_height + font_size * Config.LABEL_VERTICAL_OFFSET_FACTOR
                         anchor = "middle" if label_alignment == "Centre" else "start" if label_alignment == "Left" else "end"
                         self.dwg.add(self.dwg.text(task_name, insert=(label_x, label_y), font_size="10", fill="black",
                                                    text_anchor=anchor))
-                        self.dwg.add(self.dwg.line((center_x, label_y + font_size), (center_x, center_y - half_size),
-                                                   stroke="black", stroke_width=1))
+                        self.dwg.add(
+                            self.dwg.line((center_x, label_y + 1), (center_x, center_y - half_size), stroke="black",
+                                          stroke_width=1))
                     elif label_placement == "Below":
                         label_x = center_x if label_alignment == "Centre" else center_x - label_width if label_alignment == "Left" else center_x + label_width
-                        label_y = center_y + half_size + label_vertical_offset * row_height - font_size * Config.LABEL_VERTICAL_OFFSET_FACTOR
+                        label_y = center_y + half_size + label_vertical_offset * row_height + font_size * Config.LABEL_VERTICAL_OFFSET_FACTOR
                         anchor = "middle" if label_alignment == "Centre" else "start" if label_alignment == "Left" else "end"
                         self.dwg.add(self.dwg.text(task_name, insert=(label_x, label_y), font_size="10", fill="black",
                                                    text_anchor=anchor))
-                        self.dwg.add(self.dwg.line((center_x, label_y + font_size), (center_x, center_y + half_size),
+                        self.dwg.add(self.dwg.line((center_x, label_y - font_size), (center_x, center_y + half_size),
                                                    stroke="black", stroke_width=1))
+                self.dwg.add(self.dwg.polygon(points=points, fill="red", stroke="black", stroke_width=1))
             else:
                 if x_start < x + width:
                     y_offset = (row_height - task_height) / 2
                     rect_y = y_task + y_offset
                     self.dwg.add(self.dwg.rect(insert=(x_start, rect_y), size=(width_task, task_height), fill="blue"))
                     if not label_hide:
-                        label_y_base = rect_y + task_height / 2 - font_size * Config.LABEL_VERTICAL_OFFSET_FACTOR
+                        label_y_base = rect_y + task_height / 2 + font_size * Config.LABEL_VERTICAL_OFFSET_FACTOR
                         if label_placement == "Inside":
                             label_x = x_start if label_alignment == "Left" else x_start + (
                                         width_task - label_width) / 2 if label_alignment == "Centre" and width_task > label_width else x_start + width_task - label_width if label_alignment == "Right" and width_task > label_width else x_start
@@ -238,20 +238,26 @@ class GanttChartGenerator(QObject):
                             label_x = (x_start + width_task / 2) if label_alignment == "Centre" else (
                                         x_start + width_task / 2 - label_width) if label_alignment == "Left" else (
                                         x_start + width_task / 2 + label_width)
-                            label_y = rect_y - label_vertical_offset * row_height - font_size * Config.LABEL_VERTICAL_OFFSET_FACTOR
+                            label_y = rect_y - label_vertical_offset * row_height + font_size * Config.LABEL_VERTICAL_OFFSET_FACTOR
                             anchor = "middle" if label_alignment == "Centre" else "start" if label_alignment == "Left" else "end"
                             self.dwg.add(
                                 self.dwg.text(task_name, insert=(label_x, label_y), font_size="10", fill="black",
                                               text_anchor=anchor))
-                            self.dwg.add(self.dwg.line((x_start + width_task / 2, label_y + font_size),
+                            self.dwg.add(self.dwg.line((x_start + width_task / 2, label_y + 1),
                                                        (x_start + width_task / 2, rect_y), stroke="black",
                                                        stroke_width=1))
                         elif label_placement == "Below":
                             label_x = (x_start + width_task / 2) if label_alignment == "Centre" else (
                                         x_start + width_task / 2 - label_width) if label_alignment == "Left" else (
                                         x_start + width_task / 2 + label_width)
-                            label_y = rect_y + task_height + label_vertical_offset * row_height - font_size * Config.LABEL_VERTICAL_OFFSET_FACTOR
+                            label_y = rect_y + task_height + label_vertical_offset * row_height + font_size * Config.LABEL_VERTICAL_OFFSET_FACTOR
                             anchor = "middle" if label_alignment == "Centre" else "start" if label_alignment == "Left" else "end"
+                            self.dwg.add(
+                                self.dwg.text(task_name, insert=(label_x, label_y), font_size="10", fill="black",
+                                              text_anchor=anchor))
+                            self.dwg.add(self.dwg.line((x_start + width_task / 2, label_y - font_size),
+                                                       (x_start + width_task / 2, rect_y + task_height), stroke="black",
+                                                       stroke_width=1))
 
     def render_scales_and_rows(self, x, y, width, height, start_date, end_date):
         total_days = max((end_date - start_date).days, 1)
