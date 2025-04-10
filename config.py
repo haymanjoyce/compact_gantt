@@ -39,4 +39,5 @@ class Config:
     LEADER_LINE_VERTICAL_DEFAULT = 0.5  # For Above/Below
     LEADER_LINE_HORIZONTAL_DEFAULT = 1.0  # For To left/To right
     LABEL_VERTICAL_OFFSET_FACTOR = 0.3  # Factor of font_size to shift text down for vertical centering
-    LABEL_HORIZONTAL_OFFSET_FACTOR = 0.0  # Factor of font_size to shift text right for horizontal centering
+    LABEL_HORIZONTAL_OFFSET_FACTOR = 0.0  # For Left placement
+    LABEL_TEXT_WIDTH_FACTOR = 0.55  # New: ~7px/char for 10pt font

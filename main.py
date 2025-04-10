@@ -1,9 +1,3 @@
-"""
-Purpose: Launches the app, ties everything together.
-Why: Keeps the startup logic separate, making it easy to test or swap UIs later.
-"""
-
-
 import sys
 from PyQt5.QtWidgets import QApplication
 from data_entry import DataEntryWindow
