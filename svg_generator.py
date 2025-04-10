@@ -158,6 +158,11 @@ class GanttChartGenerator(QObject):
             y_task = y + row_num * row_height
 
             label_width = len(task_name) * font_size * Config.LABEL_HORIZONTAL_OFFSET_FACTOR  # For Left/Right
+
+            label_horizontal_offset = float(task.get("label_horizontal_offset", Config.LEADER_LINE_HORIZONTAL_DEFAULT))
+            if label_horizontal_offset < 0:
+                label_horizontal_offset = Config.LEADER_LINE_HORIZONTAL_DEFAULT  # Enforce no negatives
+
             if is_milestone:
                 half_size = task_height / 2
                 center_x = x_end if finish_date_str else x_start
@@ -168,28 +173,28 @@ class GanttChartGenerator(QObject):
                     (center_x, center_y + half_size),
                     (center_x - half_size, center_y)
                 ]
-                if not label_hide and label_placement != "Inside":
+                if not label_hide:
                     label_y_base = center_y + font_size * Config.LABEL_VERTICAL_OFFSET_FACTOR
                     text_width = self.font_metrics.horizontalAdvance(task_name)
                     if label_placement == "To left":
                         milestone_left = center_x - half_size
-                        label_x = milestone_left - tf_time_scale  # Right edge of label
+                        label_x = milestone_left - label_horizontal_offset * tf_time_scale
                         label_y = label_y_base
-                        leader_start = (label_x, center_y)  # Label's right edge
+                        leader_start = (label_x, center_y)
                         leader_end = (milestone_left, center_y)
                         print(
-                            f"To left: label_x={label_x}, text_width={text_width}, leader_start={leader_start}, leader_end={leader_end}, tf_time_scale={tf_time_scale}")
+                            f"Milestone To left: label_x={label_x}, text_width={text_width}, leader_start={leader_start}, leader_end={leader_end}, offset={label_horizontal_offset}")
                         self.dwg.add(self.dwg.text(task_name, insert=(label_x, label_y), font_size="10",
                                                    font_family="Arial", fill="black", text_anchor="end"))
                         self.dwg.add(self.dwg.line(leader_start, leader_end, stroke="black", stroke_width=1))
                     elif label_placement == "To right":
                         milestone_right = center_x + half_size
-                        label_x = milestone_right + tf_time_scale  # Left edge of label
+                        label_x = milestone_right + label_horizontal_offset * tf_time_scale
                         label_y = label_y_base
                         leader_start = (label_x, center_y)
                         leader_end = (milestone_right, center_y)
                         print(
-                            f"To right: label_x={label_x}, text_width={text_width}, leader_start={leader_start}, leader_end={leader_end}, tf_time_scale={tf_time_scale}")
+                            f"Milestone To right: label_x={label_x}, text_width={text_width}, leader_start={leader_start}, leader_end={leader_end}, offset={label_horizontal_offset}")
                         self.dwg.add(self.dwg.text(task_name, insert=(label_x, label_y), font_size="10",
                                                    font_family="Arial", fill="black", text_anchor="start"))
                         self.dwg.add(self.dwg.line(leader_start, leader_end, stroke="black", stroke_width=1))

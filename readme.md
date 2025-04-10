@@ -114,7 +114,7 @@ The GUI offers tabs for input, some planned but not yet implemented:
 - [x] Gridlines [May need a solution for when they get overly dense]
 - [x] Tasks [Change shape to rounded rectangle]
 - [x] Milestones [Change shape rounded corners]
-- [ ] Labels [Need to work on the task and milestone label placement]
+- [ ] Labels [Clear out LABEL_HORIZONTAL_OFFSET_FACTOR]
 - [ ] Connectors
 - [ ] Text Boxes
 - [ ] Curtains
