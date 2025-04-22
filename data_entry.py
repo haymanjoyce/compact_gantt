@@ -2,12 +2,25 @@ from PyQt5.QtWidgets import (QMainWindow, QTableWidget, QTableWidgetItem, QVBoxL
                              QFileDialog, QTabWidget, QAction, QApplication, QToolBar, QMessageBox,
                              QLineEdit, QLabel, QGridLayout, QPushButton, QCheckBox, QDateEdit, QComboBox,
                              QMenu, QGroupBox, QHeaderView, QScrollArea)
-from PyQt5.QtGui import QIcon
+from PyQt5.QtGui import QIcon, QBrush
 from PyQt5.QtCore import QDate, pyqtSignal, Qt
 from data_model import ProjectData, FrameConfig
 from config import Config
 from datetime import datetime, timedelta
 import json
+
+
+class NumericTableWidgetItem(QTableWidgetItem):
+    def __lt__(self, other):
+        self_data = self.data(Qt.UserRole)
+        other_data = other.data(Qt.UserRole)
+        if self_data is not None and other_data is not None:
+            try:
+                return float(self_data) < float(other_data)
+            except (TypeError, ValueError):
+                pass
+        # Fallback to default text-based sorting
+        return super().__lt__(other)
 
 
 class DataEntryWindow(QMainWindow):
@@ -31,11 +44,12 @@ class DataEntryWindow(QMainWindow):
                 "min_rows": 1
             },
             "tasks": {
-                "columns": ["Task ID", "Task Name", "Start Date", "Finish Date", "Row Number",
+                "columns": ["Task ID", "Task Order", "Task Name", "Start Date", "Finish Date", "Row Number",
                             "Label Placement", "Label Hide", "Label Alignment",
                             "Horiz Offset", "Vert Offset", "Label Colour"],
-                "defaults": lambda task_id: [
+                "defaults": lambda task_id, task_order: [
                     str(task_id),  # Task ID
+                    str(task_order),  # Task Order
                     "New Task",    # Task Name
                     QDate.currentDate().toString("yyyy-MM-dd"),  # Start Date
                     QDate.currentDate().toString("yyyy-MM-dd"),  # Finish Date
@@ -250,7 +264,7 @@ class DataEntryWindow(QMainWindow):
 
     def setup_tasks_tab(self):
         tasks_layout = QVBoxLayout()
-        self.tasks_table = QTableWidget(5, 11)  # +1 for Task ID
+        self.tasks_table = QTableWidget(5, 12)  # +1 for Task Order
         self.tasks_table.setHorizontalHeaderLabels(self.table_configs["tasks"]["columns"])
         self.tasks_table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.tasks_table.customContextMenuRequested.connect(
@@ -258,11 +272,12 @@ class DataEntryWindow(QMainWindow):
         self.tasks_table.setSortingEnabled(True)
         self.tasks_table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
         self.tasks_table.setColumnWidth(0, 80)   # Task ID
-        self.tasks_table.setColumnWidth(1, 150)  # Task Name
-        self.tasks_table.setColumnWidth(5, 120)  # Label Placement
-        self.tasks_table.setColumnWidth(7, 100)  # Label Alignment
-        self.tasks_table.setColumnWidth(8, 80)   # Horiz Offset
-        self.tasks_table.setColumnWidth(9, 80)   # Vert Offset
+        self.tasks_table.setColumnWidth(1, 80)   # Task Order
+        self.tasks_table.setColumnWidth(2, 150)  # Task Name
+        self.tasks_table.setColumnWidth(6, 120)  # Label Placement
+        self.tasks_table.setColumnWidth(8, 100)  # Label Alignment
+        self.tasks_table.setColumnWidth(9, 80)   # Horiz Offset
+        self.tasks_table.setColumnWidth(10, 80)  # Vert Offset
         tasks_layout.addWidget(self.tasks_table)
         btn_layout = QGridLayout()
         add_btn = QPushButton("Add Task")
@@ -274,6 +289,8 @@ class DataEntryWindow(QMainWindow):
         tasks_layout.addLayout(btn_layout)
         self.tasks_tab.setLayout(tasks_layout)
         self.tasks_table.itemChanged.connect(self._sync_data_if_not_initializing)
+        # Default sort by Task Order (column 1)
+        self.tasks_table.sortByColumn(1, Qt.AscendingOrder)
 
     def setup_connectors_tab(self):
         conn_layout = QVBoxLayout()
@@ -397,13 +414,22 @@ class DataEntryWindow(QMainWindow):
         if config_key == "tasks":
             # Compute next task_id
             max_task_id = 0
-            for row in range(row_count):  # Check existing rows
+            for row in range(row_count):
                 item = table.item(row, 0)
                 if item and item.text().isdigit():
                     max_task_id = max(max_task_id, int(item.text()))
             task_id = max_task_id + 1
-            defaults = config.get("defaults", lambda x: [])(task_id)
-            print(f"Adding task ID={task_id}, defaults={defaults}")  # Debug
+            # Compute task_order (max + 1)
+            max_task_order = 0
+            for row in range(row_count):
+                item = table.item(row, 1)
+                try:
+                    max_task_order = max(max_task_order, float(item.text()) if item and item.text() else 0)
+                except ValueError:
+                    pass
+            task_order = max_task_order + 1
+            defaults = config.get("defaults", lambda x, y: [])(task_id, task_order)
+            print(f"Adding task ID={task_id}, Task Order={task_order}, defaults={defaults}")  # Debug
         else:
             defaults = config.get("defaults", lambda x: [])(row_count)
         # Set all cells
@@ -414,13 +440,23 @@ class DataEntryWindow(QMainWindow):
                 combo.setCurrentText(default["default"])
                 table.setCellWidget(row_count, col, combo)
             else:
-                item = QTableWidgetItem(str(default))
+                if config_key == "tasks" and col in (0, 1):  # Task ID, Task Order
+                    item = NumericTableWidgetItem(str(default))
+                else:
+                    item = QTableWidgetItem(str(default))
                 if config_key == "tasks" and col == 0:  # Make Task ID read-only
                     item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                    item.setData(Qt.UserRole, int(default))  # Numeric for Task ID sorting
+                elif config_key == "tasks" and col == 1:  # Task Order numeric
+                    item.setData(Qt.UserRole, float(default))  # Numeric for Task Order sorting
                 table.setItem(row_count, col, item)
+        # Renumber Task Orders to integers
+        if config_key == "tasks":
+            self._renumber_task_orders(table)
         # Re-enable signals and sorting, then sync
         table.blockSignals(False)
         table.setSortingEnabled(was_sorting)
+        table.sortByColumn(1, Qt.AscendingOrder)  # Sort by Task Order
         table.itemChanged.connect(self._sync_data_if_not_initializing)
         print(f"Added row, new row_count={table.rowCount()}, sorting={table.isSortingEnabled()}")  # Debug
         self._sync_data_if_not_initializing()
@@ -430,6 +466,8 @@ class DataEntryWindow(QMainWindow):
         min_rows = config.get("min_rows", 1)
         if table.rowCount() > min_rows:
             table.removeRow(table.rowCount() - 1)
+            if config_key == "tasks":
+                self._renumber_task_orders(table)
             self._sync_data_if_not_initializing()
 
     def _show_context_menu(self, pos, table, config_key):
@@ -451,18 +489,28 @@ class DataEntryWindow(QMainWindow):
         table.setSortingEnabled(False)
         table.blockSignals(True)
         print(f"Inserting above row {row_index + 1}, config_key={config_key}")
-        table.insertRow(row_index)  # Insert at 0-based index
+        table.insertRow(row_index)
         if config_key == "tasks":
             # Compute next task_id
             max_task_id = 0
             for row in range(table.rowCount()):
-                if row != row_index:  # Skip new row
+                if row != row_index:
                     item = table.item(row, 0)
                     if item and item.text().isdigit():
                         max_task_id = max(max_task_id, int(item.text()))
             task_id = max_task_id + 1
-            defaults = config.get("defaults", lambda x: [])(task_id)
-            print(f"Inserting task ID={task_id}, defaults={defaults}")
+            # Compute task_order (interpolate between prev and current)
+            prev_order = 0
+            curr_order = float('inf')
+            if row_index > 0:
+                prev_item = table.item(row_index - 1, 1)
+                prev_order = float(prev_item.text()) if prev_item and prev_item.text() else row_index
+            if row_index < table.rowCount() - 1:
+                curr_item = table.item(row_index + 1, 1)
+                curr_order = float(curr_item.text()) if curr_item and curr_item.text() else row_index + 1
+            task_order = (prev_order + curr_order) / 2 if curr_order != float('inf') else prev_order + 1
+            defaults = config.get("defaults", lambda x, y: [])(task_id, task_order)
+            print(f"Inserting task ID={task_id}, Task Order={task_order}, defaults={defaults}")
         else:
             defaults = config.get("defaults", lambda x: [])(table.rowCount())
         for col, default in enumerate(defaults):
@@ -472,12 +520,21 @@ class DataEntryWindow(QMainWindow):
                 combo.setCurrentText(default["default"])
                 table.setCellWidget(row_index, col, combo)
             else:
-                item = QTableWidgetItem(str(default))
+                if config_key == "tasks" and col in (0, 1):  # Task ID, Task Order
+                    item = NumericTableWidgetItem(str(default))
+                else:
+                    item = QTableWidgetItem(str(default))
                 if config_key == "tasks" and col == 0:  # Make Task ID read-only
                     item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                    item.setData(Qt.UserRole, int(default))  # Numeric for Task ID sorting
+                elif config_key == "tasks" and col == 1:  # Task Order numeric
+                    item.setData(Qt.UserRole, float(default))  # Numeric for Task Order sorting
                 table.setItem(row_index, col, item)
+        # Renumber Task Orders to integers
+        if config_key == "tasks":
+            self._renumber_task_orders(table)
         table.blockSignals(False)
-        table.sortByColumn(-1, Qt.AscendingOrder)
+        table.sortByColumn(1, Qt.AscendingOrder)  # Sort by Task Order
         table.setSortingEnabled(was_sorting)
         table.itemChanged.connect(self._sync_data_if_not_initializing)
         print(f"Inserted row, new row_count={table.rowCount()}, sorting={table.isSortingEnabled()}")  # Debug
@@ -490,8 +547,32 @@ class DataEntryWindow(QMainWindow):
             was_sorting = table.isSortingEnabled()
             table.setSortingEnabled(False)
             table.removeRow(row_index)
+            if config_key == "tasks":
+                self._renumber_task_orders(table)
             table.setSortingEnabled(was_sorting)
             self._sync_data_if_not_initializing()
+
+    def _renumber_task_orders(self, table):
+        # Collect tasks with their current Task Order
+        tasks = []
+        for row in range(table.rowCount()):
+            task_id_item = table.item(row, 0)
+            task_order_item = table.item(row, 1)
+            try:
+                task_order = float(task_order_item.text()) if task_order_item and task_order_item.text() else row + 1
+            except ValueError:
+                task_order = row + 1
+            tasks.append((row, task_order))
+        # Sort by Task Order
+        tasks.sort(key=lambda x: x[1])
+        # Renumber to sequential integers starting from 1
+        table.blockSignals(True)
+        for i, (row, _) in enumerate(tasks, 1):
+            item = NumericTableWidgetItem(str(i))
+            item.setData(Qt.UserRole, float(i))
+            table.setItem(row, 1, item)
+        table.blockSignals(False)
+        print(f"Renumbered Task Orders: {[table.item(row, 1).text() for row in range(table.rowCount())]}")  # Debug
 
     def _sync_data(self):
         try:
@@ -535,20 +616,65 @@ class DataEntryWindow(QMainWindow):
                 self.project_data.add_time_frame(end_dt.strftime("%Y-%m-%d"), width)
 
             tasks_data = self._extract_table_data(self.tasks_table)
-            print(f"Tasks data: {tasks_data}")  # Debug
+            # Debug: Log sort order if Task ID or Task Order column is sorted
+            sort_col = self.tasks_table.horizontalHeader().sortIndicatorSection()
+            sort_order = self.tasks_table.horizontalHeader().sortIndicatorOrder()
+            if sort_col == 0:
+                print(f"Task ID sorted: {'Ascending' if sort_order == Qt.AscendingOrder else 'Descending'}, data={tasks_data}")
+            elif sort_col == 1:
+                print(f"Task Order sorted: {'Ascending' if sort_order == Qt.AscendingOrder else 'Descending'}, data={tasks_data}")
+
+            # Highlight non-unique Task Orders
+            task_order_counts = {}
+            for row_idx, row in enumerate(tasks_data):
+                try:
+                    task_order = float(row[1] or 0)
+                    task_order_counts[task_order] = task_order_counts.get(task_order, 0) + 1
+                except ValueError:
+                    pass  # Handled below
+            non_unique_orders = {k for k, v in task_order_counts.items() if v > 1}
+            print(f"Non-unique Task Orders: {non_unique_orders}")  # Debug
+            self.tasks_table.blockSignals(True)
+            for row_idx in range(self.tasks_table.rowCount()):
+                item = self.tasks_table.item(row_idx, 1)
+                if item:
+                    try:
+                        task_order = float(item.text() or 0)
+                        if task_order in non_unique_orders:
+                            item.setBackground(QBrush(Qt.yellow))
+                        else:
+                            item.setBackground(QBrush())  # Reset to default
+                    except ValueError:
+                        item.setBackground(QBrush(Qt.yellow))  # Invalid values also highlighted
+                else:
+                    item = NumericTableWidgetItem("0")
+                    item.setData(Qt.UserRole, 0.0)
+                    item.setBackground(QBrush(Qt.yellow))
+                    self.tasks_table.setItem(row_idx, 1, item)
+            self.tasks_table.blockSignals(False)
+
+            # Validate and process tasks
             self.project_data.tasks.clear()
             for row in tasks_data:
-                task_id = int(row[0] or 0)  # Use stored task_id
-                task_name = row[1] or "Unnamed"
-                start_date_raw = row[2] or QDate.currentDate().toString("yyyy-MM-dd")  # Fallback to current date
-                finish_date_raw = row[3] or QDate.currentDate().toString("yyyy-MM-dd")  # Fallback to current date
-                row_number = int(row[4] or 1)
-                label_placement = row[5] or "Inside"
-                label_hide = row[6] or "No"
-                label_alignment = row[7] or "Left"
-                label_horizontal_offset = float(row[8] or 1.0)
-                label_vertical_offset = float(row[9] or 0.5)
-                label_text_colour = row[10] or "black"
+                task_id = int(row[0] or 0)
+                try:
+                    task_order = float(row[1] or 0)
+                    if task_order <= 0:
+                        raise ValueError(f"Task {task_id}: Task Order must be positive")
+                except ValueError as e:
+                    if str(e).startswith("Task"):
+                        raise
+                    raise ValueError(f"Task {task_id}: Invalid Task Order '{row[1]}'")
+                task_name = row[2] or "Unnamed"
+                start_date_raw = row[3] or QDate.currentDate().toString("yyyy-MM-dd")
+                finish_date_raw = row[4] or QDate.currentDate().toString("yyyy-MM-dd")
+                row_number = int(row[5] or 1)
+                label_placement = row[6] or "Inside"
+                label_hide = row[7] or "No"
+                label_alignment = row[8] or "Left"
+                label_horizontal_offset = float(row[9] or 1.0)
+                label_vertical_offset = float(row[10] or 0.5)
+                label_text_colour = row[11] or "black"
 
                 if not start_date_raw and not finish_date_raw:
                     raise ValueError(f"Task {task_id}: Must provide at least one date")
@@ -619,55 +745,35 @@ class DataEntryWindow(QMainWindow):
         tasks_data = self.project_data.get_table_data("tasks")
         self.tasks_table.setRowCount(len(tasks_data))
         for row_idx, task in enumerate(tasks_data):
-            task_id = task[0] if task[0] else str(row_idx + 1)  # Fallback for old data
-            self.tasks_table.setItem(row_idx, 0, QTableWidgetItem(task_id))
-            self.tasks_table.item(row_idx, 0).setFlags(self.tasks_table.item(row_idx, 0).flags() & ~Qt.ItemIsEditable)
-            self.tasks_table.setItem(row_idx, 1, QTableWidgetItem(task[1]))  # task_name
-            self.tasks_table.setItem(row_idx, 2, QTableWidgetItem(task[2]))  # start_date
-            self.tasks_table.setItem(row_idx, 3, QTableWidgetItem(task[3]))  # finish_date
-            self.tasks_table.setItem(row_idx, 4, QTableWidgetItem(task[4]))  # row_number
+            task_id = task[0] if task[0] else str(row_idx + 1)
+            item = NumericTableWidgetItem(task_id)
+            item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+            item.setData(Qt.UserRole, int(task_id))
+            self.tasks_table.setItem(row_idx, 0, item)
+            # Task Order: Use row index + 1 if not present (for old data)
+            task_order = str(row_idx + 1) if len(task) <= 1 or not task[1] else task[1]
+            item = NumericTableWidgetItem(task_order)
+            item.setData(Qt.UserRole, float(task_order))
+            self.tasks_table.setItem(row_idx, 1, item)
+            self.tasks_table.setItem(row_idx, 2, QTableWidgetItem(task[1] if len(task) > 1 else ""))  # task_name
+            self.tasks_table.setItem(row_idx, 3, QTableWidgetItem(task[2] if len(task) > 2 else ""))  # start_date
+            self.tasks_table.setItem(row_idx, 4, QTableWidgetItem(task[3] if len(task) > 3 else ""))  # finish_date
+            self.tasks_table.setItem(row_idx, 5, QTableWidgetItem(task[4] if len(task) > 4 else ""))  # row_number
             combo_placement = QComboBox()
             combo_placement.addItems(["Inside", "To left", "To right", "Above", "Below"])
-            combo_placement.setCurrentText(task[5])  # label_placement
-            self.tasks_table.setCellWidget(row_idx, 5, combo_placement)
-            self.tasks_table.setItem(row_idx, 6, QTableWidgetItem(task[6]))  # label_hide
+            combo_placement.setCurrentText(task[5] if len(task) > 5 else "Inside")
+            self.tasks_table.setCellWidget(row_idx, 6, combo_placement)
+            self.tasks_table.setItem(row_idx, 7, QTableWidgetItem(task[6] if len(task) > 6 else ""))  # label_hide
             combo_alignment = QComboBox()
             combo_alignment.addItems(["Left", "Centre", "Right"])
-            combo_alignment.setCurrentText(task[7])  # label_alignment
-            self.tasks_table.setCellWidget(row_idx, 7, combo_alignment)
-            self.tasks_table.setItem(row_idx, 8, QTableWidgetItem(task[8]))  # label_horizontal_offset
-            self.tasks_table.setItem(row_idx, 9, QTableWidgetItem(task[9]))  # label_vertical_offset
-            self.tasks_table.setItem(row_idx, 10, QTableWidgetItem(task[10]))  # label_text_colour
-
-        conn_data = self.project_data.get_table_data("connectors")
-        self.connectors_table.setRowCount(len(conn_data))
-        for row_idx, row_data in enumerate(conn_data):
-            for col_idx, value in enumerate(row_data):
-                self.connectors_table.setItem(row_idx, col_idx, QTableWidgetItem(value))
-
-        sl_data = self.project_data.get_table_data("swimlanes")
-        self.swimlanes_table.setRowCount(len(sl_data))
-        for row_idx, row_data in enumerate(sl_data):
-            for col_idx, value in enumerate(row_data):
-                self.swimlanes_table.setItem(row_idx, col_idx, QTableWidgetItem(value))
-
-        pipes_data = self.project_data.get_table_data("pipes")
-        self.pipes_table.setRowCount(len(pipes_data))
-        for row_idx, row_data in enumerate(pipes_data):
-            for col_idx, value in enumerate(row_data):
-                self.pipes_table.setItem(row_idx, col_idx, QTableWidgetItem(value))
-
-        curtains_data = self.project_data.get_table_data("curtains")
-        self.curtains_table.setRowCount(len(curtains_data))
-        for row_idx, row_data in enumerate(curtains_data):
-            for col_idx, value in enumerate(row_data):
-                self.curtains_table.setItem(row_idx, col_idx, QTableWidgetItem(value))
-
-        tb_data = self.project_data.get_table_data("text_boxes")
-        self.text_boxes_table.setRowCount(len(tb_data))
-        for row_idx, row_data in enumerate(tb_data):
-            for col_idx, value in enumerate(row_data):
-                self.text_boxes_table.setItem(row_idx, col_idx, QTableWidgetItem(value))
+            combo_alignment.setCurrentText(task[7] if len(task) > 7 else "Left")
+            self.tasks_table.setCellWidget(row_idx, 8, combo_alignment)
+            self.tasks_table.setItem(row_idx, 9, QTableWidgetItem(task[8] if len(task) > 8 else ""))  # label_horizontal_offset
+            self.tasks_table.setItem(row_idx, 10, QTableWidgetItem(task[9] if len(task) > 9 else ""))  # label_vertical_offset
+            self.tasks_table.setItem(row_idx, 11, QTableWidgetItem(task[10] if len(task) > 10 else ""))  # label_text_colour
+        # Renumber Task Orders for loaded data
+        self._renumber_task_orders(self.tasks_table)
+        self.tasks_table.sortByColumn(1, Qt.AscendingOrder)
 
     def _sync_data_if_not_initializing(self):
         if not self._initializing:
