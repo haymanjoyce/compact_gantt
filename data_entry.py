@@ -37,15 +37,15 @@ class DataEntryWindow(QMainWindow):
                 "defaults": lambda task_id: [
                     str(task_id),  # Task ID
                     "New Task",    # Task Name
-                    QDate.currentDate().toString("yyyy-MM-dd"),
-                    QDate.currentDate().toString("yyyy-MM-dd"),
-                    "1",
+                    QDate.currentDate().toString("yyyy-MM-dd"),  # Start Date
+                    QDate.currentDate().toString("yyyy-MM-dd"),  # Finish Date
+                    "1",  # Row Number
                     {"type": "combo", "items": ["Inside", "To left", "To right", "Above", "Below"], "default": "Inside"},
-                    "No",
+                    "No",  # Label Hide
                     {"type": "combo", "items": ["Left", "Centre", "Right"], "default": "Left"},
-                    "1.0",
-                    "0.5",
-                    "black"
+                    "1.0",  # Horiz Offset
+                    "0.5",  # Vert Offset
+                    "black"  # Label Colour
                 ],
                 "min_rows": 1
             },
@@ -326,7 +326,7 @@ class DataEntryWindow(QMainWindow):
         self.pipes_table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.pipes_table.customContextMenuRequested.connect(
             lambda pos: self._show_context_menu(pos, self.pipes_table, "pipes"))
-        self.time_frames_table.setSortingEnabled(True)
+        self.pipes_table.setSortingEnabled(True)
         self.pipes_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.pipes_table.resizeColumnsToContents()
         pipes_layout.addWidget(self.pipes_table)
@@ -388,6 +388,11 @@ class DataEntryWindow(QMainWindow):
     def _add_row(self, table, config_key):
         config = self.table_configs.get(config_key, {})
         row_count = table.rowCount()
+        # Disable sorting and signals to prevent reordering or premature sync
+        was_sorting = table.isSortingEnabled()
+        table.setSortingEnabled(False)
+        table.blockSignals(True)
+        print(f"Adding row to {config_key}, row_count={row_count}, sorting={was_sorting}")  # Debug
         table.insertRow(row_count)
         if config_key == "tasks":
             # Compute next task_id
@@ -398,9 +403,10 @@ class DataEntryWindow(QMainWindow):
                     max_task_id = max(max_task_id, int(item.text()))
             task_id = max_task_id + 1
             defaults = config.get("defaults", lambda x: [])(task_id)
+            print(f"Adding task ID={task_id}, defaults={defaults}")  # Debug
         else:
             defaults = config.get("defaults", lambda x: [])(row_count)
-        table.itemChanged.disconnect(self._sync_data_if_not_initializing)
+        # Set all cells
         for col, default in enumerate(defaults):
             if isinstance(default, dict) and default.get("type") == "combo":
                 combo = QComboBox()
@@ -412,7 +418,11 @@ class DataEntryWindow(QMainWindow):
                 if config_key == "tasks" and col == 0:  # Make Task ID read-only
                     item.setFlags(item.flags() & ~Qt.ItemIsEditable)
                 table.setItem(row_count, col, item)
+        # Re-enable signals and sorting, then sync
+        table.blockSignals(False)
+        table.setSortingEnabled(was_sorting)
         table.itemChanged.connect(self._sync_data_if_not_initializing)
+        print(f"Added row, new row_count={table.rowCount()}, sorting={table.isSortingEnabled()}")  # Debug
         self._sync_data_if_not_initializing()
 
     def _remove_row(self, table, config_key):
@@ -439,7 +449,7 @@ class DataEntryWindow(QMainWindow):
         config = self.table_configs.get(config_key, {})
         was_sorting = table.isSortingEnabled()
         table.setSortingEnabled(False)
-        # Debug: Show 1-based row number (Row 8 = index 7 + 1)
+        table.blockSignals(True)
         print(f"Inserting above row {row_index + 1}, config_key={config_key}")
         table.insertRow(row_index)  # Insert at 0-based index
         if config_key == "tasks":
@@ -451,11 +461,10 @@ class DataEntryWindow(QMainWindow):
                     if item and item.text().isdigit():
                         max_task_id = max(max_task_id, int(item.text()))
             task_id = max_task_id + 1
-            print(f"New task_id={task_id}")
             defaults = config.get("defaults", lambda x: [])(task_id)
+            print(f"Inserting task ID={task_id}, defaults={defaults}")
         else:
             defaults = config.get("defaults", lambda x: [])(table.rowCount())
-        table.itemChanged.disconnect(self._sync_data_if_not_initializing)
         for col, default in enumerate(defaults):
             if isinstance(default, dict) and default.get("type") == "combo":
                 combo = QComboBox()
@@ -467,10 +476,11 @@ class DataEntryWindow(QMainWindow):
                 if config_key == "tasks" and col == 0:  # Make Task ID read-only
                     item.setFlags(item.flags() & ~Qt.ItemIsEditable)
                 table.setItem(row_index, col, item)
-        table.itemChanged.connect(self._sync_data_if_not_initializing)
-        # Clear sort column to prevent reordering
+        table.blockSignals(False)
         table.sortByColumn(-1, Qt.AscendingOrder)
         table.setSortingEnabled(was_sorting)
+        table.itemChanged.connect(self._sync_data_if_not_initializing)
+        print(f"Inserted row, new row_count={table.rowCount()}, sorting={table.isSortingEnabled()}")  # Debug
         self._sync_data_if_not_initializing()
 
     def _delete_row(self, table, config_key, row_index):
@@ -525,12 +535,13 @@ class DataEntryWindow(QMainWindow):
                 self.project_data.add_time_frame(end_dt.strftime("%Y-%m-%d"), width)
 
             tasks_data = self._extract_table_data(self.tasks_table)
+            print(f"Tasks data: {tasks_data}")  # Debug
             self.project_data.tasks.clear()
             for row in tasks_data:
                 task_id = int(row[0] or 0)  # Use stored task_id
                 task_name = row[1] or "Unnamed"
-                start_date_raw = row[2] or ""
-                finish_date_raw = row[3] or ""
+                start_date_raw = row[2] or QDate.currentDate().toString("yyyy-MM-dd")  # Fallback to current date
+                finish_date_raw = row[3] or QDate.currentDate().toString("yyyy-MM-dd")  # Fallback to current date
                 row_number = int(row[4] or 1)
                 label_placement = row[5] or "Inside"
                 label_hide = row[6] or "No"
