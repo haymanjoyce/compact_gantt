@@ -936,6 +936,7 @@ class DataEntryWindow(QMainWindow):
             self.data_updated.emit({})  # Ensure no crash
 
     def _load_initial_data(self):
+        # Layout tab inputs
         self.outer_width_input.setText(str(self.project_data.frame_config.outer_width))
         self.outer_height_input.setText(str(self.project_data.frame_config.outer_height))
         self.header_height_input.setText(str(self.project_data.frame_config.header_height))
@@ -949,51 +950,74 @@ class DataEntryWindow(QMainWindow):
         self.num_rows_input.setText(str(self.project_data.frame_config.num_rows))
         self.horizontal_gridlines_input.setChecked(self.project_data.frame_config.horizontal_gridlines)
         self.vertical_gridlines_input.setChecked(self.project_data.frame_config.vertical_gridlines)
-        self.chart_start_date_input.setDate(QDate.fromString(self.project_data.frame_config.chart_start_date, "yyyy-MM-dd"))
+        self.chart_start_date_input.setDate(
+            QDate.fromString(self.project_data.frame_config.chart_start_date, "yyyy-MM-dd"))
 
-        tf_data = self.project_data.get_table_data("time_frames")
-        self.time_frames_table.setRowCount(len(tf_data) if tf_data else 1)
-        if tf_data:
-            for row_idx, row_data in enumerate(tf_data):
-                for col_idx, value in enumerate(row_data):
-                    self.time_frames_table.setItem(row_idx, col_idx, QTableWidgetItem(value))
-        else:
-            today = QDate.currentDate().toString("yyyy-MM-dd")
-            self.time_frames_table.setItem(0, 0, QTableWidgetItem(today))
-            self.time_frames_table.setItem(0, 1, QTableWidgetItem("100"))
+        # Initialize tables based on table_configs and project_data
+        for tab_key, table in [
+            ("time_frames", self.time_frames_table),
+            ("tasks", self.tasks_table),
+            ("connectors", self.connectors_table),
+            ("swimlanes", self.swimlanes_table),
+            ("pipes", self.pipes_table),
+            ("curtains", self.curtains_table),
+            ("text_boxes", self.text_boxes_table)
+        ]:
+            config = self.table_configs.get(tab_key, {})
+            min_rows = config.get("min_rows", 0)
+            table_data = self.project_data.get_table_data(tab_key)
 
-        tasks_data = self.project_data.get_table_data("tasks")
-        self.tasks_table.setRowCount(len(tasks_data))
-        for row_idx, task in enumerate(tasks_data):
-            task_id = task[0] if task[0] else str(row_idx + 1)
-            item = NumericTableWidgetItem(task_id)
-            item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-            item.setData(Qt.UserRole, int(task_id))
-            self.tasks_table.setItem(row_idx, 0, item)
-            # Task Order: Use row index + 1 if not present (for old data)
-            task_order = str(row_idx + 1) if len(task) <= 1 or not task[1] else task[1]
-            item = NumericTableWidgetItem(task_order)
-            item.setData(Qt.UserRole, float(task_order))
-            self.tasks_table.setItem(row_idx, 1, item)
-            self.tasks_table.setItem(row_idx, 2, QTableWidgetItem(task[1] if len(task) > 1 else ""))  # task_name
-            self.tasks_table.setItem(row_idx, 3, QTableWidgetItem(task[2] if len(task) > 2 else ""))  # start_date
-            self.tasks_table.setItem(row_idx, 4, QTableWidgetItem(task[3] if len(task) > 3 else ""))  # finish_date
-            self.tasks_table.setItem(row_idx, 5, QTableWidgetItem(task[4] if len(task) > 4 else ""))  # row_number
-            combo_placement = QComboBox()
-            combo_placement.addItems(["Inside", "To left", "To right", "Above", "Below"])
-            combo_placement.setCurrentText(task[5] if len(task) > 5 else "Inside")
-            self.tasks_table.setCellWidget(row_idx, 6, combo_placement)
-            self.tasks_table.setItem(row_idx, 7, QTableWidgetItem(task[6] if len(task) > 6 else ""))  # label_hide
-            combo_alignment = QComboBox()
-            combo_alignment.addItems(["Left", "Centre", "Right"])
-            combo_alignment.setCurrentText(task[7] if len(task) > 7 else "Left")
-            self.tasks_table.setCellWidget(row_idx, 8, combo_alignment)
-            self.tasks_table.setItem(row_idx, 9, QTableWidgetItem(task[8] if len(task) > 8 else ""))  # label_horizontal_offset
-            self.tasks_table.setItem(row_idx, 10, QTableWidgetItem(task[9] if len(task) > 9 else ""))  # label_vertical_offset
-            self.tasks_table.setItem(row_idx, 11, QTableWidgetItem(task[10] if len(task) > 10 else ""))  # label_text_colour
-        # Renumber Task Orders for loaded data
-        self._renumber_task_orders(self.tasks_table)
-        self.tasks_table.sortByColumn(1, Qt.AscendingOrder)
+            # Set row count: use table_data if available, else min_rows
+            row_count = len(table_data) if table_data else min_rows
+            table.setRowCount(row_count)
+
+            # Populate table with data or defaults
+            if table_data:
+                for row_idx, row_data in enumerate(table_data):
+                    for col_idx, value in enumerate(row_data):
+                        if tab_key == "tasks" and col_idx in (6, 8):  # Combo boxes for Label Placement, Alignment
+                            combo = QComboBox()
+                            items = ["Inside", "To left", "To right", "Above", "Below"] if col_idx == 6 else ["Left",
+                                                                                                              "Centre",
+                                                                                                              "Right"]
+                            combo.addItems(items)
+                            combo.setCurrentText(value or items[0])
+                            table.setCellWidget(row_idx, col_idx, combo)
+                        else:
+                            item = NumericTableWidgetItem(str(value)) if tab_key == "tasks" and col_idx in (0,
+                                                                                                            1) else QTableWidgetItem(
+                                str(value))
+                            if tab_key == "tasks" and col_idx == 0:  # Task ID read-only
+                                item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                                item.setData(Qt.UserRole, int(value) if value.isdigit() else 0)
+                            elif tab_key == "tasks" and col_idx == 1:  # Task Order numeric
+                                item.setData(Qt.UserRole, float(value) if value else 0.0)
+                            table.setItem(row_idx, col_idx, item)
+            elif min_rows > 0:  # Populate defaults for tabs with min_rows > 0
+                for row_idx in range(min_rows):
+                    defaults = config.get("defaults", lambda x: [])(row_idx) if tab_key != "tasks" else config.get(
+                        "defaults", lambda x, y: [])(row_idx + 1, row_idx + 1)
+                    for col_idx, default in enumerate(defaults):
+                        if isinstance(default, dict) and default.get("type") == "combo":
+                            combo = QComboBox()
+                            combo.addItems(default["items"])
+                            combo.setCurrentText(default["default"])
+                            table.setCellWidget(row_idx, col_idx, combo)
+                        else:
+                            item = NumericTableWidgetItem(str(default)) if tab_key == "tasks" and col_idx in (0,
+                                                                                                              1) else QTableWidgetItem(
+                                str(default))
+                            if tab_key == "tasks" and col_idx == 0:  # Task ID read-only
+                                item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                                item.setData(Qt.UserRole, int(default) if str(default).isdigit() else 0)
+                            elif tab_key == "tasks" and col_idx == 1:  # Task Order numeric
+                                item.setData(Qt.UserRole, float(default) if default else 0.0)
+                            table.setItem(row_idx, col_idx, item)
+
+        # Renumber Task Orders for Tasks table
+        if self.tasks_table.rowCount() > 0:
+            self._renumber_task_orders(self.tasks_table)
+            self.tasks_table.sortByColumn(1, Qt.AscendingOrder)
 
     def _sync_data_if_not_initializing(self):
         if not self._initializing:
