@@ -19,7 +19,6 @@ class NumericTableWidgetItem(QTableWidgetItem):
                 return float(self_data) < float(other_data)
             except (TypeError, ValueError):
                 pass
-        # Fallback to default text-based sorting
         return super().__lt__(other)
 
 
@@ -343,7 +342,7 @@ class DataEntryWindow(QMainWindow):
         self.pipes_table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.pipes_table.customContextMenuRequested.connect(
             lambda pos: self._show_context_menu(pos, self.pipes_table, "pipes"))
-        self.pipes_table.setSortingEnabled(True)
+        self.time_frames_table.setSortingEnabled(True)
         self.pipes_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.pipes_table.resizeColumnsToContents()
         pipes_layout.addWidget(self.pipes_table)
@@ -576,6 +575,7 @@ class DataEntryWindow(QMainWindow):
 
     def _sync_data(self):
         try:
+            # Validate Layout tab
             margins = (
                 float(self.top_margin_input.text() or 0),
                 float(self.right_margin_input.text() or 0),
@@ -596,6 +596,7 @@ class DataEntryWindow(QMainWindow):
                 self.chart_start_date_input.date().toString("yyyy-MM-dd")
             )
 
+            # Validate Time Frames
             tf_data = self._extract_table_data(self.time_frames_table)
             if not tf_data:
                 raise ValueError("At least one time frame is required")
@@ -615,6 +616,7 @@ class DataEntryWindow(QMainWindow):
             for _, end_dt, width in time_frames:
                 self.project_data.add_time_frame(end_dt.strftime("%Y-%m-%d"), width)
 
+            # Validate Tasks and apply highlights/tooltips
             tasks_data = self._extract_table_data(self.tasks_table)
             # Debug: Log sort order if Task ID or Task Order column is sorted
             sort_col = self.tasks_table.horizontalHeader().sortIndicatorSection()
@@ -624,47 +626,190 @@ class DataEntryWindow(QMainWindow):
             elif sort_col == 1:
                 print(f"Task Order sorted: {'Ascending' if sort_order == Qt.AscendingOrder else 'Descending'}, data={tasks_data}")
 
-            # Highlight non-unique Task Orders
+            # Track invalid cells with reasons for tooltips
+            invalid_cells = set()  # (row, col, reason)
+
+            # Validate Task Order
             task_order_counts = {}
             for row_idx, row in enumerate(tasks_data):
                 try:
                     task_order = float(row[1] or 0)
                     task_order_counts[task_order] = task_order_counts.get(task_order, 0) + 1
+                    if task_order <= 0:
+                        invalid_cells.add((row_idx, 1, "non-positive"))
                 except ValueError:
-                    pass  # Handled below
+                    invalid_cells.add((row_idx, 1, "invalid"))
             non_unique_orders = {k for k, v in task_order_counts.items() if v > 1}
+            for k in non_unique_orders:
+                for row_idx, row in enumerate(tasks_data):
+                    try:
+                        if float(row[1] or 0) == k:
+                            invalid_cells.add((row_idx, 1, "non-unique"))
+                    except ValueError:
+                        pass
             print(f"Non-unique Task Orders: {non_unique_orders}")  # Debug
+
+            # Validate dates and row numbers
+            has_errors = False
+            for row_idx, row in enumerate(tasks_data):
+                task_id = int(row[0] or 0)
+                start_date_raw = row[3] or ""
+                finish_date_raw = row[4] or ""
+
+                # Date validation
+                if not start_date_raw and not finish_date_raw:
+                    invalid_cells.add((row_idx, 3, "both-empty"))
+                    invalid_cells.add((row_idx, 4, "both-empty"))
+                    has_errors = True
+                else:
+                    start_valid = True
+                    finish_valid = True
+                    start_dt = None
+                    finish_dt = None
+                    if start_date_raw:
+                        try:
+                            start_dt = datetime.strptime(start_date_raw, "%Y-%m-%d")
+                        except ValueError:
+                            invalid_cells.add((row_idx, 3, "invalid format"))
+                            start_valid = False
+                            has_errors = True
+                    if finish_date_raw:
+                        try:
+                            finish_dt = datetime.strptime(finish_date_raw, "%Y-%m-%d")
+                        except ValueError:
+                            invalid_cells.add((row_idx, 4, "invalid format"))
+                            finish_valid = False
+                            has_errors = True
+                    if start_valid and finish_valid and start_dt and finish_dt and start_dt > finish_dt:
+                        invalid_cells.add((row_idx, 3, "start-after-finish"))
+                        invalid_cells.add((row_idx, 4, "start-after-finish"))
+                        has_errors = True
+
+                # Row Number validation
+                try:
+                    row_number = float(row[5] or 1)
+                    if row_number <= 0:
+                        invalid_cells.add((row_idx, 5, "non-positive"))
+                        has_errors = True
+                    elif row_number != int(row_number):
+                        invalid_cells.add((row_idx, 5, "non-integer"))
+                        has_errors = True
+                    elif row_number > self.project_data.frame_config.num_rows:
+                        invalid_cells.add((row_idx, 5, "exceeds-num-rows"))
+                        has_errors = True
+                except ValueError:
+                    invalid_cells.add((row_idx, 5, "invalid"))
+                    has_errors = True
+
+            # Apply highlights and tooltips
             self.tasks_table.blockSignals(True)
             for row_idx in range(self.tasks_table.rowCount()):
+                # Task Order (col 1)
                 item = self.tasks_table.item(row_idx, 1)
+                tooltip = ""
                 if item:
                     try:
                         task_order = float(item.text() or 0)
                         if task_order in non_unique_orders:
                             item.setBackground(QBrush(Qt.yellow))
+                            tooltip = "Task Order is not unique"
+                        elif task_order <= 0:
+                            item.setBackground(QBrush(Qt.yellow))
+                            tooltip = "Task Order must be positive"
                         else:
-                            item.setBackground(QBrush())  # Reset to default
+                            item.setBackground(QBrush())
                     except ValueError:
-                        item.setBackground(QBrush(Qt.yellow))  # Invalid values also highlighted
+                        item.setBackground(QBrush(Qt.yellow))
+                        tooltip = "Task Order must be a valid number"
                 else:
                     item = NumericTableWidgetItem("0")
                     item.setData(Qt.UserRole, 0.0)
                     item.setBackground(QBrush(Qt.yellow))
+                    tooltip = "Task Order must be a valid number"
                     self.tasks_table.setItem(row_idx, 1, item)
-            self.tasks_table.blockSignals(False)
+                item.setToolTip(tooltip)
 
-            # Validate and process tasks
+                # Start Date (col 3)
+                item = self.tasks_table.item(row_idx, 3)
+                tooltip = ""
+                if item:
+                    if any((row_idx, 3, reason) in invalid_cells for reason in ["invalid format"]):
+                        item.setBackground(QBrush(Qt.yellow))
+                        tooltip = "Start Date must be yyyy-MM-dd or empty"
+                    elif any((row_idx, 3, reason) in invalid_cells for reason in ["start-after-finish"]):
+                        item.setBackground(QBrush(Qt.yellow))
+                        tooltip = "Start Date is after Finish Date"
+                    elif any((row_idx, 3, reason) in invalid_cells for reason in ["both-empty"]):
+                        item.setBackground(QBrush(Qt.yellow))
+                        tooltip = "At least one of Start or Finish Date required"
+                    else:
+                        item.setBackground(QBrush())
+                else:
+                    item = QTableWidgetItem("")
+                    if any((row_idx, 3, reason) in invalid_cells for reason in ["both-empty"]):
+                        item.setBackground(QBrush(Qt.yellow))
+                        tooltip = "At least one of Start or Finish Date required"
+                    self.tasks_table.setItem(row_idx, 3, item)
+                item.setToolTip(tooltip)
+
+                # Finish Date (col 4)
+                item = self.tasks_table.item(row_idx, 4)
+                tooltip = ""
+                if item:
+                    if any((row_idx, 4, reason) in invalid_cells for reason in ["invalid format"]):
+                        item.setBackground(QBrush(Qt.yellow))
+                        tooltip = "Finish Date must be yyyy-MM-dd or empty"
+                    elif any((row_idx, 4, reason) in invalid_cells for reason in ["start-after-finish"]):
+                        item.setBackground(QBrush(Qt.yellow))
+                        tooltip = "Finish Date is before Start Date"
+                    elif any((row_idx, 4, reason) in invalid_cells for reason in ["both-empty"]):
+                        item.setBackground(QBrush(Qt.yellow))
+                        tooltip = "At least one of Start or Finish Date required"
+                    else:
+                        item.setBackground(QBrush())
+                else:
+                    item = QTableWidgetItem("")
+                    if any((row_idx, 4, reason) in invalid_cells for reason in ["both-empty"]):
+                        item.setBackground(QBrush(Qt.yellow))
+                        tooltip = "At least one of Start or Finish Date required"
+                    self.tasks_table.setItem(row_idx, 4, item)
+                item.setToolTip(tooltip)
+
+                # Row Number (col 5)
+                item = self.tasks_table.item(row_idx, 5)
+                tooltip = ""
+                if item:
+                    if any((row_idx, 5, reason) in invalid_cells for reason in ["non-positive"]):
+                        item.setBackground(QBrush(Qt.yellow))
+                        tooltip = "Row Number must be positive"
+                    elif any((row_idx, 5, reason) in invalid_cells for reason in ["non-integer", "invalid"]):
+                        item.setBackground(QBrush(Qt.yellow))
+                        tooltip = "Row Number must be an integer"
+                    elif any((row_idx, 5, reason) in invalid_cells for reason in ["exceeds-num-rows"]):
+                        item.setBackground(QBrush(Qt.yellow))
+                        tooltip = f"Row Number exceeds Number of Rows ({self.project_data.frame_config.num_rows})"
+                    else:
+                        item.setBackground(QBrush())
+                else:
+                    item = QTableWidgetItem("1")
+                    if any((row_idx, 5, reason) in invalid_cells for reason in ["non-positive", "non-integer", "invalid", "exceeds-num-rows"]):
+                        item.setBackground(QBrush(Qt.yellow))
+                        tooltip = "Row Number must be a positive integer"
+                    self.tasks_table.setItem(row_idx, 5, item)
+                item.setToolTip(tooltip)
+
+            self.tasks_table.blockSignals(False)
+            print(f"Highlighted cells: {list(invalid_cells)}")  # Debug
+
+            # Process tasks only if no errors
+            if has_errors:
+                self.data_updated.emit({})  # Signal empty data to prevent Gantt chart generation
+                return
+
             self.project_data.tasks.clear()
             for row in tasks_data:
                 task_id = int(row[0] or 0)
-                try:
-                    task_order = float(row[1] or 0)
-                    if task_order <= 0:
-                        raise ValueError(f"Task {task_id}: Task Order must be positive")
-                except ValueError as e:
-                    if str(e).startswith("Task"):
-                        raise
-                    raise ValueError(f"Task {task_id}: Invalid Task Order '{row[1]}'")
+                task_order = float(row[1] or 0)
                 task_name = row[2] or "Unnamed"
                 start_date_raw = row[3] or QDate.currentDate().toString("yyyy-MM-dd")
                 finish_date_raw = row[4] or QDate.currentDate().toString("yyyy-MM-dd")
@@ -676,29 +821,12 @@ class DataEntryWindow(QMainWindow):
                 label_vertical_offset = float(row[10] or 0.5)
                 label_text_colour = row[11] or "black"
 
-                if not start_date_raw and not finish_date_raw:
-                    raise ValueError(f"Task {task_id}: Must provide at least one date")
-
                 is_milestone = bool(start_date_raw) != bool(finish_date_raw)
                 start_date_json = start_date_raw
                 finish_date_json = finish_date_raw
                 render_start = start_date_raw if start_date_raw else finish_date_raw
                 render_finish = finish_date_raw if finish_date_raw else start_date_raw
 
-                if start_date_raw and finish_date_raw:
-                    start_dt = datetime.strptime(start_date_raw, "%Y-%m-%d")
-                    finish_dt = datetime.strptime(finish_date_raw, "%Y-%m-%d")
-                    if start_dt > finish_dt:
-                        raise ValueError(
-                            f"Task {task_id}: Start date '{start_date_raw}' is after finish date '{finish_date_raw}'")
-                elif start_date_raw:
-                    datetime.strptime(start_date_raw, "%Y-%m-%d")
-                elif finish_date_raw:
-                    datetime.strptime(finish_date_raw, "%Y-%m-%d")
-
-                if row_number > self.project_data.frame_config.num_rows:
-                    raise ValueError(
-                        f"Task {task_id}: Row number {row_number} exceeds {self.project_data.frame_config.num_rows}")
                 self.project_data.add_task(task_id, task_name, render_start, render_finish, row_number, is_milestone,
                                           label_placement, label_hide, label_alignment,
                                           label_horizontal_offset, label_vertical_offset, label_text_colour)
@@ -714,7 +842,6 @@ class DataEntryWindow(QMainWindow):
             self.data_updated.emit(self.project_data.to_json())
         except ValueError as e:
             QMessageBox.critical(self, "Error", str(e))
-
     def _load_initial_data(self):
         self.outer_width_input.setText(str(self.project_data.frame_config.outer_width))
         self.outer_height_input.setText(str(self.project_data.frame_config.outer_height))
