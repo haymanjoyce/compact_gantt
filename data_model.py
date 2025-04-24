@@ -19,11 +19,12 @@ class FrameConfig:
 class Task:
     def __init__(self, task_id, task_name, start_date, finish_date, row_number, is_milestone=False,
                  label_placement="Inside", label_hide="No", label_alignment="Left",
-                 label_horizontal_offset=1.0, label_vertical_offset=0.5, label_text_colour="black"):
+                 label_horizontal_offset=1.0, label_vertical_offset=0.5, label_text_colour="black", task_order=1.0):
         self.task_id = task_id
+        self.task_order = task_order
         self.task_name = task_name
-        self.start_date = start_date  # Can be "" if blank
-        self.finish_date = finish_date  # Can be "" if blank
+        self.start_date = start_date
+        self.finish_date = finish_date
         self.row_number = row_number
         self.is_milestone = is_milestone
         self.label_placement = label_placement
@@ -49,10 +50,10 @@ class ProjectData:
 
     def add_task(self, task_id, task_name, start_date, finish_date, row_number, is_milestone=False,
                  label_placement="Inside", label_hide="No", label_alignment="Left",
-                 label_horizontal_offset=1.0, label_vertical_offset=0.5, label_text_colour="black"):
+                 label_horizontal_offset=1.0, label_vertical_offset=0.5, label_text_colour="black", task_order=1.0):
         self.tasks.append(Task(task_id, task_name, start_date, finish_date, row_number, is_milestone,
                               label_placement, label_hide, label_alignment,
-                              label_horizontal_offset, label_vertical_offset, label_text_colour))
+                              label_horizontal_offset, label_vertical_offset, label_text_colour, task_order))
 
     def update_from_table(self, key, data):
         if key == "connectors":
@@ -71,7 +72,7 @@ class ProjectData:
 
     def get_table_data(self, key):
         if key == "tasks":
-            return [[t.task_id, t.task_name, t.start_date, t.finish_date, str(t.row_number),
+            return [[t.task_id, str(t.task_order), t.task_name, t.start_date, t.finish_date, str(t.row_number),
                      t.label_placement, t.label_hide, t.label_alignment,
                      str(t.label_horizontal_offset), str(t.label_vertical_offset), t.label_text_colour]
                     for t in self.tasks]
@@ -83,10 +84,11 @@ class ProjectData:
         return {
             "frame_config": vars(self.frame_config),
             "time_frames": self.time_frames,
-            "tasks": [{"task_id": t.task_id, "task_name": t.task_name, "start_date": t.start_date,
-                       "finish_date": t.finish_date, "row_number": t.row_number, "is_milestone": t.is_milestone,
-                       "label_placement": t.label_placement, "label_hide": t.label_hide,
-                       "label_alignment": t.label_alignment, "label_horizontal_offset": t.label_horizontal_offset,
+            "tasks": [{"task_id": t.task_id, "task_order": t.task_order, "task_name": t.task_name,
+                       "start_date": t.start_date, "finish_date": t.finish_date, "row_number": t.row_number,
+                       "is_milestone": t.is_milestone, "label_placement": t.label_placement,
+                       "label_hide": t.label_hide, "label_alignment": t.label_alignment,
+                       "label_horizontal_offset": t.label_horizontal_offset,
                        "label_vertical_offset": t.label_vertical_offset, "label_text_colour": t.label_text_colour}
                       for t in self.tasks],
             "connectors": self.connectors,
@@ -103,9 +105,14 @@ class ProjectData:
         project.time_frames = data.get("time_frames", [])
         for task in data.get("tasks", []):
             project.add_task(task["task_id"], task["task_name"], task["start_date"],
-                            task["finish_date"], task["row_number"], task.get("is_milestone", False),
-                            task.get("label_placement", "Inside"), task.get("label_hide", "No"),
-                            task.get("label_alignment", "Left"), task.get("label_horizontal_offset", 1.0),
-                            task.get("label_vertical_offset", 0.5), task.get("label_text_colour", "black"))
-        # [Rest unchanged, omitted]
+                             task["finish_date"], task["row_number"], task.get("is_milestone", False),
+                             task.get("label_placement", "Inside"), task.get("label_hide", "No"),
+                             task.get("label_alignment", "Left"), task.get("label_horizontal_offset", 1.0),
+                             task.get("label_vertical_offset", 0.5), task.get("label_text_colour", "black"),
+                             task.get("task_order", float(len(project.tasks) + 1)))
+        project.connectors = data.get("connectors", [])
+        project.swimlanes = data.get("swimlanes", [])
+        project.pipes = data.get("pipes", [])
+        project.curtains = data.get("curtains", [])
+        project.text_boxes = data.get("text_boxes", [])
         return project

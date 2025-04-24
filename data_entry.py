@@ -579,7 +579,7 @@ class DataEntryWindow(QMainWindow):
 
     def _sync_data(self):
         try:
-          # Validate Layout tab
+            # Validate Layout tab
             margins = (
                 float(self.top_margin_input.text() or 0),
                 float(self.right_margin_input.text() or 0),
@@ -626,21 +626,6 @@ class DataEntryWindow(QMainWindow):
             task_order_counts = {}
             for row_idx, row in enumerate(tasks_data):
                 try:
-                    task_order = float(row[1]) if row[1] else 0
-                    task_order_counts[task_order] = task_order_counts.get(task_order, 0) + 1
-                    if task_order <= 0:
-                        invalid_cells.add((row_idx, 1, "non-positive"))
-                except ValueError:
-                    invalid_cells.add((row_idx, 1, "invalid"))
-            non_unique_orders = {k for k, v in task_order_counts.items() if v > 1}
-
-            # Track invalid cells with reasons for tooltips
-            invalid_cells = set()  # (row, col, reason)
-
-            # Validate Task Order
-            task_order_counts = {}
-            for row_idx, row in enumerate(tasks_data):
-                try:
                     task_order = float(row[1] or 0)
                     task_order_counts[task_order] = task_order_counts.get(task_order, 0) + 1
                     if task_order <= 0:
@@ -648,14 +633,6 @@ class DataEntryWindow(QMainWindow):
                 except ValueError:
                     invalid_cells.add((row_idx, 1, "invalid"))
             non_unique_orders = {k for k, v in task_order_counts.items() if v > 1}
-            for k in non_unique_orders:
-                for row_idx, row in enumerate(tasks_data):
-                    try:
-                        if float(row[1] or 0) == k:
-                            invalid_cells.add((row_idx, 1, "non-unique"))
-                    except ValueError:
-                        pass
-            print(f"Non-unique Task Orders: {non_unique_orders}")  # Debug
 
             # Validate dates and row numbers
             has_errors = False
@@ -788,8 +765,7 @@ class DataEntryWindow(QMainWindow):
             # Apply highlights and tooltips for Tasks
             self.tasks_table.blockSignals(True)
             for row_idx in range(self.tasks_table.rowCount()):
-                task_id = self.tasks_table.item(row_idx, 0).text() if self.tasks_table.item(row_idx,
-                                                                                            0) else "Unknown"
+                task_id = self.tasks_table.item(row_idx, 0).text() if self.tasks_table.item(row_idx, 0) else "Unknown"
 
                 # Task Order (col 1)
                 item = self.tasks_table.item(row_idx, 1)
@@ -848,7 +824,7 @@ class DataEntryWindow(QMainWindow):
                         tooltip = f"Task {task_id}: Finish Date must be yyyy-MM-dd"
                     elif any((row_idx, 4, reason) in invalid_cells for reason in ["start-after-finish"]):
                         item.setBackground(QBrush(Qt.yellow))
-                        tooltip = f"Task {task_id}: Finish Date cannot be before Start Date"
+                        tooltip = f"Task {task_id}: Start Date cannot be after Finish Date"
                     elif any((row_idx, 4, reason) in invalid_cells for reason in ["both-empty"]):
                         item.setBackground(QBrush(Qt.yellow))
                         tooltip = f"Task {task_id}: Start or Finish Date required"
@@ -869,39 +845,38 @@ class DataEntryWindow(QMainWindow):
                     if any((row_idx, 5, reason) in invalid_cells for reason in ["non-positive"]):
                         item.setBackground(QBrush(Qt.yellow))
                         tooltip = f"Task {task_id}: Row Number must be positive"
-                    elif any((row_idx, 5, reason) in invalid_cells for reason in ["non-integer", "invalid"]):
+                    elif any((row_idx, 5, reason) in invalid_cells for reason in ["non-integer"]):
                         item.setBackground(QBrush(Qt.yellow))
                         tooltip = f"Task {task_id}: Row Number must be an integer"
                     elif any((row_idx, 5, reason) in invalid_cells for reason in ["exceeds-num-rows"]):
                         item.setBackground(QBrush(Qt.yellow))
-                        tooltip = f"Task {task_id}: Row Number cannot exceed {self.project_data.frame_config.num_rows}"
+                        tooltip = f"Task {task_id}: Row Number exceeds number of rows"
+                    elif any((row_idx, 5, reason) in invalid_cells for reason in ["invalid"]):
+                        item.setBackground(QBrush(Qt.yellow))
+                        tooltip = f"Task {task_id}: Row Number must be a number"
                     else:
                         item.setBackground(QBrush())
                 else:
                     item = QTableWidgetItem("1")
-                    if any((row_idx, 5, reason) in invalid_cells for reason in
-                           ["non-positive", "non-integer", "invalid", "exceeds-num-rows"]):
-                        item.setBackground(QBrush(Qt.yellow))
-                        tooltip = f"Task {task_id}: Row Number must be a positive integer"
+                    item.setBackground(QBrush(Qt.yellow))
+                    tooltip = f"Task {task_id}: Row Number required"
                     self.tasks_table.setItem(row_idx, 5, item)
                 item.setToolTip(tooltip)
-
             self.tasks_table.blockSignals(False)
-            print(f"Highlighted cells: {list(invalid_cells)}")  # Debug
 
-            # Process tasks only if no errors
             if has_errors:
                 self.status_bar.showMessage("Fix highlighted cells to generate chart")
                 self.data_updated.emit({})  # Signal empty data to prevent Gantt chart generation
                 return
 
+            # Update tasks in ProjectData
             self.project_data.tasks.clear()
             for row in tasks_data:
                 task_id = int(row[0] or 0)
                 task_order = float(row[1] or 0)
                 task_name = row[2] or "Unnamed"
-                start_date_raw = row[3] or QDate.currentDate().toString("yyyy-MM-dd")
-                finish_date_raw = row[4] or QDate.currentDate().toString("yyyy-MM-dd")
+                start_date_raw = row[3] or ""
+                finish_date_raw = row[4] or ""
                 row_number = int(row[5] or 1)
                 label_placement = row[6] or "Inside"
                 label_hide = row[7] or "No"
@@ -911,17 +886,18 @@ class DataEntryWindow(QMainWindow):
                 label_text_colour = row[11] or "black"
 
                 is_milestone = bool(start_date_raw) != bool(finish_date_raw)
-                start_date_json = start_date_raw
-                finish_date_json = finish_date_raw
                 render_start = start_date_raw if start_date_raw else finish_date_raw
                 render_finish = finish_date_raw if finish_date_raw else start_date_raw
 
-                self.project_data.add_task(task_id, task_name, render_start, render_finish, row_number, is_milestone,
-                                          label_placement, label_hide, label_alignment,
-                                          label_horizontal_offset, label_vertical_offset, label_text_colour)
-                self.project_data.tasks[-1].start_date = start_date_json
-                self.project_data.tasks[-1].finish_date = finish_date_json
+                self.project_data.add_task(
+                    task_id, task_name, render_start, render_finish, row_number, is_milestone,
+                    label_placement, label_hide, label_alignment,
+                    label_horizontal_offset, label_vertical_offset, label_text_colour, task_order
+                )
+                self.project_data.tasks[-1].start_date = start_date_raw
+                self.project_data.tasks[-1].finish_date = finish_date_raw
 
+            # Update other tables
             self.project_data.update_from_table("connectors", self._extract_table_data(self.connectors_table))
             self.project_data.update_from_table("swimlanes", self._extract_table_data(self.swimlanes_table))
             self.project_data.update_from_table("pipes", self._extract_table_data(self.pipes_table))
@@ -937,23 +913,27 @@ class DataEntryWindow(QMainWindow):
 
     def _load_initial_data(self):
         # Layout tab inputs
-        self.outer_width_input.setText(str(self.project_data.frame_config.outer_width))
-        self.outer_height_input.setText(str(self.project_data.frame_config.outer_height))
-        self.header_height_input.setText(str(self.project_data.frame_config.header_height))
-        self.footer_height_input.setText(str(self.project_data.frame_config.footer_height))
-        self.top_margin_input.setText(str(self.project_data.frame_config.margins[0]))
-        self.right_margin_input.setText(str(self.project_data.frame_config.margins[1]))
-        self.bottom_margin_input.setText(str(self.project_data.frame_config.margins[2]))
-        self.left_margin_input.setText(str(self.project_data.frame_config.margins[3]))
-        self.header_text_input.setText(self.project_data.frame_config.header_text)
-        self.footer_text_input.setText(self.project_data.frame_config.footer_text)
-        self.num_rows_input.setText(str(self.project_data.frame_config.num_rows))
-        self.horizontal_gridlines_input.setChecked(self.project_data.frame_config.horizontal_gridlines)
-        self.vertical_gridlines_input.setChecked(self.project_data.frame_config.vertical_gridlines)
-        self.chart_start_date_input.setDate(
-            QDate.fromString(self.project_data.frame_config.chart_start_date, "yyyy-MM-dd"))
+        try:
+            self.outer_width_input.setText(str(float(self.project_data.frame_config.outer_width or 800)))
+            self.outer_height_input.setText(str(float(self.project_data.frame_config.outer_height or 600)))
+            self.header_height_input.setText(str(float(self.project_data.frame_config.header_height or 50)))
+            self.footer_height_input.setText(str(float(self.project_data.frame_config.footer_height or 50)))
+            self.top_margin_input.setText(str(float(self.project_data.frame_config.margins[0] or 10)))
+            self.right_margin_input.setText(str(float(self.project_data.frame_config.margins[1] or 10)))
+            self.bottom_margin_input.setText(str(float(self.project_data.frame_config.margins[2] or 10)))
+            self.left_margin_input.setText(str(float(self.project_data.frame_config.margins[3] or 10)))
+            self.header_text_input.setText(str(self.project_data.frame_config.header_text or ""))
+            self.footer_text_input.setText(str(self.project_data.frame_config.footer_text or ""))
+            self.num_rows_input.setText(str(int(self.project_data.frame_config.num_rows or 1)))
+            self.horizontal_gridlines_input.setChecked(bool(self.project_data.frame_config.horizontal_gridlines))
+            self.vertical_gridlines_input.setChecked(bool(self.project_data.frame_config.vertical_gridlines))
+            chart_start_date = self.project_data.frame_config.chart_start_date or "2025-01-01"
+            QDate.fromString(chart_start_date, "yyyy-MM-dd")  # Validate date format
+            self.chart_start_date_input.setDate(QDate.fromString(chart_start_date, "yyyy-MM-dd"))
+        except (TypeError, ValueError) as e:
+            raise ValueError(f"Invalid frame_config data: {e}")
 
-        # Initialize tables based on table_configs and project_data
+        # Initialize tables
         for tab_key, table in [
             ("time_frames", self.time_frames_table),
             ("tasks", self.tasks_table),
@@ -967,33 +947,46 @@ class DataEntryWindow(QMainWindow):
             min_rows = config.get("min_rows", 0)
             table_data = self.project_data.get_table_data(tab_key)
 
-            # Set row count: use table_data if available, else min_rows
+            # Validate table data
+            if tab_key == "tasks" and table_data:
+                expected_cols = len(self.table_configs["tasks"]["columns"])
+                for row in table_data:
+                    if len(row) != expected_cols:
+                        raise ValueError(f"Tasks table data has {len(row)} columns, expected {expected_cols}")
+
             row_count = len(table_data) if table_data else min_rows
             table.setRowCount(row_count)
 
-            # Populate table with data or defaults
             if table_data:
                 for row_idx, row_data in enumerate(table_data):
                     for col_idx, value in enumerate(row_data):
-                        if tab_key == "tasks" and col_idx in (6, 8):  # Combo boxes for Label Placement, Alignment
-                            combo = QComboBox()
-                            items = ["Inside", "To left", "To right", "Above", "Below"] if col_idx == 6 else ["Left",
-                                                                                                              "Centre",
-                                                                                                              "Right"]
-                            combo.addItems(items)
-                            combo.setCurrentText(value or items[0])
-                            table.setCellWidget(row_idx, col_idx, combo)
-                        else:
-                            item = NumericTableWidgetItem(str(value)) if tab_key == "tasks" and col_idx in (0,
-                                                                                                            1) else QTableWidgetItem(
-                                str(value))
-                            if tab_key == "tasks" and col_idx == 0:  # Task ID read-only
-                                item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-                                item.setData(Qt.UserRole, int(value) if value.isdigit() else 0)
-                            elif tab_key == "tasks" and col_idx == 1:  # Task Order numeric
-                                item.setData(Qt.UserRole, float(value) if value else 0.0)
-                            table.setItem(row_idx, col_idx, item)
-            elif min_rows > 0:  # Populate defaults for tabs with min_rows > 0
+                        try:
+                            if tab_key == "tasks" and col_idx in (6, 8):  # Combo boxes
+                                combo = QComboBox()
+                                items = ["Inside", "To left", "To right", "Above", "Below"] if col_idx == 6 else [
+                                    "Left", "Centre", "Right"]
+                                combo.addItems(items)
+                                combo.setCurrentText(str(value) or items[0])
+                                table.setCellWidget(row_idx, col_idx, combo)
+                            else:
+                                item = NumericTableWidgetItem(str(value)) if tab_key == "tasks" and col_idx in (0,
+                                                                                                                1) else QTableWidgetItem(
+                                    str(value))
+                                if tab_key == "tasks" and col_idx == 0:  # Task ID read-only
+                                    item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                                    try:
+                                        item.setData(Qt.UserRole, int(value))
+                                    except (TypeError, ValueError):
+                                        item.setData(Qt.UserRole, 0)
+                                elif tab_key == "tasks" and col_idx == 1:  # Task Order numeric
+                                    try:
+                                        item.setData(Qt.UserRole, float(value) if value else 0.0)
+                                    except (TypeError, ValueError):
+                                        item.setData(Qt.UserRole, 0.0)
+                                table.setItem(row_idx, col_idx, item)
+                        except (TypeError, ValueError) as e:
+                            raise ValueError(f"Error populating {tab_key} table at row {row_idx}, col {col_idx}: {e}")
+            elif min_rows > 0:
                 for row_idx in range(min_rows):
                     defaults = config.get("defaults", lambda x: [])(row_idx) if tab_key != "tasks" else config.get(
                         "defaults", lambda x, y: [])(row_idx + 1, row_idx + 1)
@@ -1014,7 +1007,6 @@ class DataEntryWindow(QMainWindow):
                                 item.setData(Qt.UserRole, float(default) if default else 0.0)
                             table.setItem(row_idx, col_idx, item)
 
-        # Renumber Task Orders for Tasks table
         if self.tasks_table.rowCount() > 0:
             self._renumber_task_orders(self.tasks_table)
             self.tasks_table.sortByColumn(1, Qt.AscendingOrder)
