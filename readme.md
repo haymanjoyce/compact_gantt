@@ -84,17 +84,17 @@ The GUI offers tabs for input, some planned but not yet implemented:
 
 ## Files
 - `main.py`: Application entry point, initializes and connects components.
-- `ui/data_entry_window.py`: Main GUI window, manages tabs and user interactions.
+- `ui/data_entry_window.py`: Main GUI window, manages tabs and user interactions via `QTabWidget`.
+- `ui/tabs/layout_tab.py`: Layout tab UI and logic for chart dimensions, margins, and gridlines.
+- `ui/tabs/time_frames_tab.py`: Time Frames tab UI and logic for defining time spans.
+- `ui/tabs/tasks_tab.py`: Tasks tab UI and logic for task entry and validation.
+- `ui/tabs/connectors_tab.py`: Connectors tab UI and logic (planned).
+- `ui/tabs/swimlanes_tab.py`: Swimlanes tab UI and logic (planned).
+- `ui/tabs/pipes_tab.py`: Pipes tab UI and logic (planned).
+- `ui/tabs/curtains_tab.py`: Curtains tab UI and logic (planned).
+- `ui/tabs/text_boxes_tab.py`: Text Boxes tab UI and logic (planned).
 - `ui/table_utils.py`: Shared utilities for table operations (e.g., row insertion, context menus).
-- `ui/tabs/layout_tab.py`: Layout tab UI and logic.
-- `ui/tabs/time_frames_tab.py`: Time Frames tab UI and logic.
-- `ui/tabs/tasks_tab.py`: Tasks tab UI and logic.
-- `ui/tabs/connectors_tab.py`: Connectors tab UI and logic.
-- `ui/tabs/swimlanes_tab.py`: Swimlanes tab UI and logic.
-- `ui/tabs/pipes_tab.py`: Pipes tab UI and logic.
-- `ui/tabs/curtains_tab.py`: Curtains tab UI and logic.
-- `ui/tabs/text_boxes_tab.py`: Text Boxes tab UI and logic.
-- `ui/tabs/tab_factory.py`: Factory for creating tab instances dynamically.
+- `ui/tabs/tab_factory.py`: Factory for creating tab instances dynamically (optional, planned).
 - `core/data_model.py`: Defines data structures (`FrameConfig`, `Task`, `ProjectData`).
 - `core/validators.py`: Validation logic for all tabs, decoupled from UI.
 - `core/controller.py`: Coordinates UI, data model, and output generation.
@@ -112,8 +112,8 @@ The GUI offers tabs for input, some planned but not yet implemented:
 
 ## Folders
 - `haymanjoyce-gantt_02/`: Main project directory.
-- `ui/`: User interface modules, including main window and tab-specific logic.
-- `ui/tabs/`: Individual tab implementations for modular UI design.
+- `ui/`: User interface package, containing the main window and tab-specific modules.
+- `ui/tabs/`: Subpackage for individual tab implementations, enhancing modularity.
 - `core/`: Core business logic, data models, and configuration.
 - `core/config/`: Configuration settings and constants, split for clarity.
 - `output/`: Modules for generating and displaying chart output.
