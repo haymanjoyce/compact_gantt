@@ -1,6 +1,5 @@
 import svgwrite
 from datetime import datetime, timedelta
-import calendar
 import os
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot
 from PyQt5.QtGui import QFont, QFontMetrics

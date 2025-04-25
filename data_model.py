@@ -1,5 +1,3 @@
-from datetime import datetime
-
 class FrameConfig:
     def __init__(self, outer_width=800, outer_height=600, header_height=50, footer_height=50,
                  margins=(10, 10, 10, 10), num_rows=1, header_text="", footer_text="",

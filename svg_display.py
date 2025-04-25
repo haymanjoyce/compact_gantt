@@ -1,8 +1,3 @@
-"""
-Defines SVGDisplayWindow, handles SVG rendering.
-Why: Separates the output UI into its own module. It’s reusable for any SVG display need, not tied to the data entry.
-"""
-
 from PyQt5.QtWidgets import QDialog, QVBoxLayout
 from PyQt5.QtSvg import QSvgWidget
 import os

@@ -1,8 +1,3 @@
-"""
-Purpose: Centralizes configuration settings for the Gantt Chart Application.
-Why: Makes it easy to adjust sizes, paths, and defaults without changing core code.
-"""
-
 class Config:
     # Window settings
     DATA_ENTRY_WIDTH = 800
@@ -40,4 +35,4 @@ class Config:
     LEADER_LINE_HORIZONTAL_DEFAULT = 1.0  # For To left/To right
     LABEL_VERTICAL_OFFSET_FACTOR = 0.3  # Factor of font_size to shift text down for vertical centering
     LABEL_HORIZONTAL_OFFSET_FACTOR = 0.0  # For Left placement
-    LABEL_TEXT_WIDTH_FACTOR = 0.55  # New: ~7px/char for 10pt font
+    LABEL_TEXT_WIDTH_FACTOR = 0.55  # New: ~7px/char for 10 pt font
