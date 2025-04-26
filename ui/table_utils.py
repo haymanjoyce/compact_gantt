@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QTableWidgetItem, QMenu, QComboBox
+from PyQt5.QtWidgets import QTableWidgetItem, QMenu, QComboBox, QAction
 from PyQt5.QtCore import Qt
 
 class NumericTableWidgetItem(QTableWidgetItem):
@@ -13,6 +13,7 @@ class NumericTableWidgetItem(QTableWidgetItem):
         return super().__lt__(other)
 
 def add_row(table, config_key, table_configs, tab):
+    print(f"Adding row to {config_key}, row count: {table.rowCount()}")
     config = table_configs.get(config_key, {})
     row_count = table.rowCount()
     was_sorting = table.isSortingEnabled()
@@ -34,9 +35,11 @@ def add_row(table, config_key, table_configs, tab):
             except ValueError:
                 pass
         task_order = max_task_order + 1
+        print(f"Task ID: {task_id}, Task Order: {task_order}")
         defaults = config.get("defaults", lambda x, y: [])(task_id, task_order)
     else:
         defaults = config.get("defaults", lambda x: [])(row_count)
+    print(f"Defaults: {defaults}")
     for col, default in enumerate(defaults):
         if isinstance(default, dict) and default.get("type") == "combo":
             combo = QComboBox()
@@ -52,11 +55,59 @@ def add_row(table, config_key, table_configs, tab):
                 item.setData(Qt.UserRole, float(default))
             table.setItem(row_count, col, item)
     if config_key == "tasks":
+        print("Renumbering task orders")
         renumber_task_orders(table)
     table.blockSignals(False)
     table.setSortingEnabled(was_sorting)
     table.sortByColumn(1, Qt.AscendingOrder) if config_key == "tasks" else None
+    print("Syncing data")
     tab._sync_data_if_not_initializing()
+
+# def add_row(table, config_key, table_configs, tab):
+#     config = table_configs.get(config_key, {})
+#     row_count = table.rowCount()
+#     was_sorting = table.isSortingEnabled()
+#     table.setSortingEnabled(False)
+#     table.blockSignals(True)
+#     table.insertRow(row_count)
+#     if config_key == "tasks":
+#         max_task_id = 0
+#         for row in range(row_count):
+#             item = table.item(row, 0)
+#             if item and item.text().isdigit():
+#                 max_task_id = max(max_task_id, int(item.text()))
+#         task_id = max_task_id + 1
+#         max_task_order = 0
+#         for row in range(row_count):
+#             item = table.item(row, 1)
+#             try:
+#                 max_task_order = max(max_task_order, float(item.text()) if item and item.text() else 0)
+#             except ValueError:
+#                 pass
+#         task_order = max_task_order + 1
+#         defaults = config.get("defaults", lambda x, y: [])(task_id, task_order)
+#     else:
+#         defaults = config.get("defaults", lambda x: [])(row_count)
+#     for col, default in enumerate(defaults):
+#         if isinstance(default, dict) and default.get("type") == "combo":
+#             combo = QComboBox()
+#             combo.addItems(default["items"])
+#             combo.setCurrentText(default["default"])
+#             table.setCellWidget(row_count, col, combo)
+#         else:
+#             item = NumericTableWidgetItem(str(default)) if config_key == "tasks" and col in (0, 1) else QTableWidgetItem(str(default))
+#             if config_key == "tasks" and col == 0:
+#                 item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+#                 item.setData(Qt.UserRole, int(default))
+#             elif config_key == "tasks" and col == 1:
+#                 item.setData(Qt.UserRole, float(default))
+#             table.setItem(row_count, col, item)
+#     if config_key == "tasks":
+#         renumber_task_orders(table)
+#     table.blockSignals(False)
+#     table.setSortingEnabled(was_sorting)
+#     table.sortByColumn(1, Qt.AscendingOrder) if config_key == "tasks" else None
+#     tab._sync_data_if_not_initializing()
 
 def remove_row(table, config_key, table_configs, tab):
     config = table_configs.get(config_key, {})
@@ -68,17 +119,50 @@ def remove_row(table, config_key, table_configs, tab):
         tab._sync_data_if_not_initializing()
 
 def show_context_menu(pos, table, config_key, tab, table_configs):
-    menu = QMenu()
-    insert_action = QMenu("Insert Row Above", tab)
-    delete_action = QMenu("Delete Row", tab)
-    row_index = table.indexAt(pos).row()
-    if row_index < 0 or row_index >= table.rowCount():
-        row_index = 0
-    insert_action.triggered.connect(lambda: insert_row(table, config_key, table_configs, tab, row_index))
-    delete_action.triggered.connect(lambda: delete_row(table, config_key, table_configs, tab, row_index))
-    menu.addAction(insert_action)
-    menu.addAction(delete_action)
-    menu.exec_(table.viewport().mapToGlobal(pos))
+    print(f"Showing context menu for {config_key} at position {pos}")
+    try:
+        print(f"Table: {table}, Tab: {tab}, Configs: {table_configs}")
+        menu = QMenu(tab)  # Add parent for safety
+        print("Created main QMenu")
+
+        insert_action = QAction("Insert Row Above", tab)  # Use QAction instead of QMenu
+        delete_action = QAction("Delete Row", tab)  # Use QAction instead of QMenu
+        print("Created QActions")
+
+        row_index = table.indexAt(pos).row()
+        print(f"Calculated row_index: {row_index}")
+        if row_index < 0 or row_index >= table.rowCount():
+            row_index = 0
+            print(f"Adjusted row_index to: {row_index}")
+
+        menu.addAction(insert_action)
+        menu.addAction(delete_action)
+        print("Added actions to menu")
+
+        print("Connecting insert_action signal")
+        insert_action.triggered.connect(lambda: insert_row(table, config_key, table_configs, tab, row_index))
+        print("Connecting delete_action signal")
+        delete_action.triggered.connect(lambda: delete_row(table, config_key, table_configs, tab, row_index))
+
+        global_pos = table.viewport().mapToGlobal(pos)
+        print(f"Executing menu at global position {global_pos}")
+        menu.exec_(global_pos)
+    except Exception as e:
+        print(f"Error in show_context_menu: {e}")
+        raise
+
+# def show_context_menu(pos, table, config_key, tab, table_configs):
+#     menu = QMenu()
+#     insert_action = QMenu("Insert Row Above", tab)
+#     delete_action = QMenu("Delete Row", tab)
+#     row_index = table.indexAt(pos).row()
+#     if row_index < 0 or row_index >= table.rowCount():
+#         row_index = 0
+#     insert_action.triggered.connect(lambda: insert_row(table, config_key, table_configs, tab, row_index))
+#     delete_action.triggered.connect(lambda: delete_row(table, config_key, table_configs, tab, row_index))
+#     menu.addAction(insert_action)
+#     menu.addAction(delete_action)
+#     menu.exec_(table.viewport().mapToGlobal(pos))
 
 def insert_row(table, config_key, table_configs, tab, row_index):
     config = table_configs.get(config_key, {})
