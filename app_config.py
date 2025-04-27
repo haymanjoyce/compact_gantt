@@ -1,0 +1,205 @@
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from typing import List, Dict, Callable, Any, Tuple
+from PyQt5.QtCore import QDate
+
+@dataclass
+class GeneralConfig:
+    # Window settings
+    data_entry_width: int = 800
+    data_entry_height: int = 500
+    svg_display_width: int = 800
+    svg_display_height: int = 400
+
+    # SVG generation settings
+    svg_width: int = 800
+    svg_height: int = 400
+    svg_output_folder: str = "svg"
+    svg_output_filename: str = "gantt_chart.svg"
+
+    # Scale proportions
+    scale_proportion_years: float = 0.2
+    scale_proportion_months: float = 0.2
+    scale_proportion_weeks: float = 0.2
+    scale_proportion_days: float = 0.2
+
+    # Scale label thresholds
+    full_label_width: int = 50
+    short_label_width: int = 20
+    min_interval_width: int = 5
+
+    # Default table row counts
+    tasks_rows: int = 5
+    pipes_rows: int = 3
+    curtains_rows: int = 3
+
+    # Default colors and label settings
+    default_curtain_color: str = "red"
+    leader_line_vertical_default: float = 0.5
+    leader_line_horizontal_default: float = 1.0
+    label_vertical_offset_factor: float = 0.3
+    label_horizontal_offset_factor: float = 0.0
+    label_text_width_factor: float = 0.55
+
+    def __post_init__(self):
+        # Validate positive integers
+        for field_name in ["data_entry_width", "data_entry_height", "svg_display_width",
+                          "svg_display_height", "svg_width", "svg_height",
+                          "full_label_width", "short_label_width", "min_interval_width",
+                          "tasks_rows", "pipes_rows", "curtains_rows"]:
+            value = getattr(self, field_name)
+            if not isinstance(value, int) or value <= 0:
+                raise ValueError(f"{field_name} must be a positive integer")
+
+        # Validate floats
+        for field_name in ["scale_proportion_years", "scale_proportion_months",
+                          "scale_proportion_weeks", "scale_proportion_days",
+                          "leader_line_vertical_default", "leader_line_horizontal_default",
+                          "label_vertical_offset_factor", "label_horizontal_offset_factor",
+                          "label_text_width_factor"]:
+            value = getattr(self, field_name)
+            if not isinstance(value, float) or value < 0:
+                raise ValueError(f"{field_name} must be a non-negative float")
+
+@dataclass
+class TableColumnConfig:
+    name: str
+    default_value: Any = None
+    widget_type: str = "text"  # Options: "text", "combo", "date"
+    combo_items: List[str] = field(default_factory=list)
+    validator: Callable[[Any], bool] = lambda x: True
+
+@dataclass
+class TableConfig:
+    key: str
+    columns: List[TableColumnConfig]
+    min_rows: int
+    default_generator: Callable[[int, Dict[str, Any]], List[Any]]
+
+@dataclass
+class AppConfig:
+    general: GeneralConfig = field(default_factory=GeneralConfig)
+    tables: Dict[str, TableConfig] = field(default_factory=dict)
+
+    def __post_init__(self):
+        # Define default value generators
+        def time_frames_default(row_idx: int, context: Dict[str, Any]) -> List[Any]:
+            return [
+                (QDate.currentDate().addDays(7 * (row_idx + 1))).toString("yyyy-MM-dd"),
+                str(100 / (row_idx + 2))
+            ]
+
+        def tasks_default(row_idx: int, context: Dict[str, Any]) -> List[Any]:
+            task_id = context.get("max_task_id", 0) + 1
+            task_order = context.get("max_task_order", 0) + 1
+            return [
+                str(task_id), str(task_order), "New Task",
+                QDate.currentDate().toString("yyyy-MM-dd"),
+                QDate.currentDate().toString("yyyy-MM-dd"), "1",
+                {"type": "combo", "items": ["Inside", "To left", "To right", "Above", "Below"], "default": "Inside"},
+                "No", {"type": "combo", "items": ["Left", "Centre", "Right"], "default": "Left"},
+                "1.0", "0.5", "black"
+            ]
+
+        def connectors_default(row_idx: int, context: Dict[str, Any]) -> List[Any]:
+            return ["1", "2"]
+
+        def swimlanes_default(row_idx: int, context: Dict[str, Any]) -> List[Any]:
+            return ["1", "2", f"Swimlane {row_idx + 1}", "lightblue"]
+
+        def pipes_default(row_idx: int, context: Dict[str, Any]) -> List[Any]:
+            return [QDate.currentDate().toString("yyyy-MM-dd"), "red"]
+
+        def curtains_default(row_idx: int, context: Dict[str, Any]) -> List[Any]:
+            return [
+                QDate.currentDate().toString("yyyy-MM-dd"),
+                QDate.currentDate().toString("yyyy-MM-dd"), "gray"
+            ]
+
+        def text_boxes_default(row_idx: int, context: Dict[str, Any]) -> List[Any]:
+            return [f"Text {row_idx + 1}", "100", "100", "black"]
+
+        # Define table configurations
+        self.tables = {
+            "time_frames": TableConfig(
+                key="time_frames",
+                columns=[
+                    TableColumnConfig("Finish Date", validator=lambda x: bool(datetime.strptime(x, "%Y-%m-%d") if x else False)),
+                    TableColumnConfig("Width (%)", validator=lambda x: float(x) > 0 if x else False)
+                ],
+                min_rows=1,
+                default_generator=time_frames_default
+            ),
+            "tasks": TableConfig(
+                key="tasks",
+                columns=[
+                    TableColumnConfig("Task ID", validator=lambda x: int(x) > 0 if x else False),
+                    TableColumnConfig("Task Order", validator=lambda x: float(x) > 0 if x else False),
+                    TableColumnConfig("Task Name"),
+                    TableColumnConfig("Start Date", validator=lambda x: bool(datetime.strptime(x, "%Y-%m-%d") if x else False)),
+                    TableColumnConfig("Finish Date", validator=lambda x: bool(datetime.strptime(x, "%Y-%m-%d") if x else False)),
+                    TableColumnConfig("Row Number", validator=lambda x: int(x) > 0 if x else False),
+                    TableColumnConfig("Label Placement", widget_type="combo", combo_items=["Inside", "To left", "To right", "Above", "Below"]),
+                    TableColumnConfig("Label Hide", default_value="No"),
+                    TableColumnConfig("Label Alignment", widget_type="combo", combo_items=["Left", "Centre", "Right"]),
+                    TableColumnConfig("Horiz Offset", validator=lambda x: float(x) >= 0 if x else False),
+                    TableColumnConfig("Vert Offset", validator=lambda x: float(x) >= 0 if x else False),
+                    TableColumnConfig("Label Colour")
+                ],
+                min_rows=1,
+                default_generator=tasks_default
+            ),
+            "connectors": TableConfig(
+                key="connectors",
+                columns=[
+                    TableColumnConfig("From Task ID", validator=lambda x: int(x) > 0 if x else False),
+                    TableColumnConfig("To Task ID", validator=lambda x: int(x) > 0 if x else False)
+                ],
+                min_rows=0,
+                default_generator=connectors_default
+            ),
+            "swimlanes": TableConfig(
+                key="swimlanes",
+                columns=[
+                    TableColumnConfig("From Row Number", validator=lambda x: int(x) > 0 if x else False),
+                    TableColumnConfig("To Row Number", validator=lambda x: int(x) > 0 if x else False),
+                    TableColumnConfig("Title"),
+                    TableColumnConfig("Colour")
+                ],
+                min_rows=0,
+                default_generator=swimlanes_default
+            ),
+            "pipes": TableConfig(
+                key="pipes",
+                columns=[
+                    TableColumnConfig("Date", validator=lambda x: bool(datetime.strptime(x, "%Y-%m-%d") if x else False)),
+                    TableColumnConfig("Colour")
+                ],
+                min_rows=0,
+                default_generator=pipes_default
+            ),
+            "curtains": TableConfig(
+                key="curtains",
+                columns=[
+                    TableColumnConfig("From Date", validator=lambda x: bool(datetime.strptime(x, "%Y-%m-%d") if x else False)),
+                    TableColumnConfig("To Date", validator=lambda x: bool(datetime.strptime(x, "%Y-%m-%d") if x else False)),
+                    TableColumnConfig("Colour")
+                ],
+                min_rows=0,
+                default_generator=curtains_default
+            ),
+            "text_boxes": TableConfig(
+                key="text_boxes",
+                columns=[
+                    TableColumnConfig("Text"),
+                    TableColumnConfig("X Coordinate", validator=lambda x: float(x) >= 0 if x else False),
+                    TableColumnConfig("Y Coordinate", validator=lambda x: float(x) >= 0 if x else False),
+                    TableColumnConfig("Colour")
+                ],
+                min_rows=0,
+                default_generator=text_boxes_default
+            )
+        }
+
+    def get_table_config(self, key: str) -> TableConfig:
+        return self.tables.get(key, None)

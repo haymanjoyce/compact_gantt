@@ -3,16 +3,16 @@ from datetime import datetime, timedelta
 import os
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot
 from PyQt5.QtGui import QFont, QFontMetrics
-from config import Config
+from app_config import AppConfig
 
 class GanttChartGenerator(QObject):
     svg_generated = pyqtSignal(str)
 
-    def __init__(self, output_folder: str = Config.SVG_OUTPUT_FOLDER,
-                 output_filename: str = Config.SVG_OUTPUT_FILENAME):
+    def __init__(self, output_folder: str = None, output_filename: str = None):
         super().__init__()
-        self.output_folder = output_folder
-        self.output_filename = output_filename
+        self.config = AppConfig()  # Store AppConfig as instance variable
+        self.output_folder = output_folder or self.config.general.svg_output_folder
+        self.output_filename = output_filename or self.config.general.svg_output_filename
         self.dwg = None
         self.data = {"frame_config": {}, "time_frames": [], "tasks": []}
         self.start_date = None
@@ -27,8 +27,8 @@ class GanttChartGenerator(QObject):
             return
         try:
             self.data = data
-            width = self.data["frame_config"].get("outer_width", 800)
-            height = self.data["frame_config"].get("outer_height", 600)
+            width = self.data["frame_config"].get("outer_width", self.config.general.svg_width)
+            height = self.data["frame_config"].get("outer_height", self.config.general.svg_height)
             self.dwg = svgwrite.Drawing(
                 filename=os.path.abspath(os.path.join(self.output_folder, self.output_filename)),
                 size=(width, height))
@@ -68,13 +68,13 @@ class GanttChartGenerator(QObject):
         return start_date
 
     def render_outer_frame(self):
-        width = self.data["frame_config"].get("outer_width", 800)
-        height = self.data["frame_config"].get("outer_height", 600)
+        width = self.data["frame_config"].get("outer_width", self.config.general.svg_width)
+        height = self.data["frame_config"].get("outer_height", self.config.general.svg_height)
         self.dwg.add(self.dwg.rect(insert=(0, 0), size=(width, height), fill="white", stroke="black", stroke_width=2))
 
     def render_header(self):
         margins = self.data["frame_config"].get("margins", (10, 10, 10, 10))
-        width = self.data["frame_config"].get("outer_width", 800) - margins[1] - margins[3]
+        width = self.data["frame_config"].get("outer_width", self.config.general.svg_width) - margins[1] - margins[3]
         height = self.data["frame_config"].get("header_height", 50)
         self.dwg.add(self.dwg.rect(insert=(margins[3], margins[0]), size=(width, height),
                                    fill="lightgray", stroke="black", stroke_width=1))
@@ -86,9 +86,9 @@ class GanttChartGenerator(QObject):
 
     def render_footer(self):
         margins = self.data["frame_config"].get("margins", (10, 10, 10, 10))
-        width = self.data["frame_config"].get("outer_width", 800) - margins[1] - margins[3]
+        width = self.data["frame_config"].get("outer_width", self.config.general.svg_width) - margins[1] - margins[3]
         height = self.data["frame_config"].get("footer_height", 50)
-        y = self.data["frame_config"].get("outer_height", 600) - margins[2] - height
+        y = self.data["frame_config"].get("outer_height", self.config.general.svg_height) - margins[2] - height
         self.dwg.add(self.dwg.rect(insert=(margins[3], y), size=(width, height),
                                    fill="lightgray", stroke="black", stroke_width=1))
         footer_text = self.data["frame_config"].get("footer_text", "")
@@ -99,9 +99,9 @@ class GanttChartGenerator(QObject):
 
     def render_inner_frame(self):
         margins = self.data["frame_config"].get("margins", (10, 10, 10, 10))
-        width = self.data["frame_config"].get("outer_width", 800) - margins[1] - margins[3]
+        width = self.data["frame_config"].get("outer_width", self.config.general.svg_width) - margins[1] - margins[3]
         y = margins[0] + self.data["frame_config"].get("header_height", 50)
-        height = (self.data["frame_config"].get("outer_height", 600) -
+        height = (self.data["frame_config"].get("outer_height", self.config.general.svg_height) -
                   self.data["frame_config"].get("header_height", 50) -
                   self.data["frame_config"].get("footer_height", 50) - margins[0] - margins[2])
         self.dwg.add(self.dwg.rect(insert=(margins[3], y), size=(width, height),
@@ -110,8 +110,8 @@ class GanttChartGenerator(QObject):
     def render_time_frames(self):
         margins = self.data["frame_config"].get("margins", (10, 10, 10, 10))
         inner_y = margins[0] + self.data["frame_config"].get("header_height", 50)
-        inner_width = self.data["frame_config"].get("outer_width", 800) - margins[1] - margins[3]
-        inner_height = (self.data["frame_config"].get("outer_height", 600) -
+        inner_width = self.data["frame_config"].get("outer_width", self.config.general.svg_width) - margins[1] - margins[3]
+        inner_height = (self.data["frame_config"].get("outer_height", self.config.general.svg_height) -
                         self.data["frame_config"].get("header_height", 50) -
                         self.data["frame_config"].get("footer_height", 50) - margins[0] - margins[2])
         x_offset = margins[3]
@@ -141,8 +141,8 @@ class GanttChartGenerator(QObject):
             label_placement = task.get("label_placement", "Inside")
             label_hide = task.get("label_hide", "No") == "Yes"
             label_alignment = task.get("label_alignment", "Left")
-            label_horizontal_offset = float(task.get("label_horizontal_offset", 1.0))
-            label_vertical_offset = float(task.get("label_vertical_offset", 0.5))
+            label_horizontal_offset = float(task.get("label_horizontal_offset", self.config.general.leader_line_horizontal_default))
+            label_vertical_offset = float(task.get("label_vertical_offset", self.config.general.leader_line_vertical_default))
             task_name = task.get("task_name", "Unnamed")
             if not start_date_str and not finish_date_str:
                 continue
@@ -162,11 +162,11 @@ class GanttChartGenerator(QObject):
             width_task = tf_time_scale if task_start == task_finish else max(x_end - x_start, tf_time_scale)
             y_task = y + row_num * row_height
 
-            label_width = len(task_name) * font_size * Config.LABEL_HORIZONTAL_OFFSET_FACTOR  # For Left/Right
+            label_width = len(task_name) * font_size * self.config.general.label_text_width_factor  # For Left/Right
 
-            label_horizontal_offset = float(task.get("label_horizontal_offset", Config.LEADER_LINE_HORIZONTAL_DEFAULT))
+            label_horizontal_offset = float(task.get("label_horizontal_offset", self.config.general.leader_line_horizontal_default))
             if label_horizontal_offset < 0:
-                label_horizontal_offset = Config.LEADER_LINE_HORIZONTAL_DEFAULT  # Enforce no negatives
+                label_horizontal_offset = self.config.general.leader_line_horizontal_default  # Enforce no negatives
 
             if is_milestone:
                 half_size = task_height / 2
@@ -179,7 +179,7 @@ class GanttChartGenerator(QObject):
                     (center_x - half_size, center_y)
                 ]
                 if not label_hide:
-                    label_y_base = center_y + font_size * Config.LABEL_VERTICAL_OFFSET_FACTOR
+                    label_y_base = center_y + font_size * self.config.general.label_vertical_offset_factor
                     text_width = self.font_metrics.horizontalAdvance(task_name)
                     if label_placement == "To left":
                         milestone_left = center_x - half_size
@@ -205,7 +205,7 @@ class GanttChartGenerator(QObject):
                         self.dwg.add(self.dwg.line(leader_start, leader_end, stroke="black", stroke_width=1))
                     elif label_placement == "Above":
                         label_x = center_x if label_alignment == "Centre" else center_x - label_width if label_alignment == "Left" else center_x + label_width
-                        label_y = center_y - half_size - label_vertical_offset * row_height + font_size * Config.LABEL_VERTICAL_OFFSET_FACTOR
+                        label_y = center_y - half_size - label_vertical_offset * row_height + font_size * self.config.general.label_vertical_offset_factor
                         anchor = "middle" if label_alignment == "Centre" else "start" if label_alignment == "Left" else "end"
                         self.dwg.add(self.dwg.text(task_name, insert=(label_x, label_y), font_size="10", fill="black",
                                                    text_anchor=anchor))
@@ -214,7 +214,7 @@ class GanttChartGenerator(QObject):
                                           stroke_width=1))
                     elif label_placement == "Below":
                         label_x = center_x if label_alignment == "Centre" else center_x - label_width if label_alignment == "Left" else center_x + label_width
-                        label_y = center_y + half_size + label_vertical_offset * row_height + font_size * Config.LABEL_VERTICAL_OFFSET_FACTOR
+                        label_y = center_y + half_size + label_vertical_offset * row_height + font_size * self.config.general.label_vertical_offset_factor
                         anchor = "middle" if label_alignment == "Centre" else "start" if label_alignment == "Left" else "end"
                         self.dwg.add(self.dwg.text(task_name, insert=(label_x, label_y), font_size="10", fill="black",
                                                    text_anchor=anchor))
@@ -227,7 +227,7 @@ class GanttChartGenerator(QObject):
                     rect_y = y_task + y_offset
                     self.dwg.add(self.dwg.rect(insert=(x_start, rect_y), size=(width_task, task_height), fill="blue"))
                     if not label_hide:
-                        label_y_base = rect_y + task_height / 2 + font_size * Config.LABEL_VERTICAL_OFFSET_FACTOR
+                        label_y_base = rect_y + task_height / 2 + font_size * self.config.general.label_vertical_offset_factor
                         if label_placement == "Inside":
                             text_width = self.font_metrics.horizontalAdvance(task_name)
                             if text_width > width_task:
@@ -283,7 +283,7 @@ class GanttChartGenerator(QObject):
                             label_x = (x_start + width_task / 2) if label_alignment == "Centre" else (
                                         x_start + width_task / 2 - label_width) if label_alignment == "Left" else (
                                         x_start + width_task / 2 + label_width)
-                            label_y = rect_y - label_vertical_offset * row_height + font_size * Config.LABEL_VERTICAL_OFFSET_FACTOR
+                            label_y = rect_y - label_vertical_offset * row_height + font_size * self.config.general.label_vertical_offset_factor
                             anchor = "middle" if label_alignment == "Centre" else "start" if label_alignment == "Left" else "end"
                             self.dwg.add(
                                 self.dwg.text(task_name, insert=(label_x, label_y), font_size="10", fill="black",
@@ -295,7 +295,7 @@ class GanttChartGenerator(QObject):
                             label_x = (x_start + width_task / 2) if label_alignment == "Centre" else (
                                         x_start + width_task / 2 - label_width) if label_alignment == "Left" else (
                                         x_start + width_task / 2 + label_width)
-                            label_y = rect_y + task_height + label_vertical_offset * row_height + font_size * Config.LABEL_VERTICAL_OFFSET_FACTOR
+                            label_y = rect_y + task_height + label_vertical_offset * row_height + font_size * self.config.general.label_vertical_offset_factor
                             anchor = "middle" if label_alignment == "Centre" else "start" if label_alignment == "Left" else "end"
                             self.dwg.add(
                                 self.dwg.text(task_name, insert=(label_x, label_y), font_size="10", fill="black",
@@ -309,10 +309,10 @@ class GanttChartGenerator(QObject):
         tf_time_scale = width / total_days if total_days > 0 else width
 
         scale_configs = [
-            ("years", Config.SCALE_PROPORTION_YEARS),
-            ("months", Config.SCALE_PROPORTION_MONTHS),
-            ("weeks", Config.SCALE_PROPORTION_WEEKS),
-            ("days", Config.SCALE_PROPORTION_DAYS)
+            ("years", self.config.general.scale_proportion_years),
+            ("months", self.config.general.scale_proportion_months),
+            ("weeks", self.config.general.scale_proportion_weeks),
+            ("days", self.config.general.scale_proportion_days)
         ]
         row_frame_proportion = 1.0
         total_scale_proportion = sum(p for _, p in scale_configs)
@@ -381,7 +381,7 @@ class GanttChartGenerator(QObject):
             next_date = self.next_period(current_date, interval)
             x_pos = x + (next_date - start_date).days * tf_time_scale
             interval_width = x_pos - prev_x if x_pos <= x + width else (x + width) - prev_x
-            if x <= x_pos <= x + width and interval_width >= Config.MIN_INTERVAL_WIDTH:
+            if x <= x_pos <= x + width and interval_width >= self.config.general.min_interval_width:
                 self.dwg.add(self.dwg.line((x_pos, y), (x_pos, y + height),
                                            stroke="black", stroke_width=1))
             if prev_x < x + width and x_pos > x:
@@ -389,26 +389,26 @@ class GanttChartGenerator(QObject):
                 label_y = y + height / 2
                 label = ""
                 if interval == "years":
-                    if interval_width >= Config.FULL_LABEL_WIDTH:
+                    if interval_width >= self.config.general.full_label_width:
                         label = current_date.strftime("%Y")
-                    elif interval_width >= Config.SHORT_LABEL_WIDTH:
+                    elif interval_width >= self.config.general.short_label_width:
                         label = current_date.strftime("%y")
                 elif interval == "months":
-                    if interval_width >= Config.FULL_LABEL_WIDTH:
+                    if interval_width >= self.config.general.full_label_width:
                         label = current_date.strftime("%b")
-                    elif interval_width >= Config.SHORT_LABEL_WIDTH:
+                    elif interval_width >= self.config.general.short_label_width:
                         label = current_date.strftime("%b")[0]
                 elif interval == "weeks":
                     week_num = current_date.isocalendar()[1]
                     week_end = self.get_week_end_date(current_date)
-                    if interval_width >= Config.FULL_LABEL_WIDTH:
+                    if interval_width >= self.config.general.full_label_width:
                         label = f"{week_num:02d} ({week_end.strftime('%d')})"
-                    elif interval_width >= Config.SHORT_LABEL_WIDTH:
+                    elif interval_width >= self.config.general.short_label_width:
                         label = f"{week_num:02d}"
                 elif interval == "days":
-                    if interval_width >= Config.FULL_LABEL_WIDTH:
+                    if interval_width >= self.config.general.full_label_width:
                         label = current_date.strftime("%a")
-                    elif interval_width >= Config.SHORT_LABEL_WIDTH:
+                    elif interval_width >= self.config.general.short_label_width:
                         label = current_date.strftime("%a")[0]
                 if label:
                     self.dwg.add(self.dwg.text(label, insert=(label_x, label_y), text_anchor="middle",

@@ -7,10 +7,11 @@ from ..table_utils import add_row, remove_row, show_context_menu
 class TimeFramesTab(QWidget):
     data_updated = pyqtSignal(dict)
 
-    def __init__(self, project_data, table_configs):
+    def __init__(self, project_data, app_config):
         super().__init__()
         self.project_data = project_data
-        self.table_configs = table_configs
+        self.app_config = app_config
+        self.table_config = app_config.get_table_config("time_frames")
         self.setup_ui()
         self._load_initial_data()
         self.time_frames_table.itemChanged.connect(self._sync_data_if_not_initializing)
@@ -18,11 +19,11 @@ class TimeFramesTab(QWidget):
 
     def setup_ui(self):
         layout = QVBoxLayout()
-        self.time_frames_table = QTableWidget(2, len(self.table_configs["time_frames"]["columns"]))
-        self.time_frames_table.setHorizontalHeaderLabels(self.table_configs["time_frames"]["columns"])
+        self.time_frames_table = QTableWidget(2, len(self.table_config.columns))
+        self.time_frames_table.setHorizontalHeaderLabels([col.name for col in self.table_config.columns])
         self.time_frames_table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.time_frames_table.customContextMenuRequested.connect(
-            lambda pos: show_context_menu(pos, self.time_frames_table, "time_frames", self, self.table_configs))
+            lambda pos: show_context_menu(pos, self.time_frames_table, "time_frames", self, self.app_config.tables))
         self.time_frames_table.setSortingEnabled(True)
         self.time_frames_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.time_frames_table.resizeColumnsToContents()
@@ -31,17 +32,16 @@ class TimeFramesTab(QWidget):
         btn_layout = QGridLayout()
         add_btn = QPushButton("Add Time Frame")
         remove_btn = QPushButton("Remove Time Frame")
-        add_btn.clicked.connect(lambda: add_row(self.time_frames_table, "time_frames", self.table_configs, self))
-        remove_btn.clicked.connect(lambda: remove_row(self.time_frames_table, "time_frames", self.table_configs, self))
+        add_btn.clicked.connect(lambda: add_row(self.time_frames_table, "time_frames", self.app_config.tables, self))
+        remove_btn.clicked.connect(lambda: remove_row(self.time_frames_table, "time_frames", self.app_config.tables, self))
         btn_layout.addWidget(add_btn, 0, 0)
         btn_layout.addWidget(remove_btn, 0, 1)
         layout.addLayout(btn_layout)
         self.setLayout(layout)
 
     def _load_initial_data(self):
-        config = self.table_configs["time_frames"]
         table_data = self.project_data.get_table_data("time_frames")
-        row_count = max(len(table_data), config["min_rows"])
+        row_count = max(len(table_data), self.table_config.min_rows)
         self.time_frames_table.setRowCount(row_count)
         self._initializing = True
 
@@ -52,7 +52,7 @@ class TimeFramesTab(QWidget):
                     self.time_frames_table.setItem(row_idx, col_idx, item)
         else:
             for row_idx in range(row_count):
-                defaults = config["defaults"](row_idx)
+                defaults = self.table_config.default_generator(row_idx, {})
                 for col_idx, default in enumerate(defaults):
                     item = QTableWidgetItem(str(default))
                     self.time_frames_table.setItem(row_idx, col_idx, item)

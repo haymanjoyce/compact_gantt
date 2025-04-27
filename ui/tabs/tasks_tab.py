@@ -6,10 +6,11 @@ from ..table_utils import NumericTableWidgetItem, add_row, remove_row, show_cont
 class TasksTab(QWidget):
     data_updated = pyqtSignal(dict)
 
-    def __init__(self, project_data, table_configs):
+    def __init__(self, project_data, app_config):
         super().__init__()
         self.project_data = project_data
-        self.table_configs = table_configs
+        self.app_config = app_config
+        self.table_config = app_config.get_table_config("tasks")
         self.setup_ui()
         self._load_initial_data()
         self.tasks_table.itemChanged.connect(self._sync_data_if_not_initializing)
@@ -17,11 +18,11 @@ class TasksTab(QWidget):
 
     def setup_ui(self):
         layout = QVBoxLayout()
-        self.tasks_table = QTableWidget(5, len(self.table_configs["tasks"]["columns"]))
-        self.tasks_table.setHorizontalHeaderLabels(self.table_configs["tasks"]["columns"])
+        self.tasks_table = QTableWidget(self.app_config.general.tasks_rows, len(self.table_config.columns))
+        self.tasks_table.setHorizontalHeaderLabels([col.name for col in self.table_config.columns])
         self.tasks_table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.tasks_table.customContextMenuRequested.connect(
-            lambda pos: show_context_menu(pos, self.tasks_table, "tasks", self, self.table_configs))
+            lambda pos: show_context_menu(pos, self.tasks_table, "tasks", self, self.app_config.tables))
         self.tasks_table.setSortingEnabled(True)
         self.tasks_table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
         self.tasks_table.setColumnWidth(0, 80)  # Task ID
@@ -36,28 +37,27 @@ class TasksTab(QWidget):
         btn_layout = QGridLayout()
         add_btn = QPushButton("Add Task")
         remove_btn = QPushButton("Remove Task")
-        add_btn.clicked.connect(lambda: add_row(self.tasks_table, "tasks", self.table_configs, self))
-        remove_btn.clicked.connect(lambda: remove_row(self.tasks_table, "tasks", self.table_configs, self))
+        add_btn.clicked.connect(lambda: add_row(self.tasks_table, "tasks", self.app_config.tables, self))
+        remove_btn.clicked.connect(lambda: remove_row(self.tasks_table, "tasks", self.app_config.tables, self))
         btn_layout.addWidget(add_btn, 0, 0)
         btn_layout.addWidget(remove_btn, 0, 1)
         layout.addLayout(btn_layout)
         self.setLayout(layout)
 
     def _load_initial_data(self):
-        config = self.table_configs["tasks"]
         table_data = self.project_data.get_table_data("tasks")
-        row_count = max(len(table_data), config["min_rows"])
+        row_count = max(len(table_data), self.table_config.min_rows)
         self.tasks_table.setRowCount(row_count)
         self._initializing = True
 
         if table_data:
             for row_idx, row_data in enumerate(table_data):
                 for col_idx, value in enumerate(row_data):
-                    if col_idx in (6, 8):  # Combo boxes
+                    col_config = self.table_config.columns[col_idx]
+                    if col_config.widget_type == "combo":
                         combo = QComboBox()
-                        items = ["Inside", "To left", "To right", "Above", "Below"] if col_idx == 6 else ["Left", "Centre", "Right"]
-                        combo.addItems(items)
-                        combo.setCurrentText(str(value) or items[0])
+                        combo.addItems(col_config.combo_items)
+                        combo.setCurrentText(str(value) or col_config.combo_items[0])
                         self.tasks_table.setCellWidget(row_idx, col_idx, combo)
                     else:
                         item = NumericTableWidgetItem(str(value)) if col_idx in (0, 1) else QTableWidgetItem(str(value))
@@ -68,9 +68,17 @@ class TasksTab(QWidget):
                             item.setData(Qt.UserRole, float(value) if value else 0.0)
                         self.tasks_table.setItem(row_idx, col_idx, item)
         else:
+            max_task_id = 0
+            max_task_order = 0
             for row_idx in range(row_count):
-                defaults = config["defaults"](row_idx + 1, row_idx + 1)
+                defaults = self.table_config.default_generator(row_idx, {
+                    "max_task_id": max_task_id,
+                    "max_task_order": max_task_order
+                })
+                max_task_id += 1
+                max_task_order += 1
                 for col_idx, default in enumerate(defaults):
+                    col_config = self.table_config.columns[col_idx]
                     if isinstance(default, dict) and default.get("type") == "combo":
                         combo = QComboBox()
                         combo.addItems(default["items"])

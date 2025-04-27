@@ -2,6 +2,7 @@ from PyQt5.QtWidgets import QMainWindow, QTabWidget, QToolBar, QAction, QFileDia
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import pyqtSignal, QDate
 from data_model import ProjectData
+from app_config import AppConfig
 from .tabs.layout_tab import LayoutTab
 from .tabs.tasks_tab import TasksTab
 from .tabs.time_frames_tab import TimeFramesTab
@@ -20,58 +21,7 @@ class DataEntryWindow(QMainWindow):
         self.setWindowTitle("Project Planning Tool")
         self.setMinimumSize(600, 400)
         self.project_data = ProjectData()
-        self.table_configs = {
-            "time_frames": {
-                "columns": ["Finish Date", "Width (%)"],
-                "defaults": lambda row: [
-                    (QDate.currentDate().addDays(7 * (row + 1))).toString("yyyy-MM-dd"),
-                    str(100 / (row + 2))
-                ],
-                "min_rows": 1
-            },
-            "tasks": {
-                "columns": ["Task ID", "Task Order", "Task Name", "Start Date", "Finish Date", "Row Number",
-                            "Label Placement", "Label Hide", "Label Alignment",
-                            "Horiz Offset", "Vert Offset", "Label Colour"],
-                "defaults": lambda task_id, task_order: [
-                    str(task_id), str(task_order), "New Task",
-                    QDate.currentDate().toString("yyyy-MM-dd"),
-                    QDate.currentDate().toString("yyyy-MM-dd"), "1",
-                    {"type": "combo", "items": ["Inside", "To left", "To right", "Above", "Below"], "default": "Inside"},
-                    "No", {"type": "combo", "items": ["Left", "Centre", "Right"], "default": "Left"},
-                    "1.0", "0.5", "black"
-                ],
-                "min_rows": 1
-            },
-            "connectors": {
-                "columns": ["From Task ID", "To Task ID"],
-                "defaults": lambda row: ["1", "2"],
-                "min_rows": 0
-            },
-            "swimlanes": {
-                "columns": ["From Row Number", "To Row Number", "Title", "Colour"],
-                "defaults": lambda row: ["1", "2", f"Swimlane {row + 1}", "lightblue"],
-                "min_rows": 0
-            },
-            "pipes": {
-                "columns": ["Date", "Colour"],
-                "defaults": lambda row: [QDate.currentDate().toString("yyyy-MM-dd"), "red"],
-                "min_rows": 0
-            },
-            "curtains": {
-                "columns": ["From Date", "To Date", "Colour"],
-                "defaults": lambda row: [
-                    QDate.currentDate().toString("yyyy-MM-dd"),
-                    QDate.currentDate().toString("yyyy-MM-dd"), "gray"
-                ],
-                "min_rows": 0
-            },
-            "text_boxes": {
-                "columns": ["Text", "X Coordinate", "Y Coordinate", "Colour"],
-                "defaults": lambda row: [f"Text {row + 1}", "100", "100", "black"],
-                "min_rows": 0
-            }
-        }
+        self.app_config = AppConfig()  # Initialize centralized config
         self.setup_ui()
         self._connect_signals()
 
@@ -100,13 +50,13 @@ class DataEntryWindow(QMainWindow):
 
         self.tab_widget = QTabWidget()
         self.layout_tab = LayoutTab(self.project_data)
-        self.time_frames_tab = TimeFramesTab(self.project_data, self.table_configs)
-        self.tasks_tab = TasksTab(self.project_data, self.table_configs)
-        self.connectors_tab = ConnectorsTab(self.project_data, self.table_configs)
-        self.swimlanes_tab = SwimlanesTab(self.project_data, self.table_configs)
-        self.pipes_tab = PipesTab(self.project_data, self.table_configs)
-        self.curtains_tab = CurtainsTab(self.project_data, self.table_configs)
-        self.text_boxes_tab = TextBoxesTab(self.project_data, self.table_configs)
+        self.time_frames_tab = TimeFramesTab(self.project_data, self.app_config)
+        self.tasks_tab = TasksTab(self.project_data, self.app_config)
+        self.connectors_tab = ConnectorsTab(self.project_data, self.app_config)
+        self.swimlanes_tab = SwimlanesTab(self.project_data, self.app_config)
+        self.pipes_tab = PipesTab(self.project_data, self.app_config)
+        self.curtains_tab = CurtainsTab(self.project_data, self.app_config)
+        self.text_boxes_tab = TextBoxesTab(self.project_data, self.app_config)
         self.tab_widget.addTab(self.layout_tab, "Layout")
         self.tab_widget.addTab(self.time_frames_tab, "Time Frames")
         self.tab_widget.addTab(self.tasks_tab, "Tasks")

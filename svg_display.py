@@ -1,14 +1,14 @@
 from PyQt5.QtWidgets import QDialog, QVBoxLayout
 from PyQt5.QtSvg import QSvgWidget
 import os
-from config import Config
+from app_config import AppConfig
 
 class SVGDisplayWindow(QDialog):
     def __init__(self, initial_path=None):
         super().__init__()
         self.setWindowTitle("SVG Display")
-        # Start with default size, adjust in load_svg
-        self.setGeometry(150, 150, Config.SVG_DISPLAY_WIDTH, Config.SVG_DISPLAY_HEIGHT)
+        # Use dimensions from AppConfig
+        self.setGeometry(150, 150, AppConfig().general.svg_display_width, AppConfig().general.svg_display_height)
 
         self.svg_widget = QSvgWidget()
         self.layout = QVBoxLayout()
