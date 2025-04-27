@@ -41,10 +41,10 @@ def renumber_task_orders(table):
     table.blockSignals(False)
     table.setSortingEnabled(was_sorting)
 
-
 def add_row(table, config_key, table_configs, tab):
     config = table_configs.get(config_key, None)
     if not config:
+        print(f"Error: No table config found for {config_key}")
         return
     row_count = table.rowCount()
     was_sorting = table.isSortingEnabled()
@@ -69,23 +69,40 @@ def add_row(table, config_key, table_configs, tab):
         context = {"max_task_id": max_task_id, "max_task_order": max_task_order}
 
     defaults = config.default_generator(row_count, context)
-    for col_idx, default in enumerate(defaults):
-        col_config = config.columns[col_idx]
-        if isinstance(default, dict) and default.get("type") == "combo":
-            combo = QComboBox()
-            combo.addItems(default["items"])
-            combo.setCurrentText(default["default"])
-            table.setCellWidget(row_count, col_idx, combo)
-        else:
-            item = NumericTableWidgetItem(str(default)) if config_key == "tasks" and col_idx in (0,
-                                                                                                 1) else QTableWidgetItem(
-                str(default))
-            if config_key == "tasks" and col_idx == 0:
-                item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-                item.setData(Qt.UserRole, int(default))
-            elif config_key == "tasks" and col_idx == 1:
-                item.setData(Qt.UserRole, float(default))
-            table.setItem(row_count, col_idx, item)
+    # Validate defaults length
+    if len(defaults) != len(config.columns):
+        print(f"Error: Default values length ({len(defaults)}) does not match columns ({len(config.columns)}) for {config_key}")
+        table.removeRow(row_count)  # Roll back insertion
+        table.blockSignals(False)
+        table.setSortingEnabled(was_sorting)
+        return
+
+    try:
+        for col_idx, default in enumerate(defaults):
+            col_config = config.columns[col_idx]
+            if isinstance(default, dict) and default.get("type") == "combo":
+                combo = QComboBox()
+                combo.addItems(default.get("items", []))
+                combo.setCurrentText(default.get("default", ""))
+                table.setCellWidget(row_count, col_idx, combo)
+            else:
+                item = None
+                if config_key == "tasks" and col_idx in (0, 1):
+                    item = NumericTableWidgetItem(str(default))
+                    if col_idx == 0:
+                        item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                        item.setData(Qt.UserRole, int(default) if str(default).isdigit() else 0)
+                    elif col_idx == 1:
+                        item.setData(Qt.UserRole, float(default) if default else 0.0)
+                else:
+                    item = QTableWidgetItem(str(default) if default is not None else "")
+                table.setItem(row_count, col_idx, item)
+    except Exception as e:
+        print(f"Error setting table item in {config_key}: {e}")
+        table.removeRow(row_count)  # Roll back insertion
+        table.blockSignals(False)
+        table.setSortingEnabled(was_sorting)
+        return
 
     if config_key == "tasks":
         renumber_task_orders(table)
@@ -94,7 +111,6 @@ def add_row(table, config_key, table_configs, tab):
     if config_key == "tasks":
         table.sortByColumn(1, Qt.AscendingOrder)
     tab._sync_data_if_not_initializing()
-
 
 def remove_row(table, config_key, table_configs, tab):
     config = table_configs.get(config_key, None)

@@ -1,5 +1,6 @@
 from PyQt5.QtWidgets import QWidget, QTableWidget, QVBoxLayout, QPushButton, QGridLayout, QHeaderView, QTableWidgetItem
 from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtGui import QBrush
 from ..table_utils import add_row, remove_row, show_context_menu
 
 class SwimlanesTab(QWidget):
@@ -58,18 +59,69 @@ class SwimlanesTab(QWidget):
 
     def _sync_data(self):
         swimlanes_data = self._extract_table_data()
-        self.project_data.swimlanes.clear()
-        for row in swimlanes_data:
+        invalid_cells = set()
+        for row_idx, row in enumerate(swimlanes_data):
             from_row = row[0] or "1"
             to_row = row[1] or "1"
             title = row[2] or ""
             colour = row[3] or "lightblue"
+
+            # Validate From Row Number
             try:
-                from_row = int(from_row)
-                to_row = int(to_row)
-                self.project_data.add_swimlane(from_row, to_row, title, colour)
+                from_row_int = int(from_row)
+                if from_row_int <= 0:
+                    invalid_cells.add((row_idx, 0, "non-positive"))
             except ValueError:
-                continue
+                invalid_cells.add((row_idx, 0, "invalid"))
+
+            # Validate To Row Number
+            try:
+                to_row_int = int(to_row)
+                if to_row_int <= 0:
+                    invalid_cells.add((row_idx, 1, "non-positive"))
+                elif from_row_int and to_row_int < from_row_int:
+                    invalid_cells.add((row_idx, 1, "less-than-from"))
+            except ValueError:
+                invalid_cells.add((row_idx, 1, "invalid"))
+
+            # Validate Colour
+            if not colour:
+                invalid_cells.add((row_idx, 3, "empty"))
+
+        self.swimlanes_table.blockSignals(True)
+        for row_idx in range(self.swimlanes_table.rowCount()):
+            for col in range(self.swimlanes_table.columnCount()):
+                item = self.swimlanes_table.item(row_idx, col)
+                tooltip = ""
+                if item:
+                    if (row_idx, col, "invalid") in invalid_cells:
+                        item.setBackground(QBrush(Qt.yellow))
+                        tooltip = f"Swimlane {row_idx + 1}: {'From' if col == 0 else 'To'} Row Number must be a number"
+                    elif (row_idx, col, "non-positive") in invalid_cells:
+                        item.setBackground(QBrush(Qt.yellow))
+                        tooltip = f"Swimlane {row_idx + 1}: {'From' if col == 0 else 'To'} Row Number must be positive"
+                    elif (row_idx, col, "less-than-from") in invalid_cells:
+                        item.setBackground(QBrush(Qt.yellow))
+                        tooltip = f"Swimlane {row_idx + 1}: To Row Number must be on or after From Row Number"
+                    elif (row_idx, col, "empty") in invalid_cells:
+                        item.setBackground(QBrush(Qt.yellow))
+                        tooltip = f"Swimlane {row_idx + 1}: Colour must be specified"
+                    else:
+                        item.setBackground(QBrush())
+                else:
+                    item = QTableWidgetItem("")
+                    item.setBackground(QBrush(Qt.yellow))
+                    tooltip = f"Swimlane {row_idx + 1}: {'From Row Number' if col == 0 else 'To Row Number' if col == 1 else 'Title' if col == 2 else 'Colour'} required"
+                    self.swimlanes_table.setItem(row_idx, col, item)
+                item.setToolTip(tooltip)
+        self.swimlanes_table.blockSignals(False)
+
+        if invalid_cells:
+            from PyQt5.QtWidgets import QMessageBox
+            QMessageBox.critical(self, "Error", "Fix highlighted cells in Swimlanes tab")
+            return
+
+        self.project_data.update_from_table("swimlanes", swimlanes_data)
         self.data_updated.emit(self.project_data.to_json())
 
     def _sync_data_if_not_initializing(self):

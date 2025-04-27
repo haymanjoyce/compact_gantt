@@ -1,5 +1,7 @@
 from PyQt5.QtWidgets import QWidget, QTableWidget, QVBoxLayout, QPushButton, QGridLayout, QHeaderView, QTableWidgetItem
 from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtGui import QBrush
+from datetime import datetime
 from ..table_utils import add_row, remove_row, show_context_menu
 
 class PipesTab(QWidget):
@@ -58,11 +60,49 @@ class PipesTab(QWidget):
 
     def _sync_data(self):
         pipes_data = self._extract_table_data()
-        self.project_data.pipes.clear()
-        for row in pipes_data:
+        invalid_cells = set()
+        for row_idx, row in enumerate(pipes_data):
             date = row[0] or ""
             colour = row[1] or "red"
-            self.project_data.add_pipe(date, colour)
+
+            # Validate Date
+            try:
+                datetime.strptime(date, "%Y-%m-%d") if date else None
+            except ValueError:
+                invalid_cells.add((row_idx, 0, "invalid format"))
+
+            # Validate Colour
+            if not colour:
+                invalid_cells.add((row_idx, 1, "empty"))
+
+        self.pipes_table.blockSignals(True)
+        for row_idx in range(self.pipes_table.rowCount()):
+            for col in range(self.pipes_table.columnCount()):
+                item = self.pipes_table.item(row_idx, col)
+                tooltip = ""
+                if item:
+                    if (row_idx, col, "invalid format") in invalid_cells:
+                        item.setBackground(QBrush(Qt.yellow))
+                        tooltip = f"Pipe {row_idx + 1}: Date must be yyyy-MM-dd"
+                    elif (row_idx, col, "empty") in invalid_cells:
+                        item.setBackground(QBrush(Qt.yellow))
+                        tooltip = f"Pipe {row_idx + 1}: Colour must be specified"
+                    else:
+                        item.setBackground(QBrush())
+                else:
+                    item = QTableWidgetItem("")
+                    item.setBackground(QBrush(Qt.yellow))
+                    tooltip = f"Pipe {row_idx + 1}: {'Date' if col == 0 else 'Colour'} required"
+                    self.pipes_table.setItem(row_idx, col, item)
+                item.setToolTip(tooltip)
+        self.pipes_table.blockSignals(False)
+
+        if invalid_cells:
+            from PyQt5.QtWidgets import QMessageBox
+            QMessageBox.critical(self, "Error", "Fix highlighted cells in Pipes tab")
+            return
+
+        self.project_data.update_from_table("pipes", pipes_data)
         self.data_updated.emit(self.project_data.to_json())
 
     def _sync_data_if_not_initializing(self):

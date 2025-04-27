@@ -1,5 +1,6 @@
 from PyQt5.QtWidgets import QWidget, QTableWidget, QVBoxLayout, QPushButton, QGridLayout, QHeaderView, QTableWidgetItem
 from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtGui import QBrush
 from ..table_utils import add_row, remove_row, show_context_menu
 
 class ConnectorsTab(QWidget):
@@ -58,16 +59,54 @@ class ConnectorsTab(QWidget):
 
     def _sync_data(self):
         connectors_data = self._extract_table_data()
-        self.project_data.connectors.clear()
-        for row in connectors_data:
+        invalid_cells = set()
+        for row_idx, row in enumerate(connectors_data):
             from_task_id = row[0] or "0"
             to_task_id = row[1] or "0"
             try:
                 from_task_id = int(from_task_id)
                 to_task_id = int(to_task_id)
-                self.project_data.add_connector(from_task_id, to_task_id)
+                if from_task_id <= 0:
+                    invalid_cells.add((row_idx, 0, "non-positive"))
+                if to_task_id <= 0:
+                    invalid_cells.add((row_idx, 1, "non-positive"))
+                if from_task_id == to_task_id:
+                    invalid_cells.add((row_idx, 1, "same-id"))
             except ValueError:
-                continue
+                invalid_cells.add((row_idx, 0, "invalid"))
+                invalid_cells.add((row_idx, 1, "invalid"))
+
+        self.connectors_table.blockSignals(True)
+        for row_idx in range(self.connectors_table.rowCount()):
+            for col in (0, 1):
+                item = self.connectors_table.item(row_idx, col)
+                tooltip = ""
+                if item:
+                    if (row_idx, col, "invalid") in invalid_cells:
+                        item.setBackground(QBrush(Qt.yellow))
+                        tooltip = f"Connector {row_idx + 1}: {'From' if col == 0 else 'To'} Task ID must be a number"
+                    elif (row_idx, col, "non-positive") in invalid_cells:
+                        item.setBackground(QBrush(Qt.yellow))
+                        tooltip = f"Connector {row_idx + 1}: {'From' if col == 0 else 'To'} Task ID must be positive"
+                    elif (row_idx, col, "same-id") in invalid_cells:
+                        item.setBackground(QBrush(Qt.yellow))
+                        tooltip = f"Connector {row_idx + 1}: From and To Task IDs must be different"
+                    else:
+                        item.setBackground(QBrush())
+                else:
+                    item = QTableWidgetItem("0")
+                    item.setBackground(QBrush(Qt.yellow))
+                    tooltip = f"Connector {row_idx + 1}: {'From' if col == 0 else 'To'} Task ID required"
+                    self.connectors_table.setItem(row_idx, col, item)
+                item.setToolTip(tooltip)
+        self.connectors_table.blockSignals(False)
+
+        if invalid_cells:
+            from PyQt5.QtWidgets import QMessageBox
+            QMessageBox.critical(self, "Error", "Fix highlighted cells in Connectors tab")
+            return
+
+        self.project_data.update_from_table("connectors", connectors_data)
         self.data_updated.emit(self.project_data.to_json())
 
     def _sync_data_if_not_initializing(self):

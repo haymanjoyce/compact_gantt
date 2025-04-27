@@ -1,5 +1,7 @@
 from PyQt5.QtWidgets import QWidget, QTableWidget, QVBoxLayout, QPushButton, QGridLayout, QHeaderView, QTableWidgetItem
 from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtGui import QBrush
+from datetime import datetime
 from ..table_utils import add_row, remove_row, show_context_menu
 
 class CurtainsTab(QWidget):
@@ -58,12 +60,65 @@ class CurtainsTab(QWidget):
 
     def _sync_data(self):
         curtains_data = self._extract_table_data()
-        self.project_data.curtains.clear()
-        for row in curtains_data:
+        invalid_cells = set()
+        for row_idx, row in enumerate(curtains_data):
             from_date = row[0] or ""
             to_date = row[1] or ""
             colour = row[2] or self.app_config.general.default_curtain_color
-            self.project_data.add_curtain(from_date, to_date, colour)
+
+            # Validate From Date
+            try:
+                from_dt = datetime.strptime(from_date, "%Y-%m-%d") if from_date else None
+            except ValueError:
+                invalid_cells.add((row_idx, 0, "invalid format"))
+                from_dt = None
+
+            # Validate To Date
+            try:
+                to_dt = datetime.strptime(to_date, "%Y-%m-%d") if to_date else None
+            except ValueError:
+                invalid_cells.add((row_idx, 1, "invalid format"))
+                to_dt = None
+
+            # Validate date order
+            if from_dt and to_dt and to_dt < from_dt:
+                invalid_cells.add((row_idx, 1, "before-from"))
+
+            # Validate Colour
+            if not colour:
+                invalid_cells.add((row_idx, 2, "empty"))
+
+        self.curtains_table.blockSignals(True)
+        for row_idx in range(self.curtains_table.rowCount()):
+            for col in range(self.curtains_table.columnCount()):
+                item = self.curtains_table.item(row_idx, col)
+                tooltip = ""
+                if item:
+                    if (row_idx, col, "invalid format") in invalid_cells:
+                        item.setBackground(QBrush(Qt.yellow))
+                        tooltip = f"Curtain {row_idx + 1}: {'From' if col == 0 else 'To'} Date must be yyyy-MM-dd"
+                    elif (row_idx, col, "before-from") in invalid_cells:
+                        item.setBackground(QBrush(Qt.yellow))
+                        tooltip = f"Curtain {row_idx + 1}: To Date must be on or after From Date"
+                    elif (row_idx, col, "empty") in invalid_cells:
+                        item.setBackground(QBrush(Qt.yellow))
+                        tooltip = f"Curtain {row_idx + 1}: Colour must be specified"
+                    else:
+                        item.setBackground(QBrush())
+                else:
+                    item = QTableWidgetItem("")
+                    item.setBackground(QBrush(Qt.yellow))
+                    tooltip = f"Curtain {row_idx + 1}: {'From Date' if col == 0 else 'To Date' if col == 1 else 'Colour'} required"
+                    self.curtains_table.setItem(row_idx, col, item)
+                item.setToolTip(tooltip)
+        self.curtains_table.blockSignals(False)
+
+        if invalid_cells:
+            from PyQt5.QtWidgets import QMessageBox
+            QMessageBox.critical(self, "Error", "Fix highlighted cells in Curtains tab")
+            return
+
+        self.project_data.update_from_table("curtains", curtains_data)
         self.data_updated.emit(self.project_data.to_json())
 
     def _sync_data_if_not_initializing(self):
