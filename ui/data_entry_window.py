@@ -3,6 +3,7 @@ from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import pyqtSignal, QDate
 from data_model import ProjectData
 from app_config import AppConfig
+from data_model import FrameConfig
 from .tabs.layout_tab import LayoutTab
 from .tabs.tasks_tab import TasksTab
 from .tabs.time_frames_tab import TimeFramesTab
@@ -16,11 +17,11 @@ import json
 class DataEntryWindow(QMainWindow):
     data_updated = pyqtSignal(dict)
 
-    def __init__(self):
+    def __init__(self, project_data):
         super().__init__()
         self.setWindowTitle("Project Planning Tool")
         self.setMinimumSize(600, 400)
-        self.project_data = ProjectData()
+        self.project_data = project_data  # Use passed project_data instance
         self.app_config = AppConfig()  # Initialize centralized config
         self.setup_ui()
         self._connect_signals()
@@ -80,8 +81,10 @@ class DataEntryWindow(QMainWindow):
                 with open(file_path, "w") as jsonfile:
                     jsonfile.write(json_str)
                 QMessageBox.information(self, "Success", "Project saved successfully!")
+                self.status_bar.showMessage("Project saved successfully")
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Error saving JSON: {e}")
+                self.status_bar.showMessage("Error saving project")
 
     def load_from_json(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Open Project", "", "JSON Files (*.json)")
@@ -89,14 +92,32 @@ class DataEntryWindow(QMainWindow):
             try:
                 with open(file_path, "r") as jsonfile:
                     data = json.load(jsonfile)
-                self.project_data = ProjectData.from_json(data)
-                for tab in [self.layout_tab, self.time_frames_tab, self.tasks_tab, self.connectors_tab,
+                self.project_data.__init__()  # Reset existing project_data
+                self.project_data.frame_config = FrameConfig(**data.get("frame_config", {}))
+                self.project_data.time_frames = data.get("time_frames", [])
+                for task in data.get("tasks", []):
+                    self.project_data.add_task(
+                        task["task_id"], task["task_name"], task["start_date"],
+                        task["finish_date"], task["row_number"], task.get("is_milestone", False),
+                        task.get("label_placement", "Inside"), task.get("label_hide", "No"),
+                        task.get("label_alignment", "Left"), task.get("label_horizontal_offset", 1.0),
+                        task.get("label_vertical_offset", 0.5), task.get("label_text_colour", "black"),
+                        task.get("task_order", float(len(self.project_data.tasks) + 1))
+                    )
+                self.project_data.connectors = data.get("connectors", [])
+                self.project_data.swimlanes = data.get("swimlanes", [])
+                self.project_data.pipes = data.get("pipes", [])
+                self.project_data.curtains = data.get("curtains", [])
+                self.project_data.text_boxes = data.get("text_boxes", [])
+                for tab in [self.time_frames_tab, self.layout_tab, self.tasks_tab, self.connectors_tab,
                             self.swimlanes_tab, self.pipes_tab, self.curtains_tab, self.text_boxes_tab]:
                     tab._load_initial_data()
                 self.data_updated.emit(self.project_data.to_json())
                 QMessageBox.information(self, "Success", "Project loaded successfully!")
+                self.status_bar.showMessage("Project loaded successfully")  # User feedback
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Error loading JSON: {e}")
+                self.status_bar.showMessage("Error loading project")
 
     def _emit_data_updated(self):
         self.data_updated.emit(self.project_data.to_json())

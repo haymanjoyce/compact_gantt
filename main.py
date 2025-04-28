@@ -8,7 +8,7 @@ from svg_display import SVGDisplayWindow
 def main():
     app = QApplication(sys.argv)
     project_data = ProjectData()
-    data_entry = DataEntryWindow()
+    data_entry = DataEntryWindow(project_data)  # Pass project_data
     svg_generator = GanttChartGenerator()
     svg_display = SVGDisplayWindow()
 

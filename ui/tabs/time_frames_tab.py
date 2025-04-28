@@ -12,6 +12,7 @@ class TimeFramesTab(QWidget):
         self.project_data = project_data
         self.app_config = app_config
         self.table_config = app_config.get_table_config("time_frames")
+        self.original_time_frames = []  # Store original time_frames for ordering
         self.setup_ui()
         self._load_initial_data()
         self.time_frames_table.itemChanged.connect(self._sync_data_if_not_initializing)
@@ -19,7 +20,7 @@ class TimeFramesTab(QWidget):
 
     def setup_ui(self):
         layout = QVBoxLayout()
-        self.time_frames_table = QTableWidget(2, len(self.table_config.columns))
+        self.time_frames_table = QTableWidget(self.table_config.min_rows, len(self.table_config.columns))
         self.time_frames_table.setHorizontalHeaderLabels([col.name for col in self.table_config.columns])
         self.time_frames_table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.time_frames_table.customContextMenuRequested.connect(
@@ -41,23 +42,26 @@ class TimeFramesTab(QWidget):
 
     def _load_initial_data(self):
         table_data = self.project_data.get_table_data("time_frames")
+        self.original_time_frames = self.project_data.time_frames.copy()  # Store original order
+        self._initializing = True
+        self.time_frames_table.clearContents()
+        was_sorting = self.time_frames_table.isSortingEnabled()
+        self.time_frames_table.setSortingEnabled(False)
         row_count = max(len(table_data), self.table_config.min_rows)
         self.time_frames_table.setRowCount(row_count)
-        self._initializing = True
 
-        if table_data:
-            for row_idx, row_data in enumerate(table_data):
-                for col_idx, value in enumerate(row_data):
-                    item = QTableWidgetItem(str(value))
-                    self.time_frames_table.setItem(row_idx, col_idx, item)
-        else:
-            for row_idx in range(row_count):
-                defaults = self.table_config.default_generator(row_idx, {})
-                for col_idx, default in enumerate(defaults):
-                    item = QTableWidgetItem(str(default))
-                    self.time_frames_table.setItem(row_idx, col_idx, item)
+        for row_idx in range(row_count):
+            if row_idx < len(table_data):
+                row_data = table_data[row_idx]
+            else:
+                row_data = self.table_config.default_generator(row_idx, {})
+            for col_idx, value in enumerate(row_data):
+                item = QTableWidgetItem(str(value))
+                self.time_frames_table.setItem(row_idx, col_idx, item)
 
+        self.time_frames_table.setSortingEnabled(was_sorting)
         self._initializing = False
+        self._sync_data()
 
     def _sync_data(self):
         try:
@@ -117,11 +121,29 @@ class TimeFramesTab(QWidget):
             if invalid_cells:
                 raise ValueError("Fix highlighted cells in Time Frames tab")
 
-            self.project_data.time_frames.clear()
+            # Update project_data.time_frames with table data
+            new_time_frames = []
             for row in tf_data:
                 end = row[0] or "2025-01-01"
                 width = float(row[1] or 100) / 100
-                self.project_data.add_time_frame(end, width)
+                new_time_frames.append({"finish_date": end, "width_proportion": width})
+
+            # Reorder new_time_frames to match original order from JSON
+            if self.original_time_frames:
+                reordered_time_frames = []
+                original_dates = [tf["finish_date"] for tf in self.original_time_frames]
+                for orig_date in original_dates:
+                    for tf in new_time_frames:
+                        if tf["finish_date"] == orig_date:
+                            reordered_time_frames.append(tf)
+                            break
+                # Add any new time frames that weren't in the original
+                for tf in new_time_frames:
+                    if tf not in reordered_time_frames:
+                        reordered_time_frames.append(tf)
+                self.project_data.time_frames = reordered_time_frames
+            else:
+                self.project_data.time_frames = new_time_frames
 
             self.data_updated.emit(self.project_data.to_json())
         except ValueError as e:
