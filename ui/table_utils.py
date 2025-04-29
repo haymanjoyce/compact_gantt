@@ -18,13 +18,40 @@ class NumericTableWidgetItem(QTableWidgetItem):
 def add_row(table, table_key, table_configs, parent, context=None):
     logging.debug(f"Starting add_row for table_key: {table_key}, context: {context}")
     try:
+        # Save current sort state
+        was_sorting = table.isSortingEnabled()
+        sort_col = table.horizontalHeader().sortIndicatorSection()
+        sort_order = table.horizontalHeader().sortIndicatorOrder()
+
+        table.setSortingEnabled(False)
+        table.blockSignals(True)
+
         table_config = table_configs.get(table_key)
         if not table_config:
             logging.error(f"No table config found for key: {table_key}")
+            table.blockSignals(False)
+            table.setSortingEnabled(was_sorting)
             return
         row_idx = table.rowCount()
-        table.insertRow(row_idx)
+
+        # --- Gather context for auto-increment fields ---
         context = context or {}
+        if table_key == "tasks":
+            max_task_id = 0
+            max_task_order = 0
+            for row in range(table.rowCount()):
+                item_id = table.item(row, 0)
+                item_order = table.item(row, 1)
+                if item_id and item_id.text().isdigit():
+                    max_task_id = max(max_task_id, int(item_id.text()))
+                if item_order:
+                    try:
+                        max_task_order = max(max_task_order, float(item_order.text()))
+                    except ValueError:
+                        pass
+            context["max_task_id"] = max_task_id
+            context["max_task_order"] = max_task_order
+
         defaults = table_config.default_generator(row_idx, context)
         logging.debug(f"Generated defaults for row {row_idx}: {defaults}")
         for col_idx, default in enumerate(defaults):
@@ -33,8 +60,16 @@ def add_row(table, table_key, table_configs, parent, context=None):
                 item.setFlags(item.flags() & ~Qt.ItemIsEditable)
             table.setItem(row_idx, col_idx, item)
         logging.debug(f"Row {row_idx} added successfully")
+
+        table.blockSignals(False)
+        # Restore sorting and reapply previous sort state
+        table.setSortingEnabled(was_sorting)
+        if was_sorting:
+            table.sortByColumn(sort_col, sort_order)
     except Exception as e:
         logging.error(f"Error in add_row: {e}", exc_info=True)
+        table.blockSignals(False)
+        table.setSortingEnabled(True)
         raise
 
 def remove_row(table, table_key, table_configs, parent):
@@ -102,7 +137,12 @@ def insert_row(table, config_key, table_configs, tab, row_index):
     config = table_configs.get(config_key, None)
     if not config:
         return
+
+    # Save current sort state
     was_sorting = table.isSortingEnabled()
+    sort_col = table.horizontalHeader().sortIndicatorSection()
+    sort_order = table.horizontalHeader().sortIndicatorOrder()
+
     table.setSortingEnabled(False)
     table.blockSignals(True)
     table.insertRow(row_index)
@@ -111,6 +151,7 @@ def insert_row(table, config_key, table_configs, tab, row_index):
     if config_key == "tasks":
         max_task_id = 0
         max_task_order = 0
+        # Always iterate over the underlying data, not the sorted view
         for row in range(table.rowCount()):
             if row != row_index:
                 item_id = table.item(row, 0)
@@ -133,9 +174,7 @@ def insert_row(table, config_key, table_configs, tab, row_index):
             combo.setCurrentText(default["default"])
             table.setCellWidget(row_index, col_idx, combo)
         else:
-            item = NumericTableWidgetItem(str(default)) if config_key == "tasks" and col_idx in (0,
-                                                                                                 1) else QTableWidgetItem(
-                str(default))
+            item = NumericTableWidgetItem(str(default)) if config_key == "tasks" and col_idx in (0, 1) else QTableWidgetItem(str(default))
             if config_key == "tasks" and col_idx == 0:
                 item.setFlags(item.flags() & ~Qt.ItemIsEditable)
                 item.setData(Qt.UserRole, int(default))
@@ -146,10 +185,13 @@ def insert_row(table, config_key, table_configs, tab, row_index):
     if config_key == "tasks":
         renumber_task_orders(table)
     table.blockSignals(False)
+
+    # Restore sorting and reapply previous sort state
     table.setSortingEnabled(was_sorting)
+    if was_sorting:
+        table.sortByColumn(sort_col, sort_order)
     if config_key == "tasks":
-        table.sortByColumn(1, Qt.AscendingOrder)
-    tab._sync_data_if_not_initializing()
+        tab._sync_data_if_not_initializing()
 
 
 def delete_row(table, config_key, table_configs, tab, row_index):

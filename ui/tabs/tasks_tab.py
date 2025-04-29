@@ -2,6 +2,7 @@ from PyQt5.QtWidgets import QWidget, QTableWidget, QVBoxLayout, QPushButton, QGr
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QBrush
 from ..table_utils import NumericTableWidgetItem, add_row, remove_row, show_context_menu, renumber_task_orders
+import logging
 
 class TasksTab(QWidget):
     data_updated = pyqtSignal(dict)
@@ -183,3 +184,61 @@ class TasksTab(QWidget):
                     row_data.append(item.text() if item else "")
             data.append(row_data)
         return data
+
+def add_row(table, table_key, table_configs, parent, context=None):
+    print(f"add_row called for {table_key}")
+    logging.debug(f"Starting add_row for table_key: {table_key}, context: {context}")
+    try:
+        was_sorting = table.isSortingEnabled()
+        sort_col = table.horizontalHeader().sortIndicatorSection()
+        sort_order = table.horizontalHeader().sortIndicatorOrder()
+
+        table.setSortingEnabled(False)
+        table.blockSignals(True)
+
+        table_config = table_configs.get(table_key)
+        print("table_config:", table_config)
+        if not table_config:
+            logging.error(f"No table config found for key: {table_key}")
+            table.blockSignals(False)
+            table.setSortingEnabled(was_sorting)
+            return
+        row_idx = table.rowCount()
+        table.insertRow(row_idx)
+
+        context = context or {}
+        if table_key == "tasks":
+            max_task_id = 0
+            max_task_order = 0
+            for row in range(table.rowCount()):
+                item_id = table.item(row, 0)
+                item_order = table.item(row, 1)
+                if item_id and item_id.text().isdigit():
+                    max_task_id = max(max_task_id, int(item_id.text()))
+                if item_order:
+                    try:
+                        max_task_order = max(max_task_order, float(item_order.text()))
+                    except ValueError:
+                        pass
+            context["max_task_id"] = max_task_id
+            context["max_task_order"] = max_task_order
+
+        defaults = table_config.default_generator(row_idx, context)
+        print("defaults:", defaults)
+        for col_idx, default in enumerate(defaults):
+            item = QTableWidgetItem(str(default))
+            if table_key == "time_frames" and col_idx == 0:
+                item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+            table.setItem(row_idx, col_idx, item)
+        print("add_row: row added successfully")
+
+        table.blockSignals(False)
+        table.setSortingEnabled(was_sorting)
+        if was_sorting:
+            table.sortByColumn(sort_col, sort_order)
+    except Exception as e:
+        print("add_row exception:", e)
+        logging.error(f"Error in add_row: {e}", exc_info=True)
+        table.blockSignals(False)
+        table.setSortingEnabled(True)
+        raise
