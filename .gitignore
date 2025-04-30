@@ -138,3 +138,10 @@ cython_debug/
 *.gif
 *.bmp
 *.tiff
+svg/
+png/
+jpg/
+jpeg/
+gif/
+bmp/
+tiff/
