@@ -16,9 +16,9 @@ class NumericTableWidgetItem(QTableWidgetItem):
         return super().__lt__(other)
 
 def add_row(table, table_key, table_configs, parent, context=None):
+    print(f"add_row called for {table_key}")
     logging.debug(f"Starting add_row for table_key: {table_key}, context: {context}")
     try:
-        # Save current sort state
         was_sorting = table.isSortingEnabled()
         sort_col = table.horizontalHeader().sortIndicatorSection()
         sort_order = table.horizontalHeader().sortIndicatorOrder()
@@ -27,14 +27,15 @@ def add_row(table, table_key, table_configs, parent, context=None):
         table.blockSignals(True)
 
         table_config = table_configs.get(table_key)
+        print("table_config:", table_config)
         if not table_config:
             logging.error(f"No table config found for key: {table_key}")
             table.blockSignals(False)
             table.setSortingEnabled(was_sorting)
             return
         row_idx = table.rowCount()
+        table.insertRow(row_idx)
 
-        # --- Gather context for auto-increment fields ---
         context = context or {}
         if table_key == "tasks":
             max_task_id = 0
@@ -53,20 +54,41 @@ def add_row(table, table_key, table_configs, parent, context=None):
             context["max_task_order"] = max_task_order
 
         defaults = table_config.default_generator(row_idx, context)
-        logging.debug(f"Generated defaults for row {row_idx}: {defaults}")
+        print("defaults:", defaults)
+
+        # Create all items at once, handling both combo and non-combo columns
         for col_idx, default in enumerate(defaults):
-            item = QTableWidgetItem(str(default))
-            if table_key == "time_frames" and col_idx == 0:  # Make Time Frame ID read-only
-                item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-            table.setItem(row_idx, col_idx, item)
-        logging.debug(f"Row {row_idx} added successfully")
+            col_config = table_config.columns[col_idx]
+            if col_config.widget_type == "combo":
+                combo = QComboBox()
+                combo.addItems(col_config.combo_items)
+                combo.setCurrentText(str(default))
+                table.setCellWidget(row_idx, col_idx, combo)
+            else:
+                item = NumericTableWidgetItem(str(default)) if table_key == "tasks" and col_idx in (0, 1) else QTableWidgetItem(str(default))
+                if table_key == "tasks" and col_idx == 0:
+                    item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                    item.setData(Qt.UserRole, int(default) if str(default).isdigit() else 0)
+                elif table_key == "tasks" and col_idx == 1:
+                    item.setData(Qt.UserRole, float(default) if default else 0.0)
+                table.setItem(row_idx, col_idx, item)
+
+        if table_key == "tasks":
+            renumber_task_orders(table)
+
+        print("add_row: row added successfully")
 
         table.blockSignals(False)
-        # Restore sorting and reapply previous sort state
         table.setSortingEnabled(was_sorting)
         if was_sorting:
             table.sortByColumn(sort_col, sort_order)
+
+        # Call sync_data after everything is set up
+        if hasattr(parent, '_sync_data'):
+            parent._sync_data()
+
     except Exception as e:
+        print("add_row exception:", e)
         logging.error(f"Error in add_row: {e}", exc_info=True)
         table.blockSignals(False)
         table.setSortingEnabled(True)
@@ -168,10 +190,10 @@ def insert_row(table, config_key, table_configs, tab, row_index):
     defaults = config.default_generator(row_index, context)
     for col_idx, default in enumerate(defaults):
         col_config = config.columns[col_idx]
-        if isinstance(default, dict) and default.get("type") == "combo":
+        if col_config.widget_type == "combo":
             combo = QComboBox()
-            combo.addItems(default["items"])
-            combo.setCurrentText(default["default"])
+            combo.addItems(col_config.combo_items)
+            combo.setCurrentText(str(default))
             table.setCellWidget(row_index, col_idx, combo)
         else:
             item = NumericTableWidgetItem(str(default)) if config_key == "tasks" and col_idx in (0, 1) else QTableWidgetItem(str(default))

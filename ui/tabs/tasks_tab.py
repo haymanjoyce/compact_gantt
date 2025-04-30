@@ -80,10 +80,10 @@ class TasksTab(QWidget):
                 max_task_order += 1
                 for col_idx, default in enumerate(defaults):
                     col_config = self.table_config.columns[col_idx]
-                    if isinstance(default, dict) and default.get("type") == "combo":
+                    if col_config.widget_type == "combo":
                         combo = QComboBox()
-                        combo.addItems(default["items"])
-                        combo.setCurrentText(default["default"])
+                        combo.addItems(col_config.combo_items)
+                        combo.setCurrentText(str(default))
                         self.tasks_table.setCellWidget(row_idx, col_idx, combo)
                     else:
                         item = NumericTableWidgetItem(str(default)) if col_idx in (0, 1) else QTableWidgetItem(str(default))

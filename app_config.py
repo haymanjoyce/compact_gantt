@@ -114,12 +114,18 @@ class AppConfig:
             task_id = context.get("max_task_id", 0) + 1
             task_order = context.get("max_task_order", 0) + 1
             return [
-                str(task_id), str(task_order), "New Task",
+                str(task_id), 
+                str(task_order), 
+                "New Task",
                 QDate.currentDate().toString("yyyy-MM-dd"),
-                QDate.currentDate().toString("yyyy-MM-dd"), "1",
-                {"type": "combo", "items": ["Inside", "To left", "To right", "Above", "Below"], "default": "Inside"},
-                "No", {"type": "combo", "items": ["Left", "Centre", "Right"], "default": "Left"},
-                "1.0", "0.5", "black"
+                QDate.currentDate().toString("yyyy-MM-dd"), 
+                "1",
+                "Inside",  # Default for Label Placement
+                "No", 
+                "Left",    # Default for Label Alignment
+                "1.0", 
+                "0.5", 
+                "black"
             ]
 
         def connectors_default(row_idx: int, context: Dict[str, Any]) -> List[Any]:
