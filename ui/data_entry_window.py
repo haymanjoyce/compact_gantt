@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QMainWindow, QTabWidget, QToolBar, QAction, QFileDialog, QMessageBox, QWidget, QSizePolicy, QPushButton
+from PyQt5.QtWidgets import QMainWindow, QTabWidget, QToolBar, QAction, QFileDialog, QMessageBox, QWidget, QSizePolicy, QPushButton, QVBoxLayout
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import pyqtSignal, QDate
 from data_model import ProjectData
@@ -19,7 +19,8 @@ class DataEntryWindow(QMainWindow):
 
     def __init__(self, project_data):
         super().__init__()
-        self.setWindowTitle("Project Planning Tool")
+        self.setWindowTitle("Compact Gantt")
+        self.setWindowIcon(QIcon("assets/logo.png"))  # Add window icon
         self.setMinimumSize(600, 400)
         self.project_data = project_data  # Use passed project_data instance
         self.app_config = AppConfig()  # Initialize centralized config
@@ -27,6 +28,7 @@ class DataEntryWindow(QMainWindow):
         self._connect_signals()
 
     def setup_ui(self):
+        # Create menu bar
         self.menu_bar = self.menuBar()
         file_menu = self.menu_bar.addMenu("File")
         self.save_action = QAction("Save Project", self)
@@ -38,24 +40,11 @@ class DataEntryWindow(QMainWindow):
         self.load_action.triggered.connect(self.load_from_json)
         file_menu.addAction(self.load_action)
 
-        # Add a spacer to push the "Update Image" action to the right
-        spacer = QWidget()
-        spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self.menu_bar.setCornerWidget(spacer)
+        # Create central widget to hold everything
+        central_widget = QWidget()
+        main_layout = QVBoxLayout(central_widget)
 
-        # Create a QPushButton for "Update Image" and place it in the corner
-        self.update_image_button = QPushButton("Update Image")
-        self.update_image_button.setFlat(True)
-        # self.update_image_button.setStyleSheet("background-color: #000000; color: #ffffff;")
-        # style = self.style()
-        # self.update_image_button.setIcon(QIcon(style.standardIcon(style.SP_ArrowRight)))
-        # self.update_image_button.setStyleSheet("margin: 5px 10px;")
-        self.update_image_button.clicked.connect(self._emit_data_updated)
-        self.menu_bar.setCornerWidget(self.update_image_button)
-
-        self.status_bar = self.statusBar()
-        self.status_bar.showMessage("Ready")
-
+        # Create and setup tab widget
         self.tab_widget = QTabWidget()
         self.layout_tab = LayoutTab(self.project_data, self.app_config)
         self.time_frames_tab = TimeFramesTab(self.project_data, self.app_config)
@@ -73,7 +62,29 @@ class DataEntryWindow(QMainWindow):
         self.tab_widget.addTab(self.pipes_tab, "Pipes")
         self.tab_widget.addTab(self.curtains_tab, "Curtains")
         self.tab_widget.addTab(self.text_boxes_tab, "Text Boxes")
-        self.setCentralWidget(self.tab_widget)
+        main_layout.addWidget(self.tab_widget)
+
+        # Create Update Image button at the bottom
+        self.update_image_button = QPushButton("Update Image")
+        self.update_image_button.setStyleSheet("""
+            QPushButton {
+                padding: 8px;
+            }
+        """)
+        self.update_image_button.clicked.connect(self._emit_data_updated)
+        main_layout.addWidget(self.update_image_button)
+
+        self.setCentralWidget(central_widget)
+        # Create and style the status bar
+        self.status_bar = self.statusBar()
+        self.status_bar.setStyleSheet("""
+            QStatusBar {
+                border-top: 1px solid #D3D3D3;
+                padding: 3px;
+                background: #F8F9FA;
+            }
+        """)
+        self.status_bar.showMessage("Ready")
 
     def _connect_signals(self):
         for tab in [self.layout_tab, self.time_frames_tab, self.tasks_tab, self.connectors_tab,

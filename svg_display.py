@@ -1,5 +1,7 @@
-from PyQt5.QtWidgets import QDialog, QVBoxLayout
+from PyQt5.QtWidgets import QDialog, QVBoxLayout, QMainWindow, QWidget, QLabel, QScrollArea
 from PyQt5.QtSvg import QSvgWidget
+from PyQt5.QtGui import QIcon
+from PyQt5.QtCore import Qt
 import os
 from app_config import AppConfig
 
@@ -8,6 +10,7 @@ class SVGDisplayWindow(QDialog):
     def __init__(self, app_config, initial_path=None):
         super().__init__()
         self.setWindowTitle("SVG Display")
+        self.setWindowIcon(QIcon("assets/logo.png"))  # Add window icon
         self.setGeometry(150, 150, app_config.general.svg_display_width, app_config.general.svg_display_height)
 
         self.svg_widget = QSvgWidget()
@@ -27,3 +30,10 @@ class SVGDisplayWindow(QDialog):
             self.show()
         else:
             print(f"SVG file not found: {absolute_path}")
+
+class SVGDisplay(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Compact Gantt - Preview")
+        self.setWindowIcon(QIcon("assets/logo.png"))  # Add window icon
+        # ... rest of initialization ...

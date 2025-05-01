@@ -1,4 +1,4 @@
-# Project Planning Tool
+# Compact Gantt
 
 ## Purpose
 This tool creates compact Gantt charts using PyQt5 and SVG output, allowing multiple tasks per row, customizable zoom, and flexible label placement.
