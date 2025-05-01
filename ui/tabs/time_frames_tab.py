@@ -4,7 +4,7 @@ from PyQt5.QtCore import Qt, pyqtSignal, QDate
 from PyQt5.QtGui import QBrush
 from datetime import datetime, timedelta
 import logging
-from ..table_utils import add_row, remove_row, show_context_menu, _extract_table_data, CheckBoxWidget
+from ..table_utils import add_row, remove_row, _extract_table_data, CheckBoxWidget
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -28,9 +28,6 @@ class TimeFramesTab(QWidget):
         layout = QVBoxLayout()
         self.time_frames_table = QTableWidget(self.table_config.min_rows, len(self.table_config.columns))
         self.time_frames_table.setHorizontalHeaderLabels([col.name for col in self.table_config.columns])
-        self.time_frames_table.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.time_frames_table.customContextMenuRequested.connect(
-            lambda pos: show_context_menu(pos, self.time_frames_table, "time_frames", self, self.app_config.tables))
         self.time_frames_table.setSortingEnabled(True)
         self.time_frames_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.time_frames_table.setColumnWidth(0, 80)  # Time Frame ID

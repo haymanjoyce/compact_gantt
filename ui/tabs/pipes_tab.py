@@ -2,7 +2,7 @@ from PyQt5.QtWidgets import QWidget, QTableWidget, QVBoxLayout, QPushButton, QGr
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QBrush
 from datetime import datetime
-from ..table_utils import add_row, remove_row, show_context_menu
+from ..table_utils import add_row, remove_row
 
 class PipesTab(QWidget):
     data_updated = pyqtSignal(dict)
@@ -21,9 +21,6 @@ class PipesTab(QWidget):
         layout = QVBoxLayout()
         self.pipes_table = QTableWidget(self.app_config.general.pipes_rows, len(self.table_config.columns))
         self.pipes_table.setHorizontalHeaderLabels([col.name for col in self.table_config.columns])
-        self.pipes_table.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.pipes_table.customContextMenuRequested.connect(
-            lambda pos: show_context_menu(pos, self.pipes_table, "pipes", self, self.app_config.tables))
         self.pipes_table.setSortingEnabled(True)
         self.pipes_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         layout.addWidget(self.pipes_table)

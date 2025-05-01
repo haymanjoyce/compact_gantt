@@ -2,7 +2,7 @@ from PyQt5.QtWidgets import QWidget, QTableWidget, QVBoxLayout, QPushButton, QGr
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QBrush
 from datetime import datetime
-from ..table_utils import add_row, remove_row, show_context_menu
+from ..table_utils import add_row, remove_row
 
 class CurtainsTab(QWidget):
     data_updated = pyqtSignal(dict)
@@ -21,9 +21,6 @@ class CurtainsTab(QWidget):
         layout = QVBoxLayout()
         self.curtains_table = QTableWidget(self.app_config.general.curtains_rows, len(self.table_config.columns))
         self.curtains_table.setHorizontalHeaderLabels([col.name for col in self.table_config.columns])
-        self.curtains_table.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.curtains_table.customContextMenuRequested.connect(
-            lambda pos: show_context_menu(pos, self.curtains_table, "curtains", self, self.app_config.tables))
         self.curtains_table.setSortingEnabled(True)
         self.curtains_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         layout.addWidget(self.curtains_table)

@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import QWidget, QTableWidget, QVBoxLayout, QPushButton, QGridLayout, QHeaderView, QTableWidgetItem
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QBrush
-from ..table_utils import add_row, remove_row, show_context_menu
+from ..table_utils import add_row, remove_row
 
 class ConnectorsTab(QWidget):
     data_updated = pyqtSignal(dict)
@@ -20,9 +20,6 @@ class ConnectorsTab(QWidget):
         layout = QVBoxLayout()
         self.connectors_table = QTableWidget(2, len(self.table_config.columns))
         self.connectors_table.setHorizontalHeaderLabels([col.name for col in self.table_config.columns])
-        self.connectors_table.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.connectors_table.customContextMenuRequested.connect(
-            lambda pos: show_context_menu(pos, self.connectors_table, "connectors", self, self.app_config.tables))
         self.connectors_table.setSortingEnabled(True)
         self.connectors_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         layout.addWidget(self.connectors_table)

@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import QWidget, QTableWidget, QVBoxLayout, QPushButton, QGridLayout, QHeaderView, QTableWidgetItem
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QBrush
-from ..table_utils import add_row, remove_row, show_context_menu
+from ..table_utils import add_row, remove_row
 
 class TextBoxesTab(QWidget):
     data_updated = pyqtSignal(dict)
@@ -20,9 +20,6 @@ class TextBoxesTab(QWidget):
         layout = QVBoxLayout()
         self.text_boxes_table = QTableWidget(2, len(self.table_config.columns))
         self.text_boxes_table.setHorizontalHeaderLabels([col.name for col in self.table_config.columns])
-        self.text_boxes_table.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.text_boxes_table.customContextMenuRequested.connect(
-            lambda pos: show_context_menu(pos, self.text_boxes_table, "text_boxes", self, self.app_config.tables))
         self.text_boxes_table.setSortingEnabled(True)
         self.text_boxes_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         layout.addWidget(self.text_boxes_table)

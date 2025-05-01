@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QTableWidgetItem, QMenu, QComboBox, QAction, QCheckBox, QWidget, QHBoxLayout
+from PyQt5.QtWidgets import QTableWidgetItem, QComboBox, QCheckBox, QWidget, QHBoxLayout
 from PyQt5.QtCore import Qt
 import logging
 
@@ -174,26 +174,6 @@ def remove_row(table, table_key, table_configs, parent):
                               f"Cannot remove all selected rows. Table must have at least {table_config.min_rows} row(s).")
     except Exception as e:
         logging.error(f"Error in remove_row: {e}", exc_info=True)
-        raise
-
-def show_context_menu(pos, table, table_key, parent, table_configs):
-    logging.debug(f"Showing context menu for table_key: {table_key}")
-    try:
-        menu = QMenu()
-        add_action = QAction("Add Row", parent)
-        remove_action = QAction("Delete Row(s)", parent)
-        
-        add_action.triggered.connect(
-            lambda: add_row(table, table_key, table_configs, parent))
-        remove_action.triggered.connect(
-            lambda: remove_row(table, table_key, table_configs, parent))
-            
-        menu.addAction(add_action)
-        menu.addAction(remove_action)
-        menu.exec_(table.viewport().mapToGlobal(pos))
-        logging.debug("Context menu shown")
-    except Exception as e:
-        logging.error(f"Error in show_context_menu: {e}", exc_info=True)
         raise
 
 def renumber_task_orders(table):

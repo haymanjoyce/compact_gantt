@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import QWidget, QTableWidget, QVBoxLayout, QPushButton, QGridLayout, QComboBox, QHeaderView, QTableWidgetItem
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QBrush
-from ..table_utils import NumericTableWidgetItem, add_row, remove_row, show_context_menu, renumber_task_orders
+from ..table_utils import NumericTableWidgetItem, add_row, remove_row, renumber_task_orders
 import logging
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -23,9 +23,6 @@ class TasksTab(QWidget):
         layout = QVBoxLayout()
         self.tasks_table = QTableWidget(self.app_config.general.tasks_rows, len(self.table_config.columns))
         self.tasks_table.setHorizontalHeaderLabels([col.name for col in self.table_config.columns])
-        self.tasks_table.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.tasks_table.customContextMenuRequested.connect(
-            lambda pos: show_context_menu(pos, self.tasks_table, "tasks", self, self.app_config.tables))
         self.tasks_table.setSortingEnabled(True)
         self.tasks_table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
         self.tasks_table.setColumnWidth(0, 80)  # Task ID

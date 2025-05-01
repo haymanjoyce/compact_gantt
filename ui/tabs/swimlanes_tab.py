@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import QWidget, QTableWidget, QVBoxLayout, QPushButton, QGridLayout, QHeaderView, QTableWidgetItem
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QBrush
-from ..table_utils import add_row, remove_row, show_context_menu
+from ..table_utils import add_row, remove_row
 
 class SwimlanesTab(QWidget):
     data_updated = pyqtSignal(dict)
@@ -20,9 +20,6 @@ class SwimlanesTab(QWidget):
         layout = QVBoxLayout()
         self.swimlanes_table = QTableWidget(2, len(self.table_config.columns))
         self.swimlanes_table.setHorizontalHeaderLabels([col.name for col in self.table_config.columns])
-        self.swimlanes_table.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.swimlanes_table.customContextMenuRequested.connect(
-            lambda pos: show_context_menu(pos, self.swimlanes_table, "swimlanes", self, self.app_config.tables))
         self.swimlanes_table.setSortingEnabled(True)
         self.swimlanes_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         layout.addWidget(self.swimlanes_table)
