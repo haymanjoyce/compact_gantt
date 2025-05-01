@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import QWidget, QTableWidget, QVBoxLayout, QPushButton, QGridLayout, QHeaderView, QTableWidgetItem
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QBrush
-from ..table_utils import add_row, remove_row
+from ..table_utils import add_row, remove_row, CheckBoxWidget
 
 class TextBoxesTab(QWidget):
     data_updated = pyqtSignal(dict)
@@ -18,8 +18,11 @@ class TextBoxesTab(QWidget):
 
     def setup_ui(self):
         layout = QVBoxLayout()
-        self.text_boxes_table = QTableWidget(2, len(self.table_config.columns))
-        self.text_boxes_table.setHorizontalHeaderLabels([col.name for col in self.table_config.columns])
+        
+        # Create table with extra column for checkbox
+        self.text_boxes_table = QTableWidget(0, len(self.table_config.columns) + 1)  # +1 for checkbox
+        headers = ["Select"] + [col.name for col in self.table_config.columns]
+        self.text_boxes_table.setHorizontalHeaderLabels(headers)
         self.text_boxes_table.setSortingEnabled(True)
         self.text_boxes_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         layout.addWidget(self.text_boxes_table)
@@ -40,19 +43,29 @@ class TextBoxesTab(QWidget):
         self.text_boxes_table.setRowCount(row_count)
         self._initializing = True
 
-        if table_data:
-            for row_idx, row_data in enumerate(table_data):
-                for col_idx, value in enumerate(row_data):
+        for row_idx in range(row_count):
+            # Add checkbox first
+            checkbox_widget = CheckBoxWidget()
+            self.text_boxes_table.setCellWidget(row_idx, 0, checkbox_widget)
+
+            if row_idx < len(table_data):
+                row_data = table_data[row_idx]
+                # Start from column 1 since column 0 is checkbox
+                for col_idx, value in enumerate(row_data, start=1):
                     item = QTableWidgetItem(str(value))
                     self.text_boxes_table.setItem(row_idx, col_idx, item)
-        else:
-            for row_idx in range(row_count):
+            else:
                 defaults = self.table_config.default_generator(row_idx, {})
-                for col_idx, default in enumerate(defaults):
+                # Skip the first default (checkbox state) and start from index 1
+                for col_idx, default in enumerate(defaults[1:], start=1):
                     item = QTableWidgetItem(str(default))
                     self.text_boxes_table.setItem(row_idx, col_idx, item)
 
         self._initializing = False
+
+    def _sync_data_if_not_initializing(self):
+        if not self._initializing:
+            self._sync_data()
 
     def _sync_data(self):
         text_boxes_data = self._extract_table_data()
@@ -85,7 +98,7 @@ class TextBoxesTab(QWidget):
 
         self.text_boxes_table.blockSignals(True)
         for row_idx in range(self.text_boxes_table.rowCount()):
-            for col in range(self.text_boxes_table.columnCount()):
+            for col in range(1, self.text_boxes_table.columnCount()):  # Start from 1 to skip checkbox
                 item = self.text_boxes_table.item(row_idx, col)
                 tooltip = ""
                 if item:
@@ -115,15 +128,13 @@ class TextBoxesTab(QWidget):
 
         self.project_data.update_from_table("text_boxes", text_boxes_data)
 
-    def _sync_data_if_not_initializing(self):
-        if not self._initializing:
-            self._sync_data()
-
     def _extract_table_data(self):
+        """Extract data from table, skipping the checkbox column."""
         data = []
         for row in range(self.text_boxes_table.rowCount()):
             row_data = []
-            for col in range(self.text_boxes_table.columnCount()):
+            # Start from column 1 to skip checkbox column
+            for col in range(1, self.text_boxes_table.columnCount()):
                 item = self.text_boxes_table.item(row, col)
                 row_data.append(item.text() if item else "")
             data.append(row_data)

@@ -1,8 +1,10 @@
-from PyQt5.QtWidgets import QWidget, QTableWidget, QVBoxLayout, QPushButton, QGridLayout, QComboBox, QHeaderView, QTableWidgetItem
+from PyQt5.QtWidgets import (QWidget, QTableWidget, QVBoxLayout, QPushButton, 
+                           QGridLayout, QComboBox, QHeaderView, QTableWidgetItem)
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QBrush
-from ..table_utils import NumericTableWidgetItem, add_row, remove_row, renumber_task_orders
+from typing import List, Dict, Any
 import logging
+from ui.table_utils import NumericTableWidgetItem, add_row, remove_row, renumber_task_orders, CheckBoxWidget
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -21,27 +23,27 @@ class TasksTab(QWidget):
 
     def setup_ui(self):
         layout = QVBoxLayout()
-        self.tasks_table = QTableWidget(self.app_config.general.tasks_rows, len(self.table_config.columns))
-        self.tasks_table.setHorizontalHeaderLabels([col.name for col in self.table_config.columns])
+        
+        # Create table
+        self.tasks_table = QTableWidget(0, len(self.table_config.columns) + 1)  # +1 for checkbox
+        headers = ["Select"] + [col.name for col in self.table_config.columns]
+        self.tasks_table.setHorizontalHeaderLabels(headers)
         self.tasks_table.setSortingEnabled(True)
-        self.tasks_table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
-        self.tasks_table.setColumnWidth(0, 80)  # Task ID
-        self.tasks_table.setColumnWidth(1, 80)  # Task Order
-        self.tasks_table.setColumnWidth(2, 150)  # Task Name
-        self.tasks_table.setColumnWidth(6, 120)  # Label Placement
-        self.tasks_table.setColumnWidth(8, 100)  # Label Alignment
-        self.tasks_table.setColumnWidth(9, 80)  # Horiz Offset
-        self.tasks_table.setColumnWidth(10, 80)  # Vert Offset
+        self.tasks_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         layout.addWidget(self.tasks_table)
 
+        # Create buttons
         btn_layout = QGridLayout()
         add_btn = QPushButton("Add Task")
         remove_btn = QPushButton("Remove Task")
-        add_btn.clicked.connect(lambda: add_row(self.tasks_table, "tasks", self.app_config.tables, self))
-        remove_btn.clicked.connect(lambda: remove_row(self.tasks_table, "tasks", self.app_config.tables, self))
+        add_btn.clicked.connect(lambda: add_row(self.tasks_table, "tasks", 
+                                              self.app_config.tables, self))
+        remove_btn.clicked.connect(lambda: remove_row(self.tasks_table, "tasks", 
+                                                    self.app_config.tables, self))
         btn_layout.addWidget(add_btn, 0, 0)
         btn_layout.addWidget(remove_btn, 0, 1)
         layout.addLayout(btn_layout)
+
         self.setLayout(layout)
 
     def _load_initial_data(self):
@@ -50,115 +52,92 @@ class TasksTab(QWidget):
         self.tasks_table.setRowCount(row_count)
         self._initializing = True
 
-        if table_data:
-            for row_idx, row_data in enumerate(table_data):
-                for col_idx, value in enumerate(row_data):
-                    col_config = self.table_config.columns[col_idx]
+        for row_idx in range(row_count):
+            # Add checkbox first
+            checkbox_widget = CheckBoxWidget()
+            self.tasks_table.setCellWidget(row_idx, 0, checkbox_widget)
+
+            if row_idx < len(table_data):
+                row_data = table_data[row_idx]
+                # Start from column 1 since column 0 is checkbox
+                for col_idx, value in enumerate(row_data, start=1):
+                    col_config = self.table_config.columns[col_idx - 1]
                     if col_config.widget_type == "combo":
                         combo = QComboBox()
                         combo.addItems(col_config.combo_items)
                         combo.setCurrentText(str(value) or col_config.combo_items[0])
                         self.tasks_table.setCellWidget(row_idx, col_idx, combo)
                     else:
-                        item = NumericTableWidgetItem(str(value)) if col_idx in (0, 1) else QTableWidgetItem(str(value))
-                        if col_idx == 0:  # Task ID read-only
+                        item = (NumericTableWidgetItem(str(value)) 
+                               if col_idx in (1, 2) else QTableWidgetItem(str(value)))
+                        if col_idx == 1:  # Task ID read-only
                             item.setFlags(item.flags() & ~Qt.ItemIsEditable)
                             item.setData(Qt.UserRole, int(value) if str(value).isdigit() else 0)
-                        elif col_idx == 1:  # Task Order numeric
+                        elif col_idx == 2:  # Task Order numeric
                             item.setData(Qt.UserRole, float(value) if value else 0.0)
                         self.tasks_table.setItem(row_idx, col_idx, item)
-        else:
-            max_task_id = 0
-            max_task_order = 0
-            for row_idx in range(row_count):
-                defaults = self.table_config.default_generator(row_idx, {
-                    "max_task_id": max_task_id,
-                    "max_task_order": max_task_order
-                })
-                max_task_id += 1
-                max_task_order += 1
-                for col_idx, default in enumerate(defaults):
-                    col_config = self.table_config.columns[col_idx]
+            else:
+                context = {
+                    "max_task_id": len(table_data) + row_idx,
+                    "max_task_order": len(table_data) + row_idx
+                }
+                defaults = self.table_config.default_generator(row_idx, context)
+                # Skip the first default (checkbox state) and start from index 1
+                for col_idx, default in enumerate(defaults[1:], start=1):
+                    col_config = self.table_config.columns[col_idx - 1]
                     if col_config.widget_type == "combo":
                         combo = QComboBox()
                         combo.addItems(col_config.combo_items)
                         combo.setCurrentText(str(default))
                         self.tasks_table.setCellWidget(row_idx, col_idx, combo)
                     else:
-                        item = NumericTableWidgetItem(str(default)) if col_idx in (0, 1) else QTableWidgetItem(str(default))
-                        if col_idx == 0:
+                        item = (NumericTableWidgetItem(str(default)) 
+                               if col_idx in (1, 2) else QTableWidgetItem(str(default)))
+                        if col_idx == 1:  # Task ID read-only
                             item.setFlags(item.flags() & ~Qt.ItemIsEditable)
                             item.setData(Qt.UserRole, int(default) if str(default).isdigit() else 0)
-                        elif col_idx == 1:
+                        elif col_idx == 2:  # Task Order numeric
                             item.setData(Qt.UserRole, float(default) if default else 0.0)
                         self.tasks_table.setItem(row_idx, col_idx, item)
 
         renumber_task_orders(self.tasks_table)
-        self.tasks_table.sortByColumn(1, Qt.AscendingOrder)
+        self.tasks_table.sortByColumn(2, Qt.AscendingOrder)  # Sort by Task Order
         self._initializing = False
 
     def _sync_data(self):
         logging.debug("Starting _sync_data in TasksTab")
         tasks_data = self._extract_table_data()
-        invalid_cells = set()
-        task_order_counts = {}
-        for row_idx, row in enumerate(tasks_data):
-            try:
-                task_order = float(row[1] or 0)
-                task_order_counts[task_order] = task_order_counts.get(task_order, 0) + 1
-                if task_order <= 0:
-                    invalid_cells.add((row_idx, 1, "non-positive"))
-            except ValueError:
-                invalid_cells.add((row_idx, 1, "invalid"))
-
-        non_unique_orders = {k for k, v in task_order_counts.items() if v > 1}
+        errors = self.project_data.update_from_table("tasks", tasks_data)
+        
+        # Clear all highlights first
         self.tasks_table.blockSignals(True)
-        for row_idx in range(self.tasks_table.rowCount()):
-            for col in range(self.tasks_table.columnCount()):
-                col_config = self.table_config.columns[col]
-                if col_config.widget_type == "combo":
-                    current_widget = self.tasks_table.cellWidget(row_idx, col)
-                    if not isinstance(current_widget, QComboBox):
-                        combo = QComboBox()
-                        combo.addItems(col_config.combo_items)
-                        value = tasks_data[row_idx][col] if row_idx < len(tasks_data) else col_config.combo_items[0]
-                        combo.setCurrentText(value or col_config.combo_items[0])
-                        self.tasks_table.setCellWidget(row_idx, col, combo)
-                        logging.debug(f"Set QComboBox in _sync_data for row {row_idx}, col {col} with value {combo.currentText()}")
-                else:
-                    item = self.tasks_table.item(row_idx, col)
-                    tooltip = ""
-                    task_id = self.tasks_table.item(row_idx, 0).text() if self.tasks_table.item(row_idx, 0) else "Unknown"
-                    if col == 1:  # Task Order column
-                        if item and item.text():
-                            try:
-                                task_order = float(item.text())
-                                if task_order in non_unique_orders:
-                                    item.setBackground(QBrush(Qt.yellow))
-                                    tooltip = f"Task {task_id}: Task Order must be unique"
-                                elif task_order <= 0:
-                                    item.setBackground(QBrush(Qt.yellow))
-                                    tooltip = f"Task {task_id}: Task Order must be positive"
-                                else:
-                                    item.setBackground(QBrush())
-                            except ValueError:
+        for row in range(self.tasks_table.rowCount()):
+            for col in range(1, self.tasks_table.columnCount()):  # Skip checkbox column
+                item = self.tasks_table.item(row, col)
+                if item:
+                    item.setBackground(QBrush())
+                    item.setToolTip("")
+
+        # Highlight cells with errors
+        if errors:
+            for error in errors:
+                if error.startswith("Row"):
+                    try:
+                        row_str = error.split(":")[0].replace("Row ", "")
+                        row_idx = int(row_str) - 1
+                        # Highlight the entire row
+                        for col in range(1, self.tasks_table.columnCount()):
+                            item = self.tasks_table.item(row_idx, col)
+                            if item:
                                 item.setBackground(QBrush(Qt.yellow))
-                                tooltip = f"Task {task_id}: Task Order must be a number"
-                        else:
-                            item = NumericTableWidgetItem("0")
-                            item.setData(Qt.UserRole, 0.0)
-                            item.setBackground(QBrush(Qt.yellow))
-                            tooltip = f"Task {task_id}: Task Order required"
-                            self.tasks_table.setItem(row_idx, col, item)
-                        item.setToolTip(tooltip)
+                                item.setToolTip(error.split(":", 1)[1].strip())
+                    except (ValueError, IndexError):
+                        logging.error(f"Failed to parse error message: {error}")
+                        continue
+            
+            QMessageBox.critical(self, "Error", "\n".join(errors))
+
         self.tasks_table.blockSignals(False)
-
-        if invalid_cells:
-            from PyQt5.QtWidgets import QMessageBox
-            QMessageBox.critical(self, "Error", "Fix highlighted cells in Tasks tab")
-            return
-
-        self.project_data.update_from_table("tasks", tasks_data)
         logging.debug("_sync_data in TasksTab completed")
 
     def _sync_data_if_not_initializing(self):
@@ -166,11 +145,12 @@ class TasksTab(QWidget):
             logging.debug("Calling _sync_data from itemChanged")
             self._sync_data()
 
-    def _extract_table_data(self):
+    def _extract_table_data(self) -> List[List[str]]:
         data = []
         for row in range(self.tasks_table.rowCount()):
             row_data = []
-            for col in range(self.tasks_table.columnCount()):
+            # Start from column 1 to skip checkbox column
+            for col in range(1, self.tasks_table.columnCount()):
                 widget = self.tasks_table.cellWidget(row, col)
                 if widget and isinstance(widget, QComboBox):
                     row_data.append(widget.currentText())

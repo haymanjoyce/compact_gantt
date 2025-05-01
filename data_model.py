@@ -1,3 +1,10 @@
+from typing import List, Dict, Any, Optional, Set
+from models import FrameConfig, TimeFrame, Task
+from validators import DataValidator
+import logging
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 class FrameConfig:
     def __init__(self, outer_width=800, outer_height=600, header_height=50, footer_height=50,
                  margins=(10, 10, 10, 10), num_rows=1, header_text="", footer_text="",
@@ -34,100 +41,102 @@ class Task:
 
 class ProjectData:
     def __init__(self):
-        self.frame_config = FrameConfig()
-        self.time_frames = []
-        self.tasks = []
-        self.connectors = []
-        self.swimlanes = []
-        self.pipes = []
-        self.curtains = []
-        self.text_boxes = []
+        self.frame_config: FrameConfig = FrameConfig()
+        self.time_frames: List[TimeFrame] = []
+        self.tasks: List[Task] = []
+        self.connectors: List[List[str]] = []
+        self.swimlanes: List[List[str]] = []
+        self.pipes: List[List[str]] = []
+        self.curtains: List[List[str]] = []
+        self.text_boxes: List[List[str]] = []
+        self.validator = DataValidator()
 
-    def add_time_frame(self, time_frame_id, finish_date, width_proportion):
-        self.time_frames.append({
-            "time_frame_id": time_frame_id,
-            "finish_date": finish_date,
-            "width_proportion": width_proportion
-        })
+    def add_time_frame(self, time_frame_id: int, finish_date: str, width_proportion: float) -> List[str]:
+        time_frame = TimeFrame(time_frame_id, finish_date, width_proportion)
+        used_ids = {tf.time_frame_id for tf in self.time_frames}
+        errors = self.validator.validate_time_frame(time_frame, used_ids)
+        if not errors:
+            self.time_frames.append(time_frame)
+            self.time_frames.sort(key=lambda x: x.time_frame_id)
+        return errors
 
-    def add_task(self, task_id, task_name, start_date, finish_date, row_number, is_milestone=False,
-                 label_placement="Inside", label_hide="No", label_alignment="Left",
-                 label_horizontal_offset=1.0, label_vertical_offset=0.5, label_text_colour="black", task_order=1.0):
-        self.tasks.append(Task(task_id, task_name, start_date, finish_date, row_number, is_milestone,
-                              label_placement, label_hide, label_alignment,
-                              label_horizontal_offset, label_vertical_offset, label_text_colour, task_order))
+    def add_task(self, task_id: int, task_name: str, start_date: str, finish_date: str, 
+                row_number: int, is_milestone: bool = False, label_placement: str = "Inside",
+                label_hide: str = "No", label_alignment: str = "Left",
+                label_horizontal_offset: float = 1.0, label_vertical_offset: float = 0.5,
+                label_text_colour: str = "black", task_order: float = 1.0) -> List[str]:
+        task = Task(
+            task_id=task_id,
+            task_order=task_order,
+            task_name=task_name,
+            start_date=start_date,
+            finish_date=finish_date,
+            row_number=row_number,
+            is_milestone=is_milestone,
+            label_placement=label_placement,
+            label_hide=label_hide,
+            label_alignment=label_alignment,
+            label_horizontal_offset=label_horizontal_offset,
+            label_vertical_offset=label_vertical_offset,
+            label_text_colour=label_text_colour
+        )
+        used_ids = {t.task_id for t in self.tasks}
+        errors = self.validator.validate_task(task, used_ids)
+        if not errors:
+            self.tasks.append(task)
+        return errors
 
-    def update_from_table(self, key, data):
-        if key == "connectors":
-            valid_connectors = []
-            task_ids = {task.task_id for task in self.tasks}
-            for row in data:
-                try:
-                    from_id, to_id = int(row[0]), int(row[1])
-                    if from_id > 0 and to_id > 0 and from_id in task_ids and to_id in task_ids and from_id != to_id:
-                        valid_connectors.append(row)
-                except (ValueError, TypeError):
-                    pass
-            setattr(self, key, valid_connectors)
-        elif key == "time_frames":
-            # Create a new list for time frames with unique IDs
-            new_time_frames = []
-            used_ids = set()
-            next_id = 1
+    def update_from_table(self, key: str, data: List[List[str]]) -> List[str]:
+        errors = []
+        try:
+            if key == "time_frames":
+                new_time_frames = []
+                used_ids: Set[int] = set()
+                for row_idx, row in enumerate(data, 1):
+                    try:
+                        # The order in the table is: Time Frame ID, Finish Date, Width (%)
+                        time_frame_id = int(row[0])  # First column
+                        finish_date = row[1]         # Second column
+                        width_proportion = float(row[2]) / 100  # Third column
+                        
+                        tf = TimeFrame(
+                            time_frame_id=time_frame_id,
+                            finish_date=finish_date,
+                            width_proportion=width_proportion
+                        )
+                        row_errors = self.validator.validate_time_frame(tf, used_ids)
+                        if not row_errors:
+                            new_time_frames.append(tf)
+                            used_ids.add(tf.time_frame_id)
+                        else:
+                            errors.extend(f"Row {row_idx}: {err}" for err in row_errors)
+                    except (ValueError, IndexError) as e:
+                        errors.append(f"Row {row_idx}: {str(e)}")
+                if not errors:
+                    self.time_frames = sorted(new_time_frames, key=lambda x: x.time_frame_id)
+            else:
+                setattr(self, key, data)
+        except Exception as e:
+            logging.error(f"Error in update_from_table: {e}", exc_info=True)
+            errors.append(f"Internal error: {str(e)}")
+        return errors
 
-            # First pass: try to keep existing valid IDs
-            for row in data:
-                try:
-                    time_frame_id = int(row[0]) if row[0] else 0
-                    if time_frame_id > 0 and time_frame_id not in used_ids:
-                        used_ids.add(time_frame_id)
-                        new_time_frames.append({
-                            "time_frame_id": time_frame_id,
-                            "finish_date": row[1],
-                            "width_proportion": float(row[2]) / 100
-                        })
-                except (ValueError, TypeError):
-                    pass
-
-            # Second pass: assign new IDs to any rows that had invalid or duplicate IDs
-            remaining_rows = [row for row in data if int(row[0]) in used_ids or int(row[0]) <= 0]
-            for row in remaining_rows:
-                while next_id in used_ids:
-                    next_id += 1
-                used_ids.add(next_id)
-                new_time_frames.append({
-                    "time_frame_id": next_id,
-                    "finish_date": row[1],
-                    "width_proportion": float(row[2]) / 100
-                })
-                next_id += 1
-
-            self.time_frames = sorted(new_time_frames, key=lambda x: x["time_frame_id"])
-        else:
-            setattr(self, key, data)
-
-    def get_table_data(self, key):
+    def get_table_data(self, key: str) -> List[List[str]]:
         if key == "tasks":
-            return [[t.task_id, str(t.task_order), t.task_name, t.start_date, t.finish_date, str(t.row_number),
-                     t.label_placement, t.label_hide, t.label_alignment,
-                     str(t.label_horizontal_offset), str(t.label_vertical_offset), t.label_text_colour]
-                    for t in self.tasks]
+            return [[str(t.task_id), str(t.task_order), t.task_name, t.start_date, t.finish_date,
+                    str(t.row_number), t.label_placement, t.label_hide, t.label_alignment,
+                    str(t.label_horizontal_offset), str(t.label_vertical_offset), t.label_text_colour]
+                   for t in self.tasks]
         elif key == "time_frames":
-            return [[str(tf["time_frame_id"]), tf["finish_date"], str(tf["width_proportion"] * 100)]
-                    for tf in sorted(self.time_frames, key=lambda x: x["time_frame_id"])]
+            return [[str(tf.time_frame_id), tf.finish_date, str(tf.width_proportion * 100)]
+                   for tf in sorted(self.time_frames, key=lambda x: x.time_frame_id)]
         return getattr(self, key, [])
 
-    def to_json(self):
+    def to_json(self) -> Dict[str, Any]:
         return {
             "frame_config": vars(self.frame_config),
-            "time_frames": sorted(self.time_frames, key=lambda x: x["time_frame_id"]),
-            "tasks": [{"task_id": t.task_id, "task_order": t.task_order, "task_name": t.task_name,
-                       "start_date": t.start_date, "finish_date": t.finish_date, "row_number": t.row_number,
-                       "is_milestone": t.is_milestone, "label_placement": t.label_placement,
-                       "label_hide": t.label_hide, "label_alignment": t.label_alignment,
-                       "label_horizontal_offset": t.label_horizontal_offset,
-                       "label_vertical_offset": t.label_vertical_offset, "label_text_colour": t.label_text_colour}
-                      for t in self.tasks],
+            "time_frames": [tf.to_dict() for tf in sorted(self.time_frames, key=lambda x: x.time_frame_id)],
+            "tasks": [vars(task) for task in self.tasks],
             "connectors": self.connectors,
             "swimlanes": self.swimlanes,
             "pipes": self.pipes,
@@ -136,30 +145,23 @@ class ProjectData:
         }
 
     @classmethod
-    def from_json(cls, data):
+    def from_json(cls, data: Dict[str, Any]) -> 'ProjectData':
         project = cls()
         project.frame_config = FrameConfig(**data.get("frame_config", {}))
-        time_frames = data.get("time_frames", [])
-        for idx, tf in enumerate(time_frames, 1):
-            # Assign time_frame_id for legacy JSONs lacking it
-            time_frame_id = tf.get("time_frame_id", idx)
-            project.add_time_frame(
-                time_frame_id,
-                tf.get("finish_date", "2025-01-01"),
-                tf.get("width_proportion", 1.0)
-            )
-        for task in data.get("tasks", []):
-            project.add_task(
-                task["task_id"], task["task_name"], task["start_date"],
-                task["finish_date"], task["row_number"], task.get("is_milestone", False),
-                task.get("label_placement", "Inside"), task.get("label_hide", "No"),
-                task.get("label_alignment", "Left"), task.get("label_horizontal_offset", 1.0),
-                task.get("label_vertical_offset", 0.5), task.get("label_text_colour", "black"),
-                task.get("task_order", float(len(project.tasks) + 1))
-            )
+        
+        # Load time frames
+        for tf_data in data.get("time_frames", []):
+            project.time_frames.append(TimeFrame.from_dict(tf_data))
+        
+        # Load tasks
+        for task_data in data.get("tasks", []):
+            project.tasks.append(Task.from_dict(task_data))
+        
+        # Load other data
         project.connectors = data.get("connectors", [])
         project.swimlanes = data.get("swimlanes", [])
         project.pipes = data.get("pipes", [])
         project.curtains = data.get("curtains", [])
         project.text_boxes = data.get("text_boxes", [])
+        
         return project

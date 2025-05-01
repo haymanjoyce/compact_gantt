@@ -1,10 +1,12 @@
 # File: ui/tabs/time_frames_tab.py
-from PyQt5.QtWidgets import QWidget, QTableWidget, QVBoxLayout, QPushButton, QGridLayout, QMessageBox, QHeaderView, QTableWidgetItem
+from PyQt5.QtWidgets import (QWidget, QTableWidget, QVBoxLayout, QPushButton, 
+                           QGridLayout, QMessageBox, QHeaderView, QTableWidgetItem)
 from PyQt5.QtCore import Qt, pyqtSignal, QDate
 from PyQt5.QtGui import QBrush
-from datetime import datetime, timedelta
+from datetime import datetime
 import logging
 from ..table_utils import add_row, remove_row, CheckBoxWidget
+from typing import List, Set, Tuple
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -24,26 +26,29 @@ class TimeFramesTab(QWidget):
         logging.debug("TimeFramesTab initialized")
 
     def setup_ui(self):
-        logging.debug("Setting up TimeFramesTab UI")
         layout = QVBoxLayout()
-        self.time_frames_table = QTableWidget(self.table_config.min_rows, len(self.table_config.columns))
-        self.time_frames_table.setHorizontalHeaderLabels([col.name for col in self.table_config.columns])
+        
+        # Create table
+        self.time_frames_table = QTableWidget(0, len(self.table_config.columns))  # Remove +1 since checkbox column is already in config
+        headers = [col.name for col in self.table_config.columns]  # Use column names directly from config
+        self.time_frames_table.setHorizontalHeaderLabels(headers)
         self.time_frames_table.setSortingEnabled(True)
         self.time_frames_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.time_frames_table.setColumnWidth(0, 80)  # Time Frame ID
-        self.time_frames_table.resizeColumnsToContents()
         layout.addWidget(self.time_frames_table)
 
+        # Create buttons
         btn_layout = QGridLayout()
         add_btn = QPushButton("Add Time Frame")
         remove_btn = QPushButton("Remove Time Frame")
-        add_btn.clicked.connect(lambda: add_row(self.time_frames_table, "time_frames", self.app_config.tables, self))
-        remove_btn.clicked.connect(lambda: remove_row(self.time_frames_table, "time_frames", self.app_config.tables, self))
+        add_btn.clicked.connect(lambda: add_row(self.time_frames_table, "time_frames", 
+                                              self.app_config.tables, self))
+        remove_btn.clicked.connect(lambda: remove_row(self.time_frames_table, "time_frames", 
+                                                    self.app_config.tables, self))
         btn_layout.addWidget(add_btn, 0, 0)
         btn_layout.addWidget(remove_btn, 0, 1)
         layout.addLayout(btn_layout)
+
         self.setLayout(layout)
-        logging.debug("TimeFramesTab UI setup complete")
 
     def _load_initial_data(self):
         logging.debug("Starting _load_initial_data")
@@ -82,95 +87,50 @@ class TimeFramesTab(QWidget):
             self.time_frames_table.setSortingEnabled(was_sorting)
             self._initializing = False
             self._sync_data()
-            logging.debug("_load_initial_data completed")
         except Exception as e:
             logging.error(f"Error in _load_initial_data: {e}", exc_info=True)
             QMessageBox.critical(self, "Error", f"Failed to load initial data: {e}")
 
     def _sync_data(self):
         time_frames_data = self._extract_table_data()
-        invalid_cells = set()
-        used_ids = set()
+        errors = self.project_data.update_from_table("time_frames", time_frames_data)
         
-        # Find the Time Frame ID column index
-        id_column = None
-        for i in range(self.time_frames_table.columnCount()):
-            if self.time_frames_table.horizontalHeaderItem(i).text() == "Time Frame ID":
-                id_column = i
-                break
-
-        if id_column is None:
-            logging.error("Could not find Time Frame ID column")
-            return
-
-        # First pass: check for invalid or duplicate IDs
-        for row_idx in range(self.time_frames_table.rowCount()):
-            item = self.time_frames_table.item(row_idx, id_column)
-            if item:
-                try:
-                    time_frame_id = int(item.text())
-                    if time_frame_id <= 0:
-                        invalid_cells.add((row_idx, id_column))
-                    elif time_frame_id in used_ids:
-                        # Automatically assign a new unique ID
-                        next_id = 1
-                        while next_id in used_ids:
-                            next_id += 1
-                        item.setText(str(next_id))
-                        used_ids.add(next_id)
-                    else:
-                        used_ids.add(time_frame_id)
-                except (ValueError, TypeError):
-                    invalid_cells.add((row_idx, id_column))
-
-        # Validate other fields
-        for row_idx, row in enumerate(time_frames_data):
-            # Validate Finish Date
-            finish_date = row[1]
-            try:
-                datetime.strptime(finish_date, "%Y-%m-%d")
-            except (ValueError, TypeError):
-                invalid_cells.add((row_idx, id_column + 1))
-
-            # Validate Width
-            try:
-                width = float(row[2])
-                if width <= 0:
-                    invalid_cells.add((row_idx, id_column + 2))
-            except (ValueError, TypeError):
-                invalid_cells.add((row_idx, id_column + 2))
-
-        # Highlight invalid cells
+        # Clear all highlights first
         self.time_frames_table.blockSignals(True)
         for row in range(self.time_frames_table.rowCount()):
-            for col in range(self.time_frames_table.columnCount()):
+            for col in range(1, self.time_frames_table.columnCount()):  # Skip checkbox column
                 item = self.time_frames_table.item(row, col)
                 if item:
-                    if (row, col) in invalid_cells:
-                        item.setBackground(QBrush(Qt.yellow))
-                        if col == id_column:
-                            item.setToolTip("Time Frame ID must be a unique positive number")
-                        elif col == id_column + 1:
-                            item.setToolTip("Date must be in YYYY-MM-DD format")
-                        elif col == id_column + 2:
-                            item.setToolTip("Width must be a positive number")
-                    else:
-                        item.setBackground(QBrush())
-                        item.setToolTip("")
+                    item.setBackground(QBrush())
+                    item.setToolTip("")
+        
+        # Highlight cells with errors
+        if errors:
+            for error in errors:
+                if error.startswith("Row"):
+                    try:
+                        row_str = error.split(":")[0].replace("Row ", "")
+                        row_idx = int(row_str) - 1
+                        # Highlight the entire row
+                        for col in range(1, self.time_frames_table.columnCount()):
+                            item = self.time_frames_table.item(row_idx, col)
+                            if item:
+                                item.setBackground(QBrush(Qt.yellow))
+                                item.setToolTip(error.split(":", 1)[1].strip())
+                    except (ValueError, IndexError):
+                        logging.error(f"Failed to parse error message: {error}")
+                        continue
+            
+            QMessageBox.critical(self, "Error", "\n".join(errors))
+        
         self.time_frames_table.blockSignals(False)
-
-        if invalid_cells:
-            QMessageBox.critical(self, "Error", "Fix highlighted cells in Time Frames tab")
-            return
-
-        self.project_data.update_from_table("time_frames", time_frames_data)
 
     def _sync_data_if_not_initializing(self):
         if not self._initializing:
             logging.debug("Calling _sync_data from itemChanged")
             self._sync_data()
 
-    def _extract_table_data(self):
+    def _extract_table_data(self) -> List[List[str]]:
         """Extract data from table, skipping the checkbox column."""
         data = []
         for row in range(self.time_frames_table.rowCount()):
