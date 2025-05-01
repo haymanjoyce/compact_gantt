@@ -1,5 +1,5 @@
 from PyQt5.QtWidgets import QTableWidgetItem, QComboBox, QCheckBox, QWidget, QHBoxLayout
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QDate
 import logging
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -35,16 +35,7 @@ class CheckBoxWidget(QWidget):
         self.setLayout(layout)
 
 def add_row(table, table_key, table_configs, parent, row_index=None):
-    """
-    Add a row to a table with proper ID and sorting handling.
-    
-    Args:
-        table: QTableWidget - The table to add a row to
-        table_key: str - The key identifying the table type
-        table_configs: dict - Configuration for all tables
-        parent: QWidget - The parent widget (tab) containing the table
-        row_index: int or None - Index where to insert the row. If None, adds to end
-    """
+    """Add a row to a table with proper ID and sorting handling."""
     logging.debug(f"Starting add_row for {table_key}")
     try:
         config = table_configs.get(table_key)
@@ -60,67 +51,57 @@ def add_row(table, table_key, table_configs, parent, row_index=None):
         table.setSortingEnabled(False)
         table.blockSignals(True)
 
-        # Calculate next ID and prepare context
-        context = {}
-        max_id = 0
-        id_column = 0  # ID is always in first column
-        
-        # Calculate max ID from existing rows
+        # Find the Time Frame ID column index
+        id_column = None
+        for i in range(table.columnCount()):
+            if table.horizontalHeaderItem(i).text() == "Time Frame ID":
+                id_column = i
+                break
+
+        if id_column is None:
+            logging.error("Could not find Time Frame ID column")
+            return
+
+        # Calculate next available ID
+        used_ids = set()
         for row in range(table.rowCount()):
             item = table.item(row, id_column)
             try:
                 if item and item.text():
-                    max_id = max(max_id, int(item.text()))
+                    used_ids.add(int(item.text()))
             except (ValueError, TypeError):
-                logging.warning(f"Invalid ID in row {row}: {item.text() if item else 'None'}")
                 continue
 
-        # Add task-specific context for task orders
-        if table_key == "tasks":
-            max_task_order = 0
-            for row in range(table.rowCount()):
-                item_order = table.item(row, 1)  # Task order column
-                if item_order:
-                    try:
-                        max_task_order = max(max_task_order, float(item_order.text()))
-                    except ValueError:
-                        pass
-            context["max_task_order"] = max_task_order
-
-        # Set the max ID in context
-        context[f"max_{table_key.rstrip('s')}_id"] = max_id
+        # Find the next available ID
+        next_id = 1
+        while next_id in used_ids:
+            next_id += 1
 
         # Insert the row at specified index or append
         if row_index is None:
             row_index = table.rowCount()
         table.insertRow(row_index)
 
-        # Generate and set defaults
-        defaults = config.default_generator(row_index, context)
-        for col_idx, default in enumerate(defaults):
-            col_config = config.columns[col_idx]
-            if col_config.widget_type == "checkbox":
-                checkbox_widget = CheckBoxWidget()
-                checkbox_widget.checkbox.setChecked(bool(default))
-                table.setCellWidget(row_index, col_idx, checkbox_widget)
-            elif col_config.widget_type == "combo":
-                combo = QComboBox()
-                combo.addItems(col_config.combo_items)
-                combo.setCurrentText(str(default) or col_config.combo_items[0])
-                table.setCellWidget(row_index, col_idx, combo)
-            else:
-                item = NumericTableWidgetItem(str(default)) if col_idx in (0, 1) else QTableWidgetItem(str(default))
-                if table_key in ["time_frames", "tasks"] and col_idx == 0:
-                    item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-                if table_key == "tasks" and col_idx == 0:
-                    item.setData(Qt.UserRole, int(default) if str(default).isdigit() else 0)
-                elif table_key == "tasks" and col_idx == 1:
-                    item.setData(Qt.UserRole, float(default) if default else 0.0)
-                table.setItem(row_index, col_idx, item)
+        # Add checkbox first
+        checkbox_widget = CheckBoxWidget()
+        table.setCellWidget(row_index, 0, checkbox_widget)
 
-        # Handle task-specific operations
-        if table_key == "tasks":
-            renumber_task_orders(table)
+        # Add Time Frame ID
+        id_item = QTableWidgetItem(str(next_id))
+        id_item.setFlags(id_item.flags() & ~Qt.ItemIsEditable)  # Make ID read-only
+        table.setItem(row_index, id_column, id_item)
+
+        # Add default values for other columns
+        finish_date = QDate.currentDate().addDays(7).toString("yyyy-MM-dd")
+        width = "50.0"
+
+        # Find column indices
+        for i in range(table.columnCount()):
+            header_text = table.horizontalHeaderItem(i).text()
+            if header_text == "Finish Date":
+                table.setItem(row_index, i, QTableWidgetItem(finish_date))
+            elif header_text == "Width (%)":
+                table.setItem(row_index, i, QTableWidgetItem(width))
 
         # Restore table state
         table.blockSignals(False)

@@ -90,34 +90,55 @@ class TimeFramesTab(QWidget):
     def _sync_data(self):
         time_frames_data = self._extract_table_data()
         invalid_cells = set()
+        used_ids = set()
         
-        # Create a mapping of column names to indices
-        header_to_index = {self.time_frames_table.horizontalHeaderItem(i).text(): i 
-                          for i in range(self.time_frames_table.columnCount())}
-        
-        # Create a mapping of column names to validators
-        validators = {col.name: col.validator for col in self.table_config.columns if col.validator}
-        
-        for row_idx, row in enumerate(time_frames_data):
-            for col_name, validator in validators.items():
-                if col_name not in header_to_index:
-                    continue
-                    
-                col_idx = header_to_index[col_name]
-                value = row[col_idx - 1]  # Adjust index because _extract_table_data skips checkbox column
-                
+        # Find the Time Frame ID column index
+        id_column = None
+        for i in range(self.time_frames_table.columnCount()):
+            if self.time_frames_table.horizontalHeaderItem(i).text() == "Time Frame ID":
+                id_column = i
+                break
+
+        if id_column is None:
+            logging.error("Could not find Time Frame ID column")
+            return
+
+        # First pass: check for invalid or duplicate IDs
+        for row_idx in range(self.time_frames_table.rowCount()):
+            item = self.time_frames_table.item(row_idx, id_column)
+            if item:
                 try:
-                    if not validator(value):
-                        invalid_cells.add((row_idx, col_idx))
-                        if col_name == "Time Frame ID":
-                            logging.warning(f"Invalid Time Frame ID in row {row_idx}: {value}")
-                        elif col_name == "Finish Date":
-                            logging.warning(f"Invalid Finish Date in row {row_idx}: {value}")
-                        elif col_name == "Width (%)":
-                            logging.warning(f"Invalid Width in row {row_idx}: {value}")
-                except (ValueError, TypeError) as e:
-                    invalid_cells.add((row_idx, col_idx))
-                    logging.warning(f"Validation error in {col_name} at row {row_idx}: {e}")
+                    time_frame_id = int(item.text())
+                    if time_frame_id <= 0:
+                        invalid_cells.add((row_idx, id_column))
+                    elif time_frame_id in used_ids:
+                        # Automatically assign a new unique ID
+                        next_id = 1
+                        while next_id in used_ids:
+                            next_id += 1
+                        item.setText(str(next_id))
+                        used_ids.add(next_id)
+                    else:
+                        used_ids.add(time_frame_id)
+                except (ValueError, TypeError):
+                    invalid_cells.add((row_idx, id_column))
+
+        # Validate other fields
+        for row_idx, row in enumerate(time_frames_data):
+            # Validate Finish Date
+            finish_date = row[1]
+            try:
+                datetime.strptime(finish_date, "%Y-%m-%d")
+            except (ValueError, TypeError):
+                invalid_cells.add((row_idx, id_column + 1))
+
+            # Validate Width
+            try:
+                width = float(row[2])
+                if width <= 0:
+                    invalid_cells.add((row_idx, id_column + 2))
+            except (ValueError, TypeError):
+                invalid_cells.add((row_idx, id_column + 2))
 
         # Highlight invalid cells
         self.time_frames_table.blockSignals(True)
@@ -127,12 +148,11 @@ class TimeFramesTab(QWidget):
                 if item:
                     if (row, col) in invalid_cells:
                         item.setBackground(QBrush(Qt.yellow))
-                        col_name = self.time_frames_table.horizontalHeaderItem(col).text()
-                        if col_name == "Time Frame ID":
-                            item.setToolTip("Time Frame ID must be a positive number")
-                        elif col_name == "Finish Date":
+                        if col == id_column:
+                            item.setToolTip("Time Frame ID must be a unique positive number")
+                        elif col == id_column + 1:
                             item.setToolTip("Date must be in YYYY-MM-DD format")
-                        elif col_name == "Width (%)":
+                        elif col == id_column + 2:
                             item.setToolTip("Width must be a positive number")
                     else:
                         item.setBackground(QBrush())
@@ -143,6 +163,8 @@ class TimeFramesTab(QWidget):
             QMessageBox.critical(self, "Error", "Please fix highlighted cells")
             return
 
+        # Get the updated data after potential ID changes
+        time_frames_data = self._extract_table_data()
         self.project_data.update_from_table("time_frames", time_frames_data)
         self.data_updated.emit(self.project_data.to_json())
 

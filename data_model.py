@@ -70,23 +70,38 @@ class ProjectData:
                     pass
             setattr(self, key, valid_connectors)
         elif key == "time_frames":
-            # Preserve existing time_frame_id where possible
+            # Create a new list for time frames with unique IDs
             new_time_frames = []
-            existing_ids = {tf["time_frame_id"]: tf for tf in self.time_frames}
+            used_ids = set()
+            next_id = 1
+
+            # First pass: try to keep existing valid IDs
             for row in data:
-                time_frame_id = int(row[0]) if row[0] else len(new_time_frames) + 1
-                if time_frame_id in existing_ids:
-                    new_time_frames.append({
-                        "time_frame_id": time_frame_id,
-                        "finish_date": row[1],
-                        "width_proportion": float(row[2]) / 100
-                    })
-                else:
-                    new_time_frames.append({
-                        "time_frame_id": time_frame_id,
-                        "finish_date": row[1],
-                        "width_proportion": float(row[2]) / 100
-                    })
+                try:
+                    time_frame_id = int(row[0]) if row[0] else 0
+                    if time_frame_id > 0 and time_frame_id not in used_ids:
+                        used_ids.add(time_frame_id)
+                        new_time_frames.append({
+                            "time_frame_id": time_frame_id,
+                            "finish_date": row[1],
+                            "width_proportion": float(row[2]) / 100
+                        })
+                except (ValueError, TypeError):
+                    pass
+
+            # Second pass: assign new IDs to any rows that had invalid or duplicate IDs
+            remaining_rows = [row for row in data if int(row[0]) in used_ids or int(row[0]) <= 0]
+            for row in remaining_rows:
+                while next_id in used_ids:
+                    next_id += 1
+                used_ids.add(next_id)
+                new_time_frames.append({
+                    "time_frame_id": next_id,
+                    "finish_date": row[1],
+                    "width_proportion": float(row[2]) / 100
+                })
+                next_id += 1
+
             self.time_frames = sorted(new_time_frames, key=lambda x: x["time_frame_id"])
         else:
             setattr(self, key, data)
