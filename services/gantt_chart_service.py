@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import os
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot
 from PyQt5.QtGui import QFont, QFontMetrics
-from app_config import AppConfig
+from config.app_config import AppConfig
 import logging
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

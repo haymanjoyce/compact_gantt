@@ -3,7 +3,7 @@ from PyQt5.QtSvg import QSvgWidget
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt
 import os
-from app_config import AppConfig
+from config.app_config import AppConfig
 
 
 class SVGDisplayWindow(QDialog):
