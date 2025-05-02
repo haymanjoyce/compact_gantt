@@ -1,6 +1,3 @@
-from models.frame import FrameConfig
-from models.time_frame import TimeFrame
-from models.task import Task
 from repositories.project_repository import JsonProjectRepository
 from validators.validators import DataValidator
 
@@ -9,8 +6,8 @@ class ProjectService:
         self.repository = repository or JsonProjectRepository()
         self.validator = DataValidator()
 
-    def load_project(self, file_path):
-        return self.repository.load(file_path)
+    def load_project(self, file_path, project_data_cls):
+        return self.repository.load(file_path, project_data_cls)
 
     def save_project(self, file_path, project_data):
         self.repository.save(file_path, project_data)

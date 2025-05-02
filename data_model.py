@@ -121,5 +121,6 @@ class ProjectData:
         self.project_service.save_project(file_path, self)
 
     def load_from_file(self, file_path):
-        loaded = self.project_service.load_project(file_path)
+        from data_model import ProjectData  # Local import to avoid circular import
+        loaded = self.project_service.load_project(file_path, ProjectData)
         self.__dict__.update(loaded.__dict__)

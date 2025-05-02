@@ -103,7 +103,8 @@ class DataEntryWindow(QMainWindow):
         file_path, _ = QFileDialog.getOpenFileName(self, "Open Project", "", "JSON Files (*.json)")
         if file_path:
             try:
-                loaded_project = self.repository.load(file_path)
+                from data_model import ProjectData  # Import here to avoid circular import
+                loaded_project = self.repository.load(file_path, ProjectData)
                 self.project_data.__dict__.update(loaded_project.__dict__)
                 # Only reload data for implemented tabs
                 for tab in [self.time_frames_tab, self.layout_tab, self.tasks_tab]:

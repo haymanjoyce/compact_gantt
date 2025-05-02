@@ -1,6 +1,6 @@
 from typing import List, Set, Dict, Any
 from datetime import datetime
-from models.frame import TimeFrame, Task
+from models import TimeFrame, Task
 
 
 class DataValidator:
