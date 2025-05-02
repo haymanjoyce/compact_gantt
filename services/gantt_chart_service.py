@@ -9,10 +9,11 @@ import logging
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-class GanttChartService:
+class GanttChartService(QObject):
     svg_generated = pyqtSignal(str)
 
     def __init__(self, output_folder: str = None, output_filename: str = None):
+        super().__init__()
         self.config = AppConfig()
         self.output_folder = output_folder or self.config.general.svg_output_folder
         self.output_filename = output_filename or self.config.general.svg_output_filename
