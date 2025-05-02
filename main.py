@@ -2,8 +2,8 @@ import sys
 from PyQt5.QtWidgets import QApplication
 from ui.data_entry_window import DataEntryWindow
 from data_model import ProjectData
-from svg_generator import GanttChartGenerator
-from svg_display import SVGDisplayWindow
+from services.gantt_chart_service import GanttChartService
+from ui.svg_display import SVGDisplayWindow
 from app_config import AppConfig
 
 
@@ -12,7 +12,7 @@ def main():
     app_config = AppConfig()  # Single instance
     project_data = ProjectData()
     data_entry = DataEntryWindow(project_data)  # Pass project_data
-    svg_generator = GanttChartGenerator()
+    gantt_chart_service = GanttChartService()
     svg_display = SVGDisplayWindow(app_config)
 
     def handle_svg_path(svg_path):
@@ -21,8 +21,8 @@ def main():
         else:
             print("No SVG generated due to invalid data")
 
-    data_entry.data_updated.connect(svg_generator.generate_svg)
-    svg_generator.svg_generated.connect(handle_svg_path)
+    data_entry.data_updated.connect(gantt_chart_service.generate_svg)
+    gantt_chart_service.svg_generated.connect(handle_svg_path)
     data_entry.show()
     sys.exit(app.exec_())
 

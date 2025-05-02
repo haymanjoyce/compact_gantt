@@ -1,4 +1,4 @@
-# File: svg_generator.py
+# File: gantt_chart_service.py
 import svgwrite
 from datetime import datetime, timedelta
 import os
@@ -9,11 +9,10 @@ import logging
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-class GanttChartGenerator(QObject):
+class GanttChartService:
     svg_generated = pyqtSignal(str)
 
     def __init__(self, output_folder: str = None, output_filename: str = None):
-        super().__init__()
         self.config = AppConfig()
         self.output_folder = output_folder or self.config.general.svg_output_folder
         self.output_filename = output_filename or self.config.general.svg_output_filename
@@ -22,7 +21,7 @@ class GanttChartGenerator(QObject):
         self.start_date = None
         self.font = QFont("Arial", 10)
         self.font_metrics = QFontMetrics(self.font)
-        logging.debug("GanttChartGenerator initialized")
+        logging.debug("GanttChartService initialized")
 
     @pyqtSlot(dict)
     def generate_svg(self, data):
