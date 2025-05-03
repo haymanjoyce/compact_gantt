@@ -30,10 +30,3 @@ class SVGDisplayWindow(QDialog):
             self.show()
         else:
             print(f"SVG file not found: {absolute_path}")
-
-class SVGDisplay(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("Compact Gantt - Preview")
-        self.setWindowIcon(QIcon("assets/logo.png"))  # Add window icon
-        # ... rest of initialization ...
