@@ -23,8 +23,14 @@ class DataEntryWindow(QMainWindow):
         self.project_data = project_data  # Use passed project_data instance
         self.app_config = AppConfig()  # Initialize centralized config
         self.repository = JsonProjectRepository()  # Add this line
+        self.resize(self.app_config.general.data_entry_width, self.app_config.general.data_entry_height)
+        move_window_to_screen_center(
+            self,
+            screen_number=0,
+            width=self.app_config.general.data_entry_width,
+            height=self.app_config.general.data_entry_height
+        )
         self.setup_ui()
-        move_window_to_screen_center(self, screen_number=2, width=600, height=800)  # screen_number=0 is usually primary, 1 is secondary
 
     def setup_ui(self):
         # Create menu bar

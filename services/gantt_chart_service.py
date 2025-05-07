@@ -33,8 +33,8 @@ class GanttChartService(QObject):
             return
         try:
             self.data = data
-            width = self.data["frame_config"].get("outer_width", self.config.general.svg_width)
-            height = self.data["frame_config"].get("outer_height", self.config.general.svg_height)
+            width = self.config.general.outer_width
+            height = self.config.general.outer_height
             self.dwg = svgwrite.Drawing(
                 filename=os.path.abspath(os.path.join(self.output_folder, self.output_filename)),
                 size=(width, height))

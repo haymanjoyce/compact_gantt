@@ -9,10 +9,15 @@ from PyQt5.QtWidgets import QApplication
 
 
 class SVGDisplayWindow(QDialog):
-    def __init__(self, app_config, initial_path=None):
+    def __init__(self, app_config, initial_path=None, reference_window=None):
         super().__init__()
         self.setWindowTitle("SVG Display")
         self.setWindowIcon(QIcon("assets/logo.png"))  # Add window icon
+
+        # Set window size using display window variables
+        width = app_config.general.svg_display_width
+        height = app_config.general.svg_display_height
+        self.resize(width, height)
 
         self.svg_widget = QSvgWidget()
         self.layout = QVBoxLayout()
@@ -23,15 +28,16 @@ class SVGDisplayWindow(QDialog):
             self.load_svg(initial_path)
 
         # Try to open on screen 2 (index 1)
-        width = app_config.general.svg_display_width
-        height = app_config.general.svg_display_height
         app = QApplication.instance()
         screens = app.screens()
         if len(screens) > 1:
             move_window_to_screen_center(self, screen_number=1, width=width, height=height)
         else:
             # Open to the right of DataEntryWindow on screen 1
-            move_window_to_screen_right_of(self, self, screen_number=0, width=width, height=height)
+            if reference_window is not None:
+                move_window_to_screen_right_of(self, reference_window, screen_number=0, width=width, height=height)
+            else:
+                move_window_to_screen_center(self, screen_number=0, width=width, height=height)
 
     def load_svg(self, svg_path):
         print("Received SVG path:", svg_path)  # Debug

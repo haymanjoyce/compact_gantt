@@ -106,3 +106,15 @@ The `utils/` and `ui/` packages contain helper functions for use throughout the 
   - `move_window_to_screen_right_of(window, reference_window, screen_number=0, width=None, height=None)`: Move and optionally resize a window to the right of another window, on a given screen.
 
 These are used in the UI and service layers to robustly handle user input, data conversion, and window management.
+
+## Configuration Variables
+
+- **Window size variables** (control the size of application windows):
+    - `data_entry_width`, `data_entry_height`: Main data entry window size (in pixels).
+    - `svg_display_width`, `svg_display_height`: SVG display window size (in pixels).
+
+- **SVG/image size variables** (control the resolution of the generated chart):
+    - `outer_width`, `outer_height`: The width and height of the SVG chart (in pixels). These do not affect the window size, only the resolution of the output image.
+
+**Note:**  
+Window size and SVG/image size are independent. You can generate a high-resolution SVG and view it in a smaller window with scrollbars.
