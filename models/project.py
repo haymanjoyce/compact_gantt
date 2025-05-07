@@ -24,6 +24,8 @@ class ProjectData:
         self.task_service = TaskService()
 
     def to_json(self) -> Dict[str, Any]:
+        for t in self.tasks:
+            assert hasattr(t, "__dict__"), f"Non-class instance in self.tasks: {t} ({type(t)})"
         return {
             "frame_config": vars(self.frame_config),
             "time_frames": [tf.to_dict() for tf in sorted(self.time_frames, key=lambda x: x.time_frame_id)],
