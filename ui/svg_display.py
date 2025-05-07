@@ -4,6 +4,8 @@ from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt
 import os
 from config.app_config import AppConfig
+from ui.window_utils import move_window_to_screen_center, move_window_to_screen_right_of
+from PyQt5.QtWidgets import QApplication
 
 
 class SVGDisplayWindow(QDialog):
@@ -11,7 +13,6 @@ class SVGDisplayWindow(QDialog):
         super().__init__()
         self.setWindowTitle("SVG Display")
         self.setWindowIcon(QIcon("assets/logo.png"))  # Add window icon
-        self.setGeometry(150, 150, app_config.general.svg_display_width, app_config.general.svg_display_height)
 
         self.svg_widget = QSvgWidget()
         self.layout = QVBoxLayout()
@@ -20,6 +21,17 @@ class SVGDisplayWindow(QDialog):
 
         if initial_path and os.path.exists(initial_path):
             self.load_svg(initial_path)
+
+        # Try to open on screen 2 (index 1)
+        width = app_config.general.svg_display_width
+        height = app_config.general.svg_display_height
+        app = QApplication.instance()
+        screens = app.screens()
+        if len(screens) > 1:
+            move_window_to_screen_center(self, screen_number=1, width=width, height=height)
+        else:
+            # Open to the right of DataEntryWindow on screen 1
+            move_window_to_screen_right_of(self, self, screen_number=0, width=width, height=height)
 
     def load_svg(self, svg_path):
         print("Received SVG path:", svg_path)  # Debug

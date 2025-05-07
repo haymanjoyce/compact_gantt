@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QMainWindow, QTabWidget, QToolBar, QAction, QFileDialog, QMessageBox, QWidget, QSizePolicy, QPushButton, QVBoxLayout
+from PyQt5.QtWidgets import QMainWindow, QTabWidget, QToolBar, QAction, QFileDialog, QMessageBox, QWidget, QSizePolicy, QPushButton, QVBoxLayout, QApplication
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import pyqtSignal, QDate, QObject
 from config.app_config import AppConfig
@@ -10,6 +10,7 @@ from .tabs.placeholder_tab import PlaceholderTab
 from repositories.project_repository import JsonProjectRepository
 from models.project import ProjectData  # Import here to avoid circular import
 import json
+from ui.window_utils import move_window_to_screen_center
 
 class DataEntryWindow(QMainWindow):
     data_updated = pyqtSignal(dict)
@@ -18,12 +19,12 @@ class DataEntryWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Compact Gantt")
         self.setWindowIcon(QIcon("assets/logo.png"))  # Add window icon
-        self.setMinimumSize(600, 400)
+        self.setMinimumSize(600, 700)
         self.project_data = project_data  # Use passed project_data instance
         self.app_config = AppConfig()  # Initialize centralized config
         self.repository = JsonProjectRepository()  # Add this line
         self.setup_ui()
-        # No longer connecting signals for automatic updates
+        move_window_to_screen_center(self, screen_number=2, width=600, height=800)  # screen_number=0 is usually primary, 1 is secondary
 
     def setup_ui(self):
         # Create menu bar
