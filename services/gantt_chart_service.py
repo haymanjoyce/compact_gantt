@@ -77,14 +77,14 @@ class GanttChartService(QObject):
         return start_date
 
     def render_outer_frame(self):
-        width = self.data["frame_config"].get("outer_width", self.config.general.svg_width)
-        height = self.data["frame_config"].get("outer_height", self.config.general.svg_height)
+        width = self.data["frame_config"].get("outer_width", self.config.general.outer_width)
+        height = self.data["frame_config"].get("outer_height", self.config.general.outer_height)
         self.dwg.add(self.dwg.rect(insert=(0, 0), size=(width, height), fill="white", stroke="black", stroke_width=2))
         logging.debug("Outer frame rendered")
 
     def render_header(self):
         margins = self.data["frame_config"].get("margins", (10, 10, 10, 10))
-        width = self.data["frame_config"].get("outer_width", self.config.general.svg_width) - margins[1] - margins[3]
+        width = self.data["frame_config"].get("outer_width", self.config.general.outer_width) - margins[1] - margins[3]
         height = self.data["frame_config"].get("header_height", 50)
         self.dwg.add(self.dwg.rect(insert=(margins[3], margins[0]), size=(width, height),
                                    fill="lightgray", stroke="black", stroke_width=1))
@@ -97,9 +97,9 @@ class GanttChartService(QObject):
 
     def render_footer(self):
         margins = self.data["frame_config"].get("margins", (10, 10, 10, 10))
-        width = self.data["frame_config"].get("outer_width", self.config.general.svg_width) - margins[1] - margins[3]
+        width = self.data["frame_config"].get("outer_width", self.config.general.outer_width) - margins[1] - margins[3]
         height = self.data["frame_config"].get("footer_height", 50)
-        y = self.data["frame_config"].get("outer_height", self.config.general.svg_height) - margins[2] - height
+        y = self.data["frame_config"].get("outer_height", self.config.general.outer_height) - margins[2] - height
         self.dwg.add(self.dwg.rect(insert=(margins[3], y), size=(width, height),
                                    fill="lightgray", stroke="black", stroke_width=1))
         footer_text = self.data["frame_config"].get("footer_text", "")
@@ -111,9 +111,9 @@ class GanttChartService(QObject):
 
     def render_inner_frame(self):
         margins = self.data["frame_config"].get("margins", (10, 10, 10, 10))
-        width = self.data["frame_config"].get("outer_width", self.config.general.svg_width) - margins[1] - margins[3]
+        width = self.data["frame_config"].get("outer_width", self.config.general.outer_width) - margins[1] - margins[3]
         y = margins[0] + self.data["frame_config"].get("header_height", 50)
-        height = (self.data["frame_config"].get("outer_height", self.config.general.svg_height) -
+        height = (self.data["frame_config"].get("outer_height", self.config.general.outer_height) -
                   self.data["frame_config"].get("header_height", 50) -
                   self.data["frame_config"].get("footer_height", 50) - margins[0] - margins[2])
         self.dwg.add(self.dwg.rect(insert=(margins[3], y), size=(width, height),
@@ -124,8 +124,8 @@ class GanttChartService(QObject):
         logging.debug("Starting render_time_frames")
         margins = self.data["frame_config"].get("margins", (10, 10, 10, 10))
         inner_y = margins[0] + self.data["frame_config"].get("header_height", 50)
-        inner_width = self.data["frame_config"].get("outer_width", self.config.general.svg_width) - margins[1] - margins[3]
-        inner_height = (self.data["frame_config"].get("outer_height", self.config.general.svg_height) -
+        inner_width = self.data["frame_config"].get("outer_width", self.config.general.outer_width) - margins[1] - margins[3]
+        inner_height = (self.data["frame_config"].get("outer_height", self.config.general.outer_height) -
                         self.data["frame_config"].get("header_height", 50) -
                         self.data["frame_config"].get("footer_height", 50) - margins[0] - margins[2])
         x_offset = margins[3]

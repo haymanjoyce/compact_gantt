@@ -19,8 +19,6 @@ class GeneralConfig:
     outer_height: int = 400     # SVG/chart height in pixels
 
     # SVG generation settings
-    svg_width: int = 800
-    svg_height: int = 400
     svg_output_folder: str = "svg"
     svg_output_filename: str = "gantt_chart.svg"
 
@@ -51,7 +49,7 @@ class GeneralConfig:
     def __post_init__(self):
         # Validate positive integers
         for field_name in ["data_entry_width", "data_entry_height", "svg_display_width",
-                          "svg_display_height", "svg_width", "svg_height",
+                          "svg_display_height", "outer_width", "outer_height",
                           "full_label_width", "short_label_width", "min_interval_width",
                           "tasks_rows", "pipes_rows", "curtains_rows"]:
             value = getattr(self, field_name)

@@ -73,13 +73,13 @@ class LayoutTab(QWidget):
         # Width
         width_label = QLabel("Outer Width:")
         width_label.setFixedWidth(label_width)
-        self.outer_width = QLineEdit(str(self.app_config.general.svg_width))
+        self.outer_width = QLineEdit(str(self.app_config.general.outer_width))
         self.outer_width.setToolTip("Total width of the chart in pixels")
 
         # Height
         height_label = QLabel("Outer Height:")
         height_label.setFixedWidth(label_width)
-        self.outer_height = QLineEdit(str(self.app_config.general.svg_height))
+        self.outer_height = QLineEdit(str(self.app_config.general.outer_height))
         self.outer_height.setToolTip("Total height of the chart in pixels")
 
         # Number of Rows
