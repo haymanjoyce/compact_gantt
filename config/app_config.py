@@ -15,8 +15,8 @@ class GeneralConfig:
     svg_display_height: int = 600
 
     # SVG/image generation settings (for chart resolution)
-    outer_width: int = 800      # SVG/chart width in pixels
-    outer_height: int = 600     # SVG/chart height in pixels
+    outer_width: int = 600      # Main SVG/chart width in pixels (user-facing)
+    outer_height: int = 400     # Main SVG/chart height in pixels (user-facing)
 
     # SVG generation settings
     svg_output_folder: str = "svg"
@@ -34,7 +34,7 @@ class GeneralConfig:
     min_interval_width: int = 5
 
     # Default table row counts
-    tasks_rows: int = 10
+    tasks_rows: int = 5         # Default number of rows for new charts
     pipes_rows: int = 3
     curtains_rows: int = 3
 
