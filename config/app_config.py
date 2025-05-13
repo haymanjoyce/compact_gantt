@@ -94,12 +94,12 @@ class AppConfig:
                 max_time_frame_id = context.get("max_time_frame_id", 0)
                 time_frame_id = max_time_frame_id + 1
                 finish_date = QDate.currentDate().addDays(7 * (row_idx + 1)).toString("yyyy-MM-dd")
-                width = 100.0 / max(1, row_idx + 2)
+                width = int(round(100.0 / max(1, row_idx + 2)))
                 return [
                     False,  # Checkbox state (unchecked by default)
                     str(time_frame_id),
                     finish_date,
-                    str(width)
+                    str(width)  # Always use str for consistency
                 ]
             except Exception as e:
                 logging.error(f"Error in time_frames_default: {e}", exc_info=True)
@@ -162,7 +162,7 @@ class AppConfig:
                     ),
                     TableColumnConfig(
                         name="Width (%)",
-                        validator=lambda x: float(x) > 0 if x else False
+                        validator=lambda x: x.isdigit() and int(x) > 0 if x else False
                     )
                 ],
                 min_rows=1,

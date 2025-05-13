@@ -2,7 +2,7 @@
 from PyQt5.QtWidgets import (QWidget, QTableWidget, QVBoxLayout, QPushButton, 
                            QGridLayout, QMessageBox, QHeaderView, QTableWidgetItem)
 from PyQt5.QtCore import Qt, pyqtSignal, QDate
-from PyQt5.QtGui import QBrush
+from PyQt5.QtGui import QBrush, QIntValidator
 from datetime import datetime
 import logging
 from ..table_utils import add_row, remove_row, CheckBoxWidget
@@ -60,6 +60,13 @@ class TimeFramesTab(QWidget):
             row_count = max(len(table_data), self.table_config.min_rows)
             self.time_frames_table.setRowCount(row_count)
 
+            # Find the index of the Width (%) column (skip checkbox column)
+            width_col_index = None
+            for idx, col in enumerate(self.table_config.columns):
+                if col.name == "Width (%)":
+                    width_col_index = idx
+                    break
+
             for row_idx in range(row_count):
                 # Add checkbox first
                 checkbox_widget = CheckBoxWidget()
@@ -69,7 +76,11 @@ class TimeFramesTab(QWidget):
                     row_data = table_data[row_idx]
                     # Start from column 1 since column 0 is checkbox
                     for col_idx, value in enumerate(row_data, start=1):
-                        item = QTableWidgetItem(str(value))
+                        # Only convert to int for the Width (%) column
+                        if width_col_index is not None and col_idx == width_col_index:
+                            item = QTableWidgetItem(str(int(float(value))) if value else "0")
+                        else:
+                            item = QTableWidgetItem(str(value))
                         if col_idx == 1:  # Time Frame ID is read-only
                             item.setFlags(item.flags() & ~Qt.ItemIsEditable)
                         self.time_frames_table.setItem(row_idx, col_idx, item)
@@ -78,7 +89,11 @@ class TimeFramesTab(QWidget):
                     defaults = self.table_config.default_generator(row_idx, context)
                     # Skip the first default (checkbox state) and start from index 1
                     for col_idx, default in enumerate(defaults[1:], start=1):
-                        item = QTableWidgetItem(str(default))
+                        # Only convert to int for the Width (%) column
+                        if width_col_index is not None and col_idx == width_col_index:
+                            item = QTableWidgetItem(str(int(float(default))) if default else "0")
+                        else:
+                            item = QTableWidgetItem(str(default))
                         if col_idx == 1:  # Time Frame ID is read-only
                             item.setFlags(item.flags() & ~Qt.ItemIsEditable)
                         self.time_frames_table.setItem(row_idx, col_idx, item)
