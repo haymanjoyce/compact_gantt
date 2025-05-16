@@ -11,6 +11,11 @@ from repositories.project_repository import JsonProjectRepository
 from models.project import ProjectData  # Import here to avoid circular import
 import json
 from ui.window_utils import move_window_to_screen_center
+from .tabs.user_preferences_tab import UserPreferencesTab
+from .tabs.header_tab import HeaderTab
+from .tabs.footer_tab import FooterTab
+from .tabs.scales_tab import ScalesTab
+from .tabs.grid_tab import GridTab
 
 class DataEntryWindow(QMainWindow):
     data_updated = pyqtSignal(dict)
@@ -51,7 +56,12 @@ class DataEntryWindow(QMainWindow):
 
         # Create and setup tab widget
         self.tab_widget = QTabWidget()
+        self.user_preferences_tab = UserPreferencesTab(self.project_data, self.app_config)
         self.layout_tab = LayoutTab(self.project_data, self.app_config)
+        self.header_tab = HeaderTab(self.project_data, self.app_config)
+        self.footer_tab = FooterTab(self.project_data, self.app_config)
+        self.scales_tab = ScalesTab(self.project_data, self.app_config)
+        self.grid_tab = GridTab(self.project_data, self.app_config)
         self.time_frames_tab = TimeFramesTab(self.project_data, self.app_config)
         self.tasks_tab = TasksTab(self.project_data, self.app_config)
         
@@ -62,7 +72,12 @@ class DataEntryWindow(QMainWindow):
         self.curtains_tab = PlaceholderTab(self.project_data, self.app_config, "Curtains")
         self.text_boxes_tab = PlaceholderTab(self.project_data, self.app_config, "Text Boxes")
         
+        self.tab_widget.addTab(self.user_preferences_tab, "User Preferences")
         self.tab_widget.addTab(self.layout_tab, "Layout")
+        self.tab_widget.addTab(self.header_tab, "Header")
+        self.tab_widget.addTab(self.footer_tab, "Footer")
+        self.tab_widget.addTab(self.scales_tab, "Scales")
+        self.tab_widget.addTab(self.grid_tab, "Grid")
         self.tab_widget.addTab(self.time_frames_tab, "Time Frames")
         self.tab_widget.addTab(self.tasks_tab, "Tasks")
         self.tab_widget.addTab(self.connectors_tab, "Connectors")
