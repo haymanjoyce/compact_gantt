@@ -1,21 +1,20 @@
-from PyQt5.QtWidgets import QMainWindow, QTabWidget, QToolBar, QAction, QFileDialog, QMessageBox, QWidget, QSizePolicy, QPushButton, QVBoxLayout, QApplication
+from PyQt5.QtWidgets import QMainWindow, QTabWidget, QAction, QFileDialog, QMessageBox, QWidget, QPushButton, QVBoxLayout
 from PyQt5.QtGui import QIcon
-from PyQt5.QtCore import pyqtSignal, QDate, QObject
+from PyQt5.QtCore import pyqtSignal, QDate
 from config.app_config import AppConfig
-from models import FrameConfig, TimeFrame, Task
 from .tabs.layout_tab import LayoutTab
 from .tabs.tasks_tab import TasksTab
 from .tabs.time_frames_tab import TimeFramesTab
 from .tabs.placeholder_tab import PlaceholderTab
 from repositories.project_repository import JsonProjectRepository
 from models.project import ProjectData  # Import here to avoid circular import
-import json
 from ui.window_utils import move_window_to_screen_center
 from .tabs.user_preferences_tab import UserPreferencesTab
 from .tabs.header_tab import HeaderTab
 from .tabs.footer_tab import FooterTab
 from .tabs.scales_tab import ScalesTab
 from .tabs.grid_tab import GridTab
+from .tabs.swimlanes_tab import SwimlanesTab
 
 class DataEntryWindow(QMainWindow):
     data_updated = pyqtSignal(dict)
@@ -56,36 +55,8 @@ class DataEntryWindow(QMainWindow):
 
         # Create and setup tab widget
         self.tab_widget = QTabWidget()
-        self.user_preferences_tab = UserPreferencesTab(self.project_data, self.app_config)
-        self.layout_tab = LayoutTab(self.project_data, self.app_config)
-        self.header_tab = HeaderTab(self.project_data, self.app_config)
-        self.footer_tab = FooterTab(self.project_data, self.app_config)
-        self.scales_tab = ScalesTab(self.project_data, self.app_config)
-        self.grid_tab = GridTab(self.project_data, self.app_config)
-        self.time_frames_tab = TimeFramesTab(self.project_data, self.app_config)
-        self.tasks_tab = TasksTab(self.project_data, self.app_config)
-        
-        # Create placeholder tabs
-        self.connectors_tab = PlaceholderTab(self.project_data, self.app_config, "Connectors")
-        self.swimlanes_tab = PlaceholderTab(self.project_data, self.app_config, "Swimlanes")
-        self.pipes_tab = PlaceholderTab(self.project_data, self.app_config, "Pipes")
-        self.curtains_tab = PlaceholderTab(self.project_data, self.app_config, "Curtains")
-        self.text_boxes_tab = PlaceholderTab(self.project_data, self.app_config, "Text Boxes")
-        
-        self.tab_widget.addTab(self.user_preferences_tab, "User Preferences")
-        self.tab_widget.addTab(self.layout_tab, "Layout")
-        self.tab_widget.addTab(self.header_tab, "Header")
-        self.tab_widget.addTab(self.footer_tab, "Footer")
-        self.tab_widget.addTab(self.scales_tab, "Scales")
-        self.tab_widget.addTab(self.grid_tab, "Grid")
-        self.tab_widget.addTab(self.time_frames_tab, "Time Frames")
-        self.tab_widget.addTab(self.tasks_tab, "Tasks")
-        self.tab_widget.addTab(self.connectors_tab, "Connectors")
-        self.tab_widget.addTab(self.swimlanes_tab, "Swimlanes")
-        self.tab_widget.addTab(self.pipes_tab, "Pipes")
-        self.tab_widget.addTab(self.curtains_tab, "Curtains")
-        self.tab_widget.addTab(self.text_boxes_tab, "Text Boxes")
-        
+        self._create_all_tabs()
+        self._add_all_tabs()
         main_layout.addWidget(self.tab_widget)
 
         # Create Update Image button at the bottom
@@ -110,6 +81,36 @@ class DataEntryWindow(QMainWindow):
         """)
         self.status_bar.showMessage("Ready")
 
+    def _create_all_tabs(self):
+        self.user_preferences_tab = UserPreferencesTab(self.project_data, self.app_config)
+        self.layout_tab = LayoutTab(self.project_data, self.app_config)
+        self.header_tab = HeaderTab(self.project_data, self.app_config)
+        self.footer_tab = FooterTab(self.project_data, self.app_config)
+        self.scales_tab = ScalesTab(self.project_data, self.app_config)
+        self.grid_tab = GridTab(self.project_data, self.app_config)
+        self.time_frames_tab = TimeFramesTab(self.project_data, self.app_config)
+        self.tasks_tab = TasksTab(self.project_data, self.app_config)
+        self.connectors_tab = PlaceholderTab(self.project_data, self.app_config, "Connectors")
+        self.swimlanes_tab = SwimlanesTab(self.project_data, self.app_config)
+        self.pipes_tab = PlaceholderTab(self.project_data, self.app_config, "Pipes")
+        self.curtains_tab = PlaceholderTab(self.project_data, self.app_config, "Curtains")
+        self.text_boxes_tab = PlaceholderTab(self.project_data, self.app_config, "Text Boxes")
+
+    def _add_all_tabs(self):
+        self.tab_widget.addTab(self.user_preferences_tab, "User Preferences")
+        self.tab_widget.addTab(self.layout_tab, "Layout")
+        self.tab_widget.addTab(self.header_tab, "Header")
+        self.tab_widget.addTab(self.footer_tab, "Footer")
+        self.tab_widget.addTab(self.scales_tab, "Scales")
+        self.tab_widget.addTab(self.grid_tab, "Grid")
+        self.tab_widget.addTab(self.time_frames_tab, "Time Frames")
+        self.tab_widget.addTab(self.tasks_tab, "Tasks")
+        self.tab_widget.addTab(self.connectors_tab, "Connectors")
+        self.tab_widget.addTab(self.swimlanes_tab, "Swimlanes")
+        self.tab_widget.addTab(self.pipes_tab, "Pipes")
+        self.tab_widget.addTab(self.curtains_tab, "Curtains")
+        self.tab_widget.addTab(self.text_boxes_tab, "Text Boxes")
+
     def save_to_json(self):
         file_path, _ = QFileDialog.getSaveFileName(self, "Save Project", "", "JSON Files (*.json)")
         if file_path:
@@ -128,21 +129,10 @@ class DataEntryWindow(QMainWindow):
                 loaded_project = self.repository.load(file_path, ProjectData)
                 self.project_data = loaded_project  # Use the loaded instance
 
-                # Re-create tabs with the new project_data
-                self.layout_tab = LayoutTab(self.project_data, self.app_config)
-                self.time_frames_tab = TimeFramesTab(self.project_data, self.app_config)
-                self.tasks_tab = TasksTab(self.project_data, self.app_config)
-                # (Re-create other tabs as needed...)
-
+                # Re-create all tabs with the new project_data
+                self._create_all_tabs()
                 self.tab_widget.clear()
-                self.tab_widget.addTab(self.layout_tab, "Layout")
-                self.tab_widget.addTab(self.time_frames_tab, "Time Frames")
-                self.tab_widget.addTab(self.tasks_tab, "Tasks")
-                self.tab_widget.addTab(self.connectors_tab, "Connectors")
-                self.tab_widget.addTab(self.swimlanes_tab, "Swimlanes")
-                self.tab_widget.addTab(self.pipes_tab, "Pipes")
-                self.tab_widget.addTab(self.curtains_tab, "Curtains")
-                self.tab_widget.addTab(self.text_boxes_tab, "Text Boxes")
+                self._add_all_tabs()
 
                 self.data_updated.emit(self.project_data.to_json())
                 QMessageBox.information(self, "Success", "Project loaded successfully!")
