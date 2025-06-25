@@ -1,16 +1,12 @@
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel
 from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtCore import Qt
+from .base_tab import BaseTab
 
-class PlaceholderTab(QWidget):
-    data_updated = pyqtSignal(dict)
-
+class PlaceholderTab(BaseTab):
     def __init__(self, project_data, app_config, tab_name):
-        super().__init__()
-        self.project_data = project_data
-        self.app_config = app_config
         self.tab_name = tab_name
-        self.setup_ui()
+        super().__init__(project_data, app_config)
 
     def setup_ui(self):
         layout = QVBoxLayout()
@@ -19,5 +15,5 @@ class PlaceholderTab(QWidget):
         layout.addWidget(label)
         self.setLayout(layout)
 
-    def _load_initial_data(self):
+    def _load_initial_data_impl(self):
         pass  # Placeholder method to maintain interface compatibility

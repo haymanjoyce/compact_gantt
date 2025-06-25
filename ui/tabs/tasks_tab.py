@@ -4,22 +4,20 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QBrush
 from typing import List, Dict, Any
 import logging
-from ui.table_utils import NumericTableWidgetItem, add_row, remove_row, renumber_task_orders, CheckBoxWidget
+from ui.table_utils import NumericTableWidgetItem, add_row, remove_row, renumber_task_orders, CheckBoxWidget, highlight_table_errors, extract_table_data
+from .base_tab import BaseTab
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-class TasksTab(QWidget):
+class TasksTab(BaseTab):
     data_updated = pyqtSignal(dict)
 
     def __init__(self, project_data, app_config):
-        super().__init__()
-        self.project_data = project_data
-        self.app_config = app_config
         self.table_config = app_config.get_table_config("tasks")
+        super().__init__(project_data, app_config)
         self.setup_ui()
         self._load_initial_data()
-        self._item_changed_connection = self.tasks_table.itemChanged.connect(self._sync_data_if_not_initializing)
-        self._initializing = False
+        self._connect_signals()
 
     def setup_ui(self):
         layout = QVBoxLayout()
@@ -52,7 +50,13 @@ class TasksTab(QWidget):
 
         self.setLayout(layout)
 
+    def _connect_signals(self):
+        self._item_changed_connection = self.tasks_table.itemChanged.connect(self._sync_data_if_not_initializing)
+
     def _load_initial_data(self):
+        self._load_initial_data_impl()
+
+    def _load_initial_data_impl(self):
         table_data = self.project_data.project_service.get_table_data(self.project_data, "tasks")
         row_count = max(len(table_data), self.table_config.min_rows)
         self.tasks_table.setRowCount(row_count)
@@ -111,39 +115,15 @@ class TasksTab(QWidget):
         self._initializing = False
 
     def _sync_data(self):
+        self._sync_data_impl()
+
+    def _sync_data_impl(self):
         logging.debug("Starting _sync_data in TasksTab")
         tasks_data = self._extract_table_data()
         errors = self.project_data.project_service.update_from_table(self.project_data, "tasks", tasks_data)
         
-        # Clear all highlights first
-        self.tasks_table.blockSignals(True)
-        for row in range(self.tasks_table.rowCount()):
-            for col in range(1, self.tasks_table.columnCount()):  # Skip checkbox column
-                item = self.tasks_table.item(row, col)
-                if item:
-                    item.setBackground(QBrush())
-                    item.setToolTip("")
-
-        # Highlight cells with errors
-        if errors:
-            for error in errors:
-                if error.startswith("Row"):
-                    try:
-                        row_str = error.split(":")[0].replace("Row ", "")
-                        row_idx = int(row_str) - 1
-                        # Highlight the entire row
-                        for col in range(1, self.tasks_table.columnCount()):
-                            item = self.tasks_table.item(row_idx, col)
-                            if item:
-                                item.setBackground(QBrush(Qt.yellow))
-                                item.setToolTip(error.split(":", 1)[1].strip())
-                    except (ValueError, IndexError):
-                        logging.error(f"Failed to parse error message: {error}")
-                        continue
-            
-            QMessageBox.critical(self, "Error", "\n".join(errors))
-
-        self.tasks_table.blockSignals(False)
+        # Use common error highlighting function
+        highlight_table_errors(self.tasks_table, errors)
         logging.debug("_sync_data in TasksTab completed")
 
     def _sync_data_if_not_initializing(self):
@@ -152,16 +132,4 @@ class TasksTab(QWidget):
             self._sync_data()
 
     def _extract_table_data(self) -> List[List[str]]:
-        data = []
-        for row in range(self.tasks_table.rowCount()):
-            row_data = []
-            # Start from column 1 to skip checkbox column
-            for col in range(1, self.tasks_table.columnCount()):
-                widget = self.tasks_table.cellWidget(row, col)
-                if widget and isinstance(widget, QComboBox):
-                    row_data.append(widget.currentText())
-                else:
-                    item = self.tasks_table.item(row, col)
-                    row_data.append(item.text() if item else "")
-            data.append(row_data)
-        return data
+        return extract_table_data(self.tasks_table, include_widgets=True)

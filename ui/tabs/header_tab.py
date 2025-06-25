@@ -3,22 +3,11 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QGridLayout, QGroupBox, QLine
 from PyQt5.QtCore import pyqtSignal, Qt
 from typing import Dict, Any
 import logging
+from .base_tab import BaseTab
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-class HeaderTab(QWidget):
-    data_updated = pyqtSignal(dict)
-
-    def __init__(self, project_data, app_config):
-        super().__init__()
-        self.project_data = project_data
-        self.app_config = app_config
-        self._initializing = True
-        self.setup_ui()
-        self._load_initial_data()
-        self._connect_signals()
-        self._initializing = False
-
+class HeaderTab(BaseTab):
     def setup_ui(self):
         layout = QVBoxLayout()
         LABEL_WIDTH = 120  # Consistent label width
@@ -59,47 +48,34 @@ class HeaderTab(QWidget):
         self.header_height.textChanged.connect(self._sync_data_if_not_initializing)
         self.header_text.textChanged.connect(self._sync_data_if_not_initializing)
 
-    def _load_initial_data(self):
-        try:
-            frame_config = self.project_data.frame_config
+    def _load_initial_data_impl(self):
+        frame_config = self.project_data.frame_config
 
-            # Load Header settings
-            self.header_height.setText(str(frame_config.header_height))
-            self.header_text.setText(frame_config.header_text)
+        # Load Header settings
+        self.header_height.setText(str(frame_config.header_height))
+        self.header_text.setText(frame_config.header_text)
 
-        except Exception as e:
-            logging.error(f"Error in _load_initial_data: {e}", exc_info=True)
-            QMessageBox.critical(self, "Error", f"Failed to load initial data: {e}")
+    def _sync_data_impl(self):
+        # Validate numeric inputs
+        numeric_fields = {
+            "header_height": self.header_height.text(),
+        }
 
-    def _sync_data_if_not_initializing(self):
-        if not self._initializing:
-            self._sync_data()
+        for field_name, value in numeric_fields.items():
+            try:
+                if not value.strip() or int(value) <= 0:
+                    raise ValueError(f"{field_name.replace('_', ' ').title()} must be a positive number")
+            except ValueError as e:
+                if "must be a positive number" not in str(e):
+                    raise ValueError(f"{field_name.replace('_', ' ').title()} must be a valid number")
+                raise
 
-    def _sync_data(self):
-        try:
-            # Validate numeric inputs
-            numeric_fields = {
-                "header_height": self.header_height.text(),
-            }
+        # Update frame config
+        self.project_data.frame_config.header_height = int(self.header_height.text())
+        self.project_data.frame_config.header_text = self.header_text.text()
 
-            for field_name, value in numeric_fields.items():
-                try:
-                    if not value.strip() or int(value) <= 0:
-                        raise ValueError(f"{field_name.replace('_', ' ').title()} must be a positive number")
-                except ValueError as e:
-                    if "must be a positive number" not in str(e):
-                        raise ValueError(f"{field_name.replace('_', ' ').title()} must be a valid number")
-                    raise
-
-            # Update frame config
-            self.project_data.frame_config.header_height = int(self.header_height.text())
-            self.project_data.frame_config.header_text = self.header_text.text()
-
-            # Emit data updated signal
-            self.data_updated.emit({
-                'header_height': self.project_data.frame_config.header_height,
-                'header_text': self.project_data.frame_config.header_text
-            })
-
-        except ValueError as e:
-            QMessageBox.critical(self, "Error", str(e))
+        # Emit data updated signal
+        self.data_updated.emit({
+            'header_height': self.project_data.frame_config.header_height,
+            'header_text': self.project_data.frame_config.header_text
+        })

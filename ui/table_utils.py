@@ -1,5 +1,6 @@
-from PyQt5.QtWidgets import QTableWidgetItem, QComboBox, QCheckBox, QWidget, QHBoxLayout
+from PyQt5.QtWidgets import QTableWidgetItem, QComboBox, QCheckBox, QWidget, QHBoxLayout, QMessageBox
 from PyQt5.QtCore import Qt, QDate
+from PyQt5.QtGui import QBrush
 import logging
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -19,20 +20,77 @@ class CheckBoxWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         layout = QHBoxLayout()
-        layout.setContentsMargins(3, 3, 3, 3)
-        layout.setAlignment(Qt.AlignCenter)
+        layout.setContentsMargins(0, 0, 0, 0)
         self.checkbox = QCheckBox()
-        self.checkbox.setStyleSheet("""
-            QCheckBox {
-                padding: 2px;
-            }
-            QCheckBox::indicator {
-                width: 15px;
-                height: 15px;
-            }
-        """)
-        layout.addWidget(self.checkbox)
+        layout.addWidget(self.checkbox, alignment=Qt.AlignCenter)
         self.setLayout(layout)
+
+def highlight_table_errors(table, errors):
+    """
+    Common function to highlight errors in table rows.
+    
+    Args:
+        table: QTableWidget to highlight
+        errors: List of error messages
+    """
+    # Clear all highlights first
+    table.blockSignals(True)
+    for row in range(table.rowCount()):
+        for col in range(1, table.columnCount()):  # Skip checkbox column
+            item = table.item(row, col)
+            if item:
+                item.setBackground(QBrush())
+                item.setToolTip("")
+    
+    # Highlight cells with errors
+    if errors:
+        for error in errors:
+            if error.startswith("Row"):
+                try:
+                    row_str = error.split(":")[0].replace("Row ", "")
+                    row_idx = int(row_str) - 1
+                    # Highlight the entire row
+                    for col in range(1, table.columnCount()):
+                        item = table.item(row_idx, col)
+                        if item:
+                            item.setBackground(QBrush(Qt.yellow))
+                            item.setToolTip(error.split(":", 1)[1].strip())
+                except (ValueError, IndexError):
+                    logging.error(f"Failed to parse error message: {error}")
+                    continue
+        
+        QMessageBox.critical(table.parent(), "Error", "\n".join(errors))
+    
+    table.blockSignals(False)
+
+def extract_table_data(table, include_widgets=True):
+    """
+    Common function to extract data from table, skipping the checkbox column.
+    
+    Args:
+        table: QTableWidget to extract data from
+        include_widgets: Whether to handle widget cells (like QComboBox)
+    
+    Returns:
+        List of lists containing table data
+    """
+    data = []
+    for row in range(table.rowCount()):
+        row_data = []
+        # Start from column 1 to skip checkbox column
+        for col in range(1, table.columnCount()):
+            if include_widgets:
+                widget = table.cellWidget(row, col)
+                if widget and isinstance(widget, QComboBox):
+                    row_data.append(widget.currentText())
+                else:
+                    item = table.item(row, col)
+                    row_data.append(item.text() if item else "")
+            else:
+                item = table.item(row, col)
+                row_data.append(item.text() if item else "")
+        data.append(row_data)
+    return data
 
 def add_row(table, table_key, table_configs, parent, id_field_name, row_index=None):
     """Add a row to a table with proper ID and sorting handling, using generic default value logic."""

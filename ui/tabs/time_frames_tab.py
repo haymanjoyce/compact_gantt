@@ -5,26 +5,17 @@ from PyQt5.QtCore import Qt, pyqtSignal, QDate
 from PyQt5.QtGui import QBrush, QIntValidator
 from datetime import datetime
 import logging
-from ..table_utils import add_row, remove_row, CheckBoxWidget
+from ..table_utils import add_row, remove_row, CheckBoxWidget, highlight_table_errors, extract_table_data
 from typing import List, Set, Tuple
+from .base_tab import BaseTab
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-class TimeFramesTab(QWidget):
-    data_updated = pyqtSignal(dict)
-
+class TimeFramesTab(BaseTab):
     def __init__(self, project_data, app_config):
-        super().__init__()
-        self.project_data = project_data
-        self.app_config = app_config
         self.table_config = app_config.get_table_config("time_frames")
-        self._initializing = True
-        self.setup_ui()
-        self._load_initial_data()
-        self.time_frames_table.itemChanged.connect(self._sync_data_if_not_initializing)
-        self._initializing = False
-        logging.debug("TimeFramesTab initialized")
+        super().__init__(project_data, app_config)
 
     def setup_ui(self):
         layout = QVBoxLayout()
@@ -38,7 +29,6 @@ class TimeFramesTab(QWidget):
         chart_start_layout.addWidget(chart_start_label, 0, 0)
         chart_start_layout.addWidget(self.chart_start_date, 0, 1)
         layout.addLayout(chart_start_layout)
-        self.chart_start_date.dateChanged.connect(self._sync_data_if_not_initializing)
 
         # Create table
         self.time_frames_table = QTableWidget(0, len(self.table_config.columns))
@@ -61,7 +51,11 @@ class TimeFramesTab(QWidget):
 
         self.setLayout(layout)
 
-    def _load_initial_data(self):
+    def _connect_signals(self):
+        self.time_frames_table.itemChanged.connect(self._sync_data_if_not_initializing)
+        self.chart_start_date.dateChanged.connect(self._sync_data_if_not_initializing)
+
+    def _load_initial_data_impl(self):
         logging.debug("Starting _load_initial_data")
         try:
             # --- Load Chart Start Date ---
@@ -127,7 +121,7 @@ class TimeFramesTab(QWidget):
             logging.error(f"Error in _load_initial_data: {e}", exc_info=True)
             QMessageBox.critical(self, "Error", f"Failed to load initial data: {e}")
 
-    def _sync_data(self):
+    def _sync_data_impl(self):
         # --- Save Chart Start Date ---
         self.project_data.frame_config.chart_start_date = self.chart_start_date.date().toString("yyyy-MM-dd")
 
@@ -152,49 +146,9 @@ class TimeFramesTab(QWidget):
 
         errors = self.project_data.project_service.update_from_table(self.project_data, "time_frames", time_frames_data)
         
-        # Clear all highlights first
-        self.time_frames_table.blockSignals(True)
-        for row in range(self.time_frames_table.rowCount()):
-            for col in range(1, self.time_frames_table.columnCount()):  # Skip checkbox column
-                item = self.time_frames_table.item(row, col)
-                if item:
-                    item.setBackground(QBrush())
-                    item.setToolTip("")
-        
-        # Highlight cells with errors
-        if errors:
-            for error in errors:
-                if error.startswith("Row"):
-                    try:
-                        row_str = error.split(":")[0].replace("Row ", "")
-                        row_idx = int(row_str) - 1
-                        # Highlight the entire row
-                        for col in range(1, self.time_frames_table.columnCount()):
-                            item = self.time_frames_table.item(row_idx, col)
-                            if item:
-                                item.setBackground(QBrush(Qt.yellow))
-                                item.setToolTip(error.split(":", 1)[1].strip())
-                    except (ValueError, IndexError):
-                        logging.error(f"Failed to parse error message: {error}")
-                        continue
-            
-            QMessageBox.critical(self, "Error", "\n".join(errors))
-        
-        self.time_frames_table.blockSignals(False)
-
-    def _sync_data_if_not_initializing(self):
-        if not self._initializing:
-            logging.debug("Calling _sync_data from itemChanged or dateChanged")
-            self._sync_data()
+        # Use common error highlighting function
+        highlight_table_errors(self.time_frames_table, errors)
 
     def _extract_table_data(self) -> List[List[str]]:
         """Extract data from table, skipping the checkbox column."""
-        data = []
-        for row in range(self.time_frames_table.rowCount()):
-            row_data = []
-            # Start from column 1 to skip checkbox column
-            for col in range(1, self.time_frames_table.columnCount()):
-                item = self.time_frames_table.item(row, col)
-                row_data.append(item.text() if item else "")
-            data.append(row_data)
-        return data
+        return extract_table_data(self.time_frames_table, include_widgets=False)
