@@ -31,6 +31,10 @@ class LayoutTab(QWidget):
         dim_group = self._create_dimensions_group(LABEL_WIDTH)
         layout.addWidget(dim_group)
 
+        # Rows Group
+        rows_group = self._create_rows_group(LABEL_WIDTH)
+        layout.addWidget(rows_group)
+
         self.setLayout(layout)
 
     def _create_dimensions_group(self, label_width: int) -> QGroupBox:
@@ -51,18 +55,28 @@ class LayoutTab(QWidget):
         self.outer_height = QLineEdit(str(self.app_config.general.outer_height))
         self.outer_height.setToolTip("Total height of the chart in pixels")
 
+        layout.addWidget(width_label, 0, 0)
+        layout.addWidget(self.outer_width, 0, 1)
+        layout.addWidget(height_label, 1, 0)
+        layout.addWidget(self.outer_height, 1, 1)
+        layout.setColumnStretch(1, 1)
+        group.setLayout(layout)
+        return group
+
+    def _create_rows_group(self, label_width: int) -> QGroupBox:
+        group = QGroupBox("Rows")
+        layout = QGridLayout()
+        layout.setHorizontalSpacing(10)
+        layout.setVerticalSpacing(5)
+
         # Number of Rows
         rows_label = QLabel("Number of Rows:")
         rows_label.setFixedWidth(label_width)
         self.num_rows = QLineEdit(str(self.app_config.general.tasks_rows))
         self.num_rows.setToolTip("Number of rows in the chart")
 
-        layout.addWidget(width_label, 0, 0)
-        layout.addWidget(self.outer_width, 0, 1)
-        layout.addWidget(height_label, 1, 0)
-        layout.addWidget(self.outer_height, 1, 1)
-        layout.addWidget(rows_label, 2, 0)
-        layout.addWidget(self.num_rows, 2, 1)
+        layout.addWidget(rows_label, 0, 0)
+        layout.addWidget(self.num_rows, 0, 1)
         layout.setColumnStretch(1, 1)
         group.setLayout(layout)
         return group
