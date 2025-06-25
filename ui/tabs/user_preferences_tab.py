@@ -8,16 +8,6 @@ from .base_tab import BaseTab
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class UserPreferencesTab(BaseTab):
-    data_updated = pyqtSignal(dict)
-
-    def __init__(self, project_data, app_config):
-        super().__init__(project_data, app_config)
-        self._initializing = True
-        self.setup_ui()
-        self._load_initial_data()
-        self._connect_signals()
-        self._initializing = False
-
     def setup_ui(self):
         layout = QVBoxLayout()
         LABEL_WIDTH = 150  # Consistent label width
@@ -107,13 +97,6 @@ class UserPreferencesTab(BaseTab):
             custom_x.valueChanged.connect(self._sync_data_if_not_initializing)
             custom_y.valueChanged.connect(self._sync_data_if_not_initializing)
 
-    def _load_initial_data(self):
-        try:
-            self._load_initial_data_impl()
-        except Exception as e:
-            logging.error(f"Error in _load_initial_data: {e}", exc_info=True)
-            QMessageBox.critical(self, "Error", f"Failed to load initial data: {e}")
-
     def _load_initial_data_impl(self):
         # Load window positioning settings for both groups
         for prefix in ["data_entry", "svg_display"]:
@@ -126,17 +109,6 @@ class UserPreferencesTab(BaseTab):
             position_combo.setCurrentText(getattr(self.app_config.general, f"{prefix}_position"))
             custom_x.setValue(getattr(self.app_config.general, f"{prefix}_x"))
             custom_y.setValue(getattr(self.app_config.general, f"{prefix}_y"))
-
-    def _sync_data_if_not_initializing(self):
-        if not self._initializing:
-            self._sync_data()
-
-    def _sync_data(self):
-        try:
-            self._sync_data_impl()
-        except Exception as e:
-            logging.error(f"Error in _sync_data: {e}", exc_info=True)
-            QMessageBox.critical(self, "Error", f"Failed to save data: {e}")
 
     def _sync_data_impl(self):
         # Update app config for both positioning groups
