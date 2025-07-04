@@ -49,6 +49,7 @@ class BaseTab(QWidget):
         except Exception as e:
             logging.error(f"Error in _sync_data: {e}", exc_info=True)
             QMessageBox.critical(self, "Error", f"Failed to save data: {e}")
+            raise  # Re-raise the exception so tests can catch it
 
     def _sync_data_impl(self):
         """Override this method to implement specific data sync logic."""

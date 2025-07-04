@@ -10,8 +10,7 @@ from repositories.project_repository import JsonProjectRepository
 from models.project import ProjectData  # Import here to avoid circular import
 from ui.window_utils import move_window_according_to_preferences
 from .tabs.user_preferences_tab import UserPreferencesTab
-from .tabs.header_tab import HeaderTab
-from .tabs.footer_tab import FooterTab
+from .tabs.titles_tab import TitlesTab
 from .tabs.scales_tab import ScalesTab
 from .tabs.grid_tab import GridTab
 from .tabs.swimlanes_tab import SwimlanesTab
@@ -86,8 +85,7 @@ class DataEntryWindow(QMainWindow):
         self.user_preferences_tab = UserPreferencesTab(self.project_data, self.app_config)
         self.user_preferences_tab.data_updated.connect(self._on_user_preferences_updated)
         self.layout_tab = LayoutTab(self.project_data, self.app_config)
-        self.header_tab = HeaderTab(self.project_data, self.app_config)
-        self.footer_tab = FooterTab(self.project_data, self.app_config)
+        self.titles_tab = TitlesTab(self.project_data, self.app_config)
         self.scales_tab = ScalesTab(self.project_data, self.app_config)
         self.grid_tab = GridTab(self.project_data, self.app_config)
         self.time_frames_tab = TimeFramesTab(self.project_data, self.app_config)
@@ -101,8 +99,7 @@ class DataEntryWindow(QMainWindow):
     def _add_all_tabs(self):
         self.tab_widget.addTab(self.user_preferences_tab, "User Preferences")
         self.tab_widget.addTab(self.layout_tab, "Layout")
-        self.tab_widget.addTab(self.header_tab, "Header")
-        self.tab_widget.addTab(self.footer_tab, "Footer")
+        self.tab_widget.addTab(self.titles_tab, "Titles")
         self.tab_widget.addTab(self.scales_tab, "Scales")
         self.tab_widget.addTab(self.grid_tab, "Grid")
         self.tab_widget.addTab(self.time_frames_tab, "Time Frames")

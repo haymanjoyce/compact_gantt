@@ -7,16 +7,46 @@ from .base_tab import BaseTab
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-class FooterTab(BaseTab):
+class TitlesTab(BaseTab):
     def setup_ui(self):
         layout = QVBoxLayout()
         LABEL_WIDTH = 120  # Consistent label width
+
+        # Header Group
+        header_group = self._create_header_group(LABEL_WIDTH)
+        layout.addWidget(header_group)
 
         # Footer Group
         footer_group = self._create_footer_group(LABEL_WIDTH)
         layout.addWidget(footer_group)
 
         self.setLayout(layout)
+
+    def _create_header_group(self, label_width: int) -> QGroupBox:
+        group = QGroupBox("Header Settings")
+        layout = QGridLayout()
+        layout.setHorizontalSpacing(10)
+        layout.setVerticalSpacing(5)
+
+        # Header height
+        header_height_label = QLabel("Header Height:")
+        header_height_label.setFixedWidth(label_width)
+        self.header_height = QLineEdit("50")
+        self.header_height.setToolTip("Height of the header section in pixels")
+
+        # Header text
+        header_text_label = QLabel("Header Text:")
+        header_text_label.setFixedWidth(label_width)
+        self.header_text = QLineEdit()
+        self.header_text.setToolTip("Text to display in the header")
+
+        layout.addWidget(header_height_label, 0, 0)
+        layout.addWidget(self.header_height, 0, 1)
+        layout.addWidget(header_text_label, 1, 0)
+        layout.addWidget(self.header_text, 1, 1)
+        layout.setColumnStretch(1, 1)
+        group.setLayout(layout)
+        return group
 
     def _create_footer_group(self, label_width: int) -> QGroupBox:
         group = QGroupBox("Footer Settings")
@@ -45,11 +75,20 @@ class FooterTab(BaseTab):
         return group
 
     def _connect_signals(self):
+        # Header signals
+        self.header_height.textChanged.connect(self._sync_data_if_not_initializing)
+        self.header_text.textChanged.connect(self._sync_data_if_not_initializing)
+        
+        # Footer signals
         self.footer_height.textChanged.connect(self._sync_data_if_not_initializing)
         self.footer_text.textChanged.connect(self._sync_data_if_not_initializing)
 
     def _load_initial_data_impl(self):
         frame_config = self.project_data.frame_config
+
+        # Load Header settings
+        self.header_height.setText(str(frame_config.header_height))
+        self.header_text.setText(frame_config.header_text)
 
         # Load Footer settings
         self.footer_height.setText(str(frame_config.footer_height))
@@ -58,6 +97,7 @@ class FooterTab(BaseTab):
     def _sync_data_impl(self):
         # Validate numeric inputs
         numeric_fields = {
+            "header_height": self.header_height.text(),
             "footer_height": self.footer_height.text(),
         }
 
@@ -71,11 +111,15 @@ class FooterTab(BaseTab):
                 raise
 
         # Update frame config
+        self.project_data.frame_config.header_height = int(self.header_height.text())
+        self.project_data.frame_config.header_text = self.header_text.text()
         self.project_data.frame_config.footer_height = int(self.footer_height.text())
         self.project_data.frame_config.footer_text = self.footer_text.text()
 
         # Emit data updated signal
         self.data_updated.emit({
+            'header_height': self.project_data.frame_config.header_height,
+            'header_text': self.project_data.frame_config.header_text,
             'footer_height': self.project_data.frame_config.footer_height,
             'footer_text': self.project_data.frame_config.footer_text
-        })
+        }) 
