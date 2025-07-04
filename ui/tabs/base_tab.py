@@ -14,8 +14,8 @@ class BaseTab(QWidget):
         self._initializing = True
         self.setup_ui()
         self._load_initial_data()
-        self._connect_signals()
         self._initializing = False
+        self._connect_signals()
 
     def setup_ui(self):
         """Override this method to set up the UI for each tab."""
