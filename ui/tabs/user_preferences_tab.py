@@ -1,6 +1,7 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QGridLayout, QGroupBox, QLineEdit, 
                            QLabel, QMessageBox, QComboBox, QSpinBox)
 from PyQt5.QtCore import pyqtSignal, Qt
+from PyQt5.QtGui import QFont
 from typing import Dict, Any
 import logging
 from .base_tab import BaseTab
@@ -46,6 +47,12 @@ class UserPreferencesTab(BaseTab):
         screen_spinbox.setToolTip("Screen number (0 = primary screen)")
         setattr(self, f"{prefix}_screen_spinbox", screen_spinbox)
 
+        # Screen specification label
+        screen_spec_label = QLabel()
+        screen_spec_label.setWordWrap(True)
+        screen_spec_label.setStyleSheet("color: #666; font-size: 10px;")
+        setattr(self, f"{prefix}_screen_spec_label", screen_spec_label)
+
         # Position selection
         position_label = QLabel("Position:")
         position_label.setFixedWidth(label_width)
@@ -74,15 +81,58 @@ class UserPreferencesTab(BaseTab):
 
         layout.addWidget(screen_label, 0, 0)
         layout.addWidget(screen_spinbox, 0, 1)
-        layout.addWidget(position_label, 1, 0)
-        layout.addWidget(position_combo, 1, 1)
-        layout.addWidget(x_label, 2, 0)
-        layout.addWidget(custom_x, 2, 1)
-        layout.addWidget(y_label, 3, 0)
-        layout.addWidget(custom_y, 3, 1)
+        layout.addWidget(screen_spec_label, 1, 1)  # Position under the spinbox only
+        layout.addWidget(position_label, 2, 0)
+        layout.addWidget(position_combo, 2, 1)
+        layout.addWidget(x_label, 3, 0)
+        layout.addWidget(custom_x, 3, 1)
+        layout.addWidget(y_label, 4, 0)
+        layout.addWidget(custom_y, 4, 1)
         layout.setColumnStretch(1, 1)
         group.setLayout(layout)
         return group
+
+    def _get_screen_specification(self, screen_number: int) -> str:
+        """Get screen specification information for the given screen number."""
+        try:
+            from PyQt5.QtWidgets import QApplication
+            app = QApplication.instance()
+            if app is None:
+                return "No application instance available"
+            
+            screens = app.screens()
+            if screen_number >= len(screens):
+                return f"Screen {screen_number} not available (max: {len(screens) - 1})"
+            
+            screen = screens[screen_number]
+            geometry = screen.geometry()
+            size = screen.size()
+            logical_dpi = screen.logicalDotsPerInch()
+            physical_dpi = screen.physicalDotsPerInch()
+            device_pixel_ratio = screen.devicePixelRatio()
+            
+            # Get screen name if available
+            screen_name = screen.name() if hasattr(screen, 'name') else f"Screen {screen_number}"
+            
+            spec = f"{screen_name} • {size.width()}×{size.height()} • {logical_dpi:.0f} DPI"
+            if device_pixel_ratio != 1.0:
+                spec += f" • {device_pixel_ratio:.1f}x scaling"
+            
+            return spec
+            
+        except Exception as e:
+            logging.error(f"Error getting screen specification: {e}")
+            return f"Error getting screen info: {e}"
+
+    def _update_screen_specifications(self):
+        """Update screen specification labels for both positioning groups."""
+        for prefix in ["data_entry", "svg_display"]:
+            screen_spinbox = getattr(self, f"{prefix}_screen_spinbox")
+            screen_spec_label = getattr(self, f"{prefix}_screen_spec_label")
+            
+            screen_number = screen_spinbox.value()
+            spec = self._get_screen_specification(screen_number)
+            screen_spec_label.setText(spec)
 
     def _connect_signals(self):
         # Connect signals for both positioning groups
@@ -93,6 +143,7 @@ class UserPreferencesTab(BaseTab):
             custom_y = getattr(self, f"{prefix}_custom_y")
             
             screen_spinbox.valueChanged.connect(self._sync_data_if_not_initializing)
+            screen_spinbox.valueChanged.connect(self._update_screen_specifications)
             position_combo.currentTextChanged.connect(self._sync_data_if_not_initializing)
             custom_x.valueChanged.connect(self._sync_data_if_not_initializing)
             custom_y.valueChanged.connect(self._sync_data_if_not_initializing)
@@ -109,6 +160,9 @@ class UserPreferencesTab(BaseTab):
             position_combo.setCurrentText(getattr(self.app_config.general, f"{prefix}_position"))
             custom_x.setValue(getattr(self.app_config.general, f"{prefix}_x"))
             custom_y.setValue(getattr(self.app_config.general, f"{prefix}_y"))
+        
+        # Update screen specifications after loading data
+        self._update_screen_specifications()
 
     def _sync_data_impl(self):
         # Update app config for both positioning groups
