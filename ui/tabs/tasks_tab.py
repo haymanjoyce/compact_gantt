@@ -15,9 +15,6 @@ class TasksTab(BaseTab):
     def __init__(self, project_data, app_config):
         self.table_config = app_config.get_table_config("tasks")
         super().__init__(project_data, app_config)
-        self.setup_ui()
-        self._load_initial_data()
-        self._connect_signals()
 
     def setup_ui(self):
         layout = QVBoxLayout()

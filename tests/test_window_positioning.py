@@ -14,6 +14,15 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from PyQt5.QtWidgets import QApplication
 from config.app_config import AppConfig
 from ui.window_utils import move_window_according_to_preferences
+import pytest
+
+@pytest.fixture(scope="session")
+def qapp():
+    """Create a QApplication instance for testing."""
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication(sys.argv)
+    return app
 
 def test_app_config():
     """Test that app config loads and has the expected window positioning properties."""
@@ -66,7 +75,7 @@ def test_config_updates():
     
     print("✓ Config updates test passed!")
 
-def test_user_preferences_tab():
+def test_user_preferences_tab(qapp):
     """Test that UserPreferencesTab can be created and works correctly."""
     print("\nTesting UserPreferencesTab...")
     
