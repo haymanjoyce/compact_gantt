@@ -22,6 +22,7 @@ class GridTab(BaseTab):
 
         layout.addWidget(self.horizontal_gridlines, 0, 0)
         layout.addWidget(self.vertical_gridlines, 1, 0)
+        layout.setRowStretch(2, 1)  # Add row stretch after the last field
         group.setLayout(layout)
         return group
 

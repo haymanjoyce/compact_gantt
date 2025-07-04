@@ -45,6 +45,7 @@ class TitlesTab(BaseTab):
         layout.addWidget(header_text_label, 1, 0)
         layout.addWidget(self.header_text, 1, 1)
         layout.setColumnStretch(1, 1)
+        layout.setRowStretch(2, 1)  # Add row stretch after the last field
         group.setLayout(layout)
         return group
 
@@ -71,6 +72,7 @@ class TitlesTab(BaseTab):
         layout.addWidget(footer_text_label, 1, 0)
         layout.addWidget(self.footer_text, 1, 1)
         layout.setColumnStretch(1, 1)
+        layout.setRowStretch(2, 1)  # Add row stretch after the last field
         group.setLayout(layout)
         return group
 

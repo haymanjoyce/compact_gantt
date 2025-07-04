@@ -49,6 +49,7 @@ class LayoutTab(BaseTab):
         layout.addWidget(height_label, 1, 0)
         layout.addWidget(self.outer_height, 1, 1)
         layout.setColumnStretch(1, 1)
+        layout.setRowStretch(2, 1)  # Add row stretch after the last field
         group.setLayout(layout)
         return group
 
@@ -67,6 +68,7 @@ class LayoutTab(BaseTab):
         layout.addWidget(rows_label, 0, 0)
         layout.addWidget(self.num_rows, 0, 1)
         layout.setColumnStretch(1, 1)
+        layout.setRowStretch(1, 1)  # Add row stretch after the last field
         group.setLayout(layout)
         return group
 
@@ -90,6 +92,7 @@ class LayoutTab(BaseTab):
 
         self.margin_top, self.margin_bottom, self.margin_left, self.margin_right = self.margin_inputs
         layout.setColumnStretch(1, 1)
+        layout.setRowStretch(4, 1)  # Add row stretch after the last field (4 margins)
         group.setLayout(layout)
         return group
 
