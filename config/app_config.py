@@ -215,7 +215,7 @@ class AppConfig:
                     TableColumnConfig("Start Date", validator=validate_display_date),
                     TableColumnConfig("Finish Date", validator=validate_display_date),
                     TableColumnConfig("Label Placement", widget_type="combo", combo_items=["Inside", "To left", "To right", "Above", "Below"]),
-                    TableColumnConfig("Label Hide", default_value="No"),
+                    TableColumnConfig("Label Hide", widget_type="combo", combo_items=["No", "Yes"], default_value="No"),
                     TableColumnConfig("Label Alignment", widget_type="combo", combo_items=["Left", "Centre", "Right"]),
                     TableColumnConfig("Horiz Offset", validator=lambda x: float(x) >= 0 if x else False),
                     TableColumnConfig("Vert Offset", validator=lambda x: float(x) >= 0 if x else False),
