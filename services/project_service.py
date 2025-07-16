@@ -57,21 +57,21 @@ class ProjectService:
                 for row_idx, row in enumerate(data, 1):
                     try:
                         # Convert display format to internal format for dates
-                        start_date_internal = display_to_internal_date(row[3])
-                        finish_date_internal = display_to_internal_date(row[4])
+                        start_date_internal = display_to_internal_date(row[4])  # Start Date is now at index 4
+                        finish_date_internal = display_to_internal_date(row[5])  # Finish Date is now at index 5
                         task = Task(
-                            task_id=safe_int(row[0]),
-                            task_order=safe_float(row[1]),
-                            task_name=row[2],
+                            task_id=safe_int(row[0]),  # ID
+                            task_order=safe_float(row[1]),  # Order
+                            task_name=row[3],  # Name is now at index 3
                             start_date=start_date_internal,  # Store in internal format
                             finish_date=finish_date_internal,  # Store in internal format
-                            row_number=safe_int(row[5], 1),
-                            label_placement=row[6],
-                            label_hide=row[7],
-                            label_alignment=row[8],
-                            label_horizontal_offset=safe_float(row[9], 1.0),
-                            label_vertical_offset=safe_float(row[10], 0.5),
-                            label_text_colour=row[11]
+                            row_number=safe_int(row[2], 1),  # Row is now at index 2
+                            label_placement=row[6],  # Label Placement
+                            label_hide=row[7],  # Label Hide
+                            label_alignment=row[8],  # Label Alignment
+                            label_horizontal_offset=safe_float(row[9], 1.0),  # Horiz Offset
+                            label_vertical_offset=safe_float(row[10], 0.5),  # Vert Offset
+                            label_text_colour=row[11]  # Label Colour
                         )
                         row_errors = self.validator.validate_task(task, used_ids)
                         if not row_errors:
@@ -92,10 +92,10 @@ class ProjectService:
 
     def get_table_data(self, project_data, key: str) -> List[List[str]]:
         if key == "tasks":
-            return [[str(t.task_id), str(t.task_order), t.task_name, 
+            return [[str(t.task_id), str(t.task_order), str(t.row_number), t.task_name, 
                     internal_to_display_date(t.start_date),  # Convert to display format
                     internal_to_display_date(t.finish_date),  # Convert to display format
-                    str(t.row_number), t.label_placement, t.label_hide, t.label_alignment,
+                    t.label_placement, t.label_hide, t.label_alignment,
                     str(t.label_horizontal_offset), str(t.label_vertical_offset), t.label_text_colour]
                    for t in project_data.tasks]
         elif key == "time_frames":

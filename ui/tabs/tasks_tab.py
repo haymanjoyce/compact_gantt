@@ -38,7 +38,7 @@ class TasksTab(BaseTab):
         btn_layout = QGridLayout()
         add_btn = QPushButton("Add Task")
         remove_btn = QPushButton("Remove Task")
-        add_btn.clicked.connect(lambda: add_row(self.tasks_table, "tasks", self.app_config.tables, self, "Task ID"))
+        add_btn.clicked.connect(lambda: add_row(self.tasks_table, "tasks", self.app_config.tables, self, "ID"))
         remove_btn.clicked.connect(lambda: remove_row(self.tasks_table, "tasks", 
                                                     self.app_config.tables, self))
         btn_layout.addWidget(add_btn, 0, 0)

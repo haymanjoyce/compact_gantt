@@ -143,10 +143,10 @@ class AppConfig:
             return [
                 str(task_id), 
                 str(task_order), 
+                "1",  # Row number
                 "New Task",
                 internal_to_display_date(internal_start),
                 internal_to_display_date(internal_finish), 
-                "1",
                 "Inside",  # Default for Label Placement
                 "No", 
                 "Left",    # Default for Label Alignment
@@ -208,12 +208,12 @@ class AppConfig:
                 key="tasks",
                 columns=[
                     TableColumnConfig("Select", widget_type="checkbox"),
-                    TableColumnConfig("Task ID", validator=lambda x: int(x) > 0 if x else False),
-                    TableColumnConfig("Task Order", validator=lambda x: float(x) > 0 if x else False),
-                    TableColumnConfig("Task Name"),
+                    TableColumnConfig("ID", validator=lambda x: int(x) > 0 if x else False),
+                    TableColumnConfig("Order", validator=lambda x: float(x) > 0 if x else False),
+                    TableColumnConfig("Row", validator=lambda x: int(x) > 0 if x else False),
+                    TableColumnConfig("Name"),
                     TableColumnConfig("Start Date", validator=validate_display_date),
                     TableColumnConfig("Finish Date", validator=validate_display_date),
-                    TableColumnConfig("Row Number", validator=lambda x: int(x) > 0 if x else False),
                     TableColumnConfig("Label Placement", widget_type="combo", combo_items=["Inside", "To left", "To right", "Above", "Below"]),
                     TableColumnConfig("Label Hide", default_value="No"),
                     TableColumnConfig("Label Alignment", widget_type="combo", combo_items=["Left", "Centre", "Right"]),
