@@ -248,19 +248,31 @@ def renumber_task_orders(table):
         was_sorting = table.isSortingEnabled()
         table.setSortingEnabled(False)
         table.blockSignals(True)
+        
+        # Find the Task Order column index
+        order_column = None
+        for i in range(table.columnCount()):
+            if table.horizontalHeaderItem(i).text() == "Order":
+                order_column = i
+                break
+        
+        if order_column is None:
+            logging.error("Could not find Order column")
+            return
+            
         task_orders = []
         for row in range(table.rowCount()):
-            item = table.item(row, 1)  # Task Order column
+            item = table.item(row, order_column)  # Task Order column
             try:
                 task_orders.append((row, float(item.text()) if item and item.text() else 0.0))
             except ValueError:
                 task_orders.append((row, 0.0))
         task_orders.sort(key=lambda x: x[1])
         for new_order, (row, _) in enumerate(task_orders, 1):
-            item = table.item(row, 1)
+            item = table.item(row, order_column)
             if not item:
                 item = NumericTableWidgetItem()
-                table.setItem(row, 1, item)
+                table.setItem(row, order_column, item)
             item.setText(str(new_order))
             item.setData(Qt.UserRole, float(new_order))
         table.blockSignals(False)

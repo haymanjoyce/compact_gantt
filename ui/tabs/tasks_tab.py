@@ -108,7 +108,14 @@ class TasksTab(BaseTab):
                         self.tasks_table.setItem(row_idx, col_idx, item)
 
         renumber_task_orders(self.tasks_table)
-        self.tasks_table.sortByColumn(2, Qt.AscendingOrder)  # Sort by Task Order
+        # Find the Order column for sorting
+        order_column = None
+        for i in range(self.tasks_table.columnCount()):
+            if self.tasks_table.horizontalHeaderItem(i).text() == "Order":
+                order_column = i
+                break
+        if order_column is not None:
+            self.tasks_table.sortByColumn(order_column, Qt.AscendingOrder)  # Sort by Task Order
         self._initializing = False
 
     def _sync_data(self):
