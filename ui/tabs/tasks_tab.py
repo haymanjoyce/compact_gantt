@@ -122,8 +122,9 @@ class TasksTab(BaseTab):
                 order_column = i
                 break
         if order_column is not None:
-            self.tasks_table.sortByColumn(order_column, Qt.AscendingOrder)  # Sort by Task Order
+            self.tasks_table.sortByColumn(order_column, Qt.AscendingOrder)  # Sort by Task Order                                                                
         self._initializing = False
+        self._sync_data()  # Sync default tasks to project_data
 
     def _sync_data(self):
         self._sync_data_impl()
