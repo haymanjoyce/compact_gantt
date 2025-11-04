@@ -157,9 +157,9 @@ def add_row(table, table_key, table_configs, parent, id_field_name, row_index=No
             header_text = table.horizontalHeaderItem(col_idx).text()
             col_config = None
             if hasattr(config, "columns"):
-                # Find the config for this column (skip checkbox, so col_idx-1)
+                # Find the config for this column (config.columns includes "Select" at index 0)
                 try:
-                    col_config = config.columns[col_idx - 1]
+                    col_config = config.columns[col_idx]
                 except (IndexError, AttributeError):
                     pass
 

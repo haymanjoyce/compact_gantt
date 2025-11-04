@@ -56,23 +56,24 @@ class ProjectService:
                 used_ids: Set[int] = set()
                 for row_idx, row in enumerate(data, 1):
                     try:
-                        # Skip checkbox column (index 0), so data starts at index 1
+                        # extract_table_data already skips checkbox column, so data is 0-indexed
+                        # Column order: ID, Order, Row, Name, Start Date, Finish Date, Label Placement, ...
                         # Convert display format to internal format for dates
-                        start_date_internal = display_to_internal_date(row[5])  # Start Date is at index 5
-                        finish_date_internal = display_to_internal_date(row[6])  # Finish Date is at index 6
+                        start_date_internal = display_to_internal_date(row[4])  # Start Date is at index 4
+                        finish_date_internal = display_to_internal_date(row[5])  # Finish Date is at index 5
                         task = Task(
-                            task_id=safe_int(row[1]),  # ID is at index 1
-                            task_order=safe_float(row[2]),  # Order is at index 2
-                            task_name=row[4],  # Name is at index 4
+                            task_id=safe_int(row[0]),  # ID is at index 0
+                            task_order=safe_float(row[1]),  # Order is at index 1
+                            row_number=safe_int(row[2], 1),  # Row is at index 2
+                            task_name=row[3],  # Name is at index 3
                             start_date=start_date_internal,  # Store in internal format
                             finish_date=finish_date_internal,  # Store in internal format
-                            row_number=safe_int(row[3], 1),  # Row is at index 3
-                            label_placement=row[7],  # Label Placement is at index 7
-                            label_hide=row[8],  # Label Hide is at index 8
-                            label_alignment=row[9],  # Label Alignment is at index 9
-                            label_horizontal_offset=safe_float(row[10], 1.0),  # Horiz Offset is at index 10
-                            label_vertical_offset=safe_float(row[11], 0.5),  # Vert Offset is at index 11
-                            label_text_colour=row[12]  # Label Colour is at index 12
+                            label_placement=row[6],  # Label Placement is at index 6
+                            label_hide=row[7],  # Label Hide is at index 7
+                            label_alignment=row[8],  # Label Alignment is at index 8
+                            label_horizontal_offset=safe_float(row[9], 1.0),  # Horiz Offset is at index 9
+                            label_vertical_offset=safe_float(row[10], 0.5),  # Vert Offset is at index 10
+                            label_text_colour=row[11]  # Label Colour is at index 11
                         )
                         row_errors = self.validator.validate_task(task, used_ids)
                         if not row_errors:

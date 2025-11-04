@@ -68,7 +68,7 @@ class TasksTab(BaseTab):
                 row_data = table_data[row_idx]
                 # Start from column 1 since column 0 is checkbox
                 for col_idx, value in enumerate(row_data, start=1):
-                    col_config = self.table_config.columns[col_idx - 1]
+                    col_config = self.table_config.columns[col_idx]
                     if col_config.widget_type == "combo":
                         combo = QComboBox()
                         combo.addItems(col_config.combo_items)
@@ -91,7 +91,7 @@ class TasksTab(BaseTab):
                 defaults = self.table_config.default_generator(row_idx, context)
                 # Skip the first default (checkbox state) and start from index 1
                 for col_idx, default in enumerate(defaults[1:], start=1):
-                    col_config = self.table_config.columns[col_idx - 1]
+                    col_config = self.table_config.columns[col_idx]
                     if col_config.widget_type == "combo":
                         combo = QComboBox()
                         combo.addItems(col_config.combo_items)

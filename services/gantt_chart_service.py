@@ -53,17 +53,17 @@ class GanttChartService(QObject):
         logging.debug("Calculating time range")
         dates = []
         for task in self.data.get("tasks", []):
-            start_date_str = task["start_date"]
-            finish_date_str = task["finish_date"]
+            start_date_str = task.get("start_date", "")
+            finish_date_str = task.get("finish_date", "")
             if start_date_str:
                 try:
                     dates.append(datetime.strptime(start_date_str, "%Y-%m-%d"))
-                except ValueError:
+                except (ValueError, TypeError):
                     pass
             if finish_date_str:
                 try:
                     dates.append(datetime.strptime(finish_date_str, "%Y-%m-%d"))
-                except ValueError:
+                except (ValueError, TypeError):
                     pass
 
         if not dates:
@@ -159,9 +159,10 @@ class GanttChartService(QObject):
         font_size = 10
 
         for task in self.data.get("tasks", []):
-            start_date_str = task["start_date"]
-            finish_date_str = task["finish_date"]
-            is_milestone = task.get("is_milestone", False)
+            start_date_str = task.get("start_date", "")
+            finish_date_str = task.get("finish_date", "")
+            # A task is a milestone if explicitly marked or if start_date equals finish_date
+            is_milestone = task.get("is_milestone", False) or (start_date_str and finish_date_str and start_date_str == finish_date_str)
             label_placement = task.get("label_placement", "Inside")
             label_hide = task.get("label_hide", "No") == "Yes"
             label_alignment = task.get("label_alignment", "Left")
@@ -171,12 +172,17 @@ class GanttChartService(QObject):
             if not start_date_str and not finish_date_str:
                 continue
 
-            date_to_use = start_date_str if start_date_str else finish_date_str
-            task_start = datetime.strptime(date_to_use, "%Y-%m-%d")
-            task_finish = task_start
-            if not is_milestone and start_date_str and finish_date_str:
-                task_start = datetime.strptime(start_date_str, "%Y-%m-%d")
-                task_finish = datetime.strptime(finish_date_str, "%Y-%m-%d")
+            # Try to parse dates, skip task if dates are invalid
+            try:
+                date_to_use = start_date_str if start_date_str else finish_date_str
+                task_start = datetime.strptime(date_to_use, "%Y-%m-%d")
+                task_finish = task_start
+                if not is_milestone and start_date_str and finish_date_str:
+                    task_start = datetime.strptime(start_date_str, "%Y-%m-%d")
+                    task_finish = datetime.strptime(finish_date_str, "%Y-%m-%d")
+            except (ValueError, TypeError) as e:
+                logging.warning(f"Skipping task {task.get('task_name', 'Unknown')} due to invalid date: {e}")
+                continue
 
             if task_finish < start_date or task_start > end_date:
                 continue
