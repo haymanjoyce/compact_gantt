@@ -305,11 +305,14 @@ class GanttChartService(QObject):
         if self._get_frame_config("vertical_gridlines", False):
             for interval, _ in scale_configs:
                 current_date = self.next_period(start_date, interval)
+                prev_x = x
                 while current_date <= end_date:
                     x_pos = x + (current_date - start_date).days * tf_time_scale
-                    if x <= x_pos <= x + width:
+                    interval_width = x_pos - prev_x if x_pos <= x + width else (x + width) - prev_x
+                    if x <= x_pos <= x + width and interval_width >= self.config.general.min_interval_width:
                         self.dwg.add(self.dwg.line((x_pos, row_y), (x_pos, row_y + row_frame_height),
                                                    stroke="gray", stroke_width=1))
+                    prev_x = x_pos
                     current_date = self.next_period(current_date, interval)
 
         self.render_tasks(x, row_y, width, row_frame_height, start_date, end_date, num_rows)
