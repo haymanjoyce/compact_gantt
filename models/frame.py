@@ -14,4 +14,4 @@ class FrameConfig:
     footer_text: str = ""
     horizontal_gridlines: bool = True
     vertical_gridlines: bool = True
-    chart_start_date: str = "2025-01-01"
+    chart_start_date: str = "2024-12-30"

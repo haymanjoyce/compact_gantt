@@ -113,12 +113,32 @@ class AppConfig:
         def time_frames_default(row_idx: int, context: Dict[str, Any]) -> List[Any]:
             logging.debug(f"Generating time_frames_default for row {row_idx}, context: {context}")
             try:
-                max_time_frame_id = context.get("max_time_frame_id", 0)
-                time_frame_id = max_time_frame_id + 1
-                # Generate date in yyyy-mm-dd format first, then convert to display format
-                internal_date = QDate.currentDate().addDays(7 * (row_idx + 1)).toString("yyyy-MM-dd")
-                finish_date = internal_to_display_date(internal_date)
-                width = int(round(100.0 / max(1, row_idx + 2)))
+                # Default time frames:
+                # #1: 25% width, finishes 5 Jan 2025
+                # #2: 25% width, finishes 2 Feb 2025
+                # #3: 25% width, finishes 4 May 2025
+                # #4: 25% width, finishes 2 Oct 2025
+                defaults = [
+                    {"id": 1, "finish_date": "2025-01-05", "width": 25},
+                    {"id": 2, "finish_date": "2025-02-02", "width": 25},
+                    {"id": 3, "finish_date": "2025-05-04", "width": 25},
+                    {"id": 4, "finish_date": "2025-10-02", "width": 25}
+                ]
+                
+                if row_idx < len(defaults):
+                    default = defaults[row_idx]
+                    time_frame_id = default["id"]
+                    internal_date = default["finish_date"]
+                    finish_date = internal_to_display_date(internal_date)
+                    width = default["width"]
+                else:
+                    # Fallback for additional rows beyond the 4 defaults
+                    max_time_frame_id = context.get("max_time_frame_id", 0)
+                    time_frame_id = max_time_frame_id + 1
+                    internal_date = QDate.currentDate().addDays(7 * (row_idx + 1)).toString("yyyy-MM-dd")
+                    finish_date = internal_to_display_date(internal_date)
+                    width = int(round(100.0 / max(1, row_idx + 2)))
+                
                 return [
                     False,  # Checkbox state (unchecked by default)
                     str(time_frame_id),
@@ -129,7 +149,7 @@ class AppConfig:
                 logging.error(f"Error in time_frames_default: {e}", exc_info=True)                                                                              
                 return [
                     False,  # Checkbox state (unchecked by default)
-                    str(max_time_frame_id + 1),
+                    str(context.get("max_time_frame_id", 0) + 1),
                     internal_to_display_date(QDate.currentDate().toString("yyyy-MM-dd")),                                                                       
                     "50.0"
                 ]
@@ -199,7 +219,7 @@ class AppConfig:
                         validator=lambda x: x.isdigit() and int(x) > 0 if x else False
                     )
                 ],
-                min_rows=1,
+                min_rows=4,
                 default_generator=time_frames_default
             ),
             "tasks": TableConfig(
