@@ -150,7 +150,7 @@ class AppConfig:
                 internal_to_display_date(internal_start),
                 internal_to_display_date(internal_finish),
                 "Yes",     # Default for Label (No = Hide, Yes = Show)
-                "Inside",  # Default for Placement
+                "Outside",  # Default for Placement
                 "1.0",
                 "black"
             ]

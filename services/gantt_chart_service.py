@@ -163,7 +163,7 @@ class GanttChartService(QObject):
             finish_date_str = task.get("finish_date", "")
             # A task is a milestone if explicitly marked or if start_date equals finish_date
             is_milestone = task.get("is_milestone", False) or (start_date_str and finish_date_str and start_date_str == finish_date_str)
-            label_placement = task.get("label_placement", "Inside")
+            label_placement = task.get("label_placement", "Outside")
             # Convert old placement values to new ones for backward compatibility
             if label_placement in ["To left", "To right"]:
                 label_placement = "Outside"
