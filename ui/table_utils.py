@@ -178,6 +178,9 @@ def add_row(table, table_key, table_configs, parent, id_field_name, row_index=No
                 combo = QComboBox()
                 combo.addItems(col_config.combo_items)
                 combo.setCurrentText(str(default) if default else col_config.combo_items[0])
+                # Connect signal to sync data when combo box value changes
+                if hasattr(parent, '_sync_data_if_not_initializing'):
+                    combo.currentTextChanged.connect(parent._sync_data_if_not_initializing)
                 table.setCellWidget(row_index, col_idx, combo)
             # Numeric column (optional: check for numeric type)
             elif col_config and getattr(col_config, "widget_type", None) == "numeric":

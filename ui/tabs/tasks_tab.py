@@ -73,6 +73,7 @@ class TasksTab(BaseTab):
                         combo = QComboBox()
                         combo.addItems(col_config.combo_items)
                         combo.setCurrentText(str(value) or col_config.combo_items[0])
+                        combo.currentTextChanged.connect(self._sync_data_if_not_initializing)
                         self.tasks_table.setCellWidget(row_idx, col_idx, combo)
                     else:
                         # Columns 1 (ID), 2 (Order), and 3 (Row) are numeric    
@@ -100,6 +101,7 @@ class TasksTab(BaseTab):
                         combo = QComboBox()
                         combo.addItems(col_config.combo_items)
                         combo.setCurrentText(str(default))
+                        combo.currentTextChanged.connect(self._sync_data_if_not_initializing)
                         self.tasks_table.setCellWidget(row_idx, col_idx, combo)
                     else:
                         # Columns 1 (ID), 2 (Order), and 3 (Row) are numeric

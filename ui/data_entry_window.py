@@ -1,6 +1,7 @@
 from PyQt5.QtWidgets import QMainWindow, QTabWidget, QAction, QFileDialog, QMessageBox, QWidget, QPushButton, QVBoxLayout
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import pyqtSignal, QDate
+import logging
 from config.app_config import AppConfig
 from .tabs.layout_tab import LayoutTab
 from .tabs.tasks_tab import TasksTab
@@ -142,6 +143,26 @@ class DataEntryWindow(QMainWindow):
 
     def _emit_data_updated(self):
         """Only called when Update Image button is clicked"""
+        # Sync all tabs to ensure project_data is up to date
+        try:
+            if hasattr(self.layout_tab, '_sync_data'):
+                self.layout_tab._sync_data()
+            if hasattr(self.titles_tab, '_sync_data'):
+                self.titles_tab._sync_data()
+            if hasattr(self.scales_tab, '_sync_data'):
+                self.scales_tab._sync_data()
+            if hasattr(self.grid_tab, '_sync_data'):
+                self.grid_tab._sync_data()
+            if hasattr(self.time_frames_tab, '_sync_data'):
+                self.time_frames_tab._sync_data()
+            if hasattr(self.tasks_tab, '_sync_data'):
+                self.tasks_tab._sync_data()
+            if hasattr(self.swimlanes_tab, '_sync_data'):
+                self.swimlanes_tab._sync_data()
+        except Exception as e:
+            logging.error(f"Error syncing tab data: {e}", exc_info=True)
+            # Continue anyway - emit with whatever data we have
+        
         self.data_updated.emit(self.project_data.to_json())
 
     def _on_user_preferences_updated(self, data):
