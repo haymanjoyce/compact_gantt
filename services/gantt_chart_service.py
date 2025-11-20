@@ -150,6 +150,42 @@ class GanttChartService(QObject):
             prev_end = tf_end + timedelta(days=1)
         logging.debug("render_time_frames completed")
 
+    def _truncate_text_to_fit(self, text: str, max_width: float) -> str:
+        """Truncate text to fit within max_width, adding ellipsis if needed."""
+        text_width = self.font_metrics.horizontalAdvance(text)
+        if text_width <= max_width:
+            return text
+        
+        left, right = 1, len(text)
+        while left <= right:
+            mid = (left + right) // 2
+            test_text = text[:mid] + "…"
+            if self.font_metrics.horizontalAdvance(test_text) <= max_width:
+                left = mid + 1
+            else:
+                right = mid - 1
+        return text[:right] + "…" if right > 0 else ""
+
+    def _render_inside_label(self, task_name: str, x_start: float, width_task: float, 
+                             label_y_base: float):
+        """Render a label inside a task bar, with truncation if needed."""
+        task_name_display = self._truncate_text_to_fit(task_name, width_task)
+        label_x = x_start + width_task / 2
+        self.dwg.add(self.dwg.text(task_name_display, insert=(label_x, label_y_base),
+                                   font_size="10", font_family="Arial", fill="white",
+                                   text_anchor="middle"))
+
+    def _render_outside_label(self, task_name: str, attachment_x: float, attachment_y: float,
+                             label_y_base: float, tf_time_scale: float):
+        """Render a label outside a task/milestone with a leader line to the right."""
+        label_horizontal_offset = self.config.general.leader_line_horizontal_default
+        label_x = attachment_x + label_horizontal_offset * tf_time_scale
+        self.dwg.add(self.dwg.text(task_name, insert=(label_x, label_y_base), 
+                                   font_size="10", font_family="Arial", fill="black",
+                                   text_anchor="start"))
+        self.dwg.add(self.dwg.line((label_x, attachment_y), (attachment_x, attachment_y),
+                                   stroke="black", stroke_width=1))
+
     def render_tasks(self, x, y, width, height, start_date, end_date, num_rows):
         logging.debug(f"Rendering tasks from {start_date} to {end_date}")
         total_days = max((end_date - start_date).days, 1)
@@ -168,11 +204,8 @@ class GanttChartService(QObject):
             if label_placement in ["To left", "To right"]:
                 label_placement = "Outside"
             label_hide = task.get("label_hide", "Yes") == "No"
-            # Inside labels are always centre-aligned
-            label_alignment = "Centre" if label_placement == "Inside" else "Left"
-            # Use horizontal offset from config (no longer per-task setting)
-            label_horizontal_offset = self.config.general.leader_line_horizontal_default
             task_name = task.get("task_name", "Unnamed")
+            
             if not start_date_str and not finish_date_str:
                 continue
 
@@ -190,16 +223,12 @@ class GanttChartService(QObject):
 
             if task_finish < start_date or task_start > end_date:
                 continue
+            
             row_num = min(max(task.get("row_number", 1) - 1, 0), num_rows - 1)
             x_start = x + max((task_start - start_date).days, 0) * tf_time_scale
             x_end = x + min((task_finish - start_date).days + 1, total_days) * tf_time_scale
             width_task = tf_time_scale if task_start == task_finish else max(x_end - x_start, tf_time_scale)
             y_task = y + row_num * row_height
-
-            label_width = len(task_name) * font_size * self.config.general.label_text_width_factor
-
-            # Use horizontal offset from config (no longer per-task setting)
-            label_horizontal_offset = self.config.general.leader_line_horizontal_default
 
             if is_milestone:
                 half_size = task_height / 2
@@ -211,61 +240,25 @@ class GanttChartService(QObject):
                     (center_x, center_y + half_size),
                     (center_x - half_size, center_y)
                 ]
-                if not label_hide:
-                    label_y_base = center_y + font_size * self.config.general.label_vertical_offset_factor
-                    text_width = self.font_metrics.horizontalAdvance(task_name)
-                    if label_placement == "Outside":
-                        # Outside labels for milestones are always placed to the right
-                        milestone_right = center_x + half_size
-                        label_x = milestone_right + label_horizontal_offset * tf_time_scale
-                        label_y = label_y_base
-                        leader_start = (label_x, center_y)
-                        leader_end = (milestone_right, center_y)
-                        self.dwg.add(self.dwg.text(task_name, insert=(label_x, label_y), font_size="10",
-                                                   font_family="Arial", fill="black", text_anchor="start"))
-                        self.dwg.add(self.dwg.line(leader_start, leader_end, stroke="black", stroke_width=1))
                 self.dwg.add(self.dwg.polygon(points=points, fill="red", stroke="black", stroke_width=1))
+                
+                if not label_hide and label_placement == "Outside":
+                    label_y_base = center_y + font_size * self.config.general.label_vertical_offset_factor
+                    milestone_right = center_x + half_size
+                    self._render_outside_label(task_name, milestone_right, center_y, label_y_base, tf_time_scale)
             else:
                 if x_start < x + width:
                     y_offset = (row_height - task_height) / 2
                     rect_y = y_task + y_offset
                     self.dwg.add(self.dwg.rect(insert=(x_start, rect_y), size=(width_task, task_height), fill="blue"))
+                    
                     if not label_hide:
                         label_y_base = rect_y + task_height / 2 + font_size * self.config.general.label_vertical_offset_factor
                         if label_placement == "Inside":
-                            text_width = self.font_metrics.horizontalAdvance(task_name)
-                            if text_width > width_task:
-                                left, right = 1, len(task_name)
-                                while left <= right:
-                                    mid = (left + right) // 2
-                                    test_text = task_name[:mid] + "…"
-                                    if self.font_metrics.horizontalAdvance(test_text) <= width_task:
-                                        left = mid + 1
-                                    else:
-                                        right = mid - 1
-                                max_chars = right
-                                task_name_display = task_name[:max_chars] + "…" if max_chars > 0 else ""
-                                text_width = self.font_metrics.horizontalAdvance(task_name_display)
-                            else:
-                                task_name_display = task_name
-
-                            # Inside labels are always centre-aligned
-                            label_x = x_start + width_task / 2
-                            anchor = "middle"
-
-                            self.dwg.add(self.dwg.text(task_name_display, insert=(label_x, label_y_base),
-                                                       font_size="10", font_family="Arial", fill="white",
-                                                       text_anchor=anchor))
+                            self._render_inside_label(task_name, x_start, width_task, label_y_base)
                         elif label_placement == "Outside":
-                            # Outside labels are always placed to the right
-                            label_x = x_end + label_horizontal_offset * tf_time_scale
-                            label_y = label_y_base
-                            self.dwg.add(
-                                self.dwg.text(task_name, insert=(label_x, label_y), font_size="10", fill="black",
-                                              text_anchor="start"))
-                            self.dwg.add(
-                                self.dwg.line((label_x, rect_y + task_height / 2), (x_end, rect_y + task_height / 2),
-                                              stroke="black", stroke_width=1))
+                            self._render_outside_label(task_name, x_end, rect_y + task_height / 2, 
+                                                      label_y_base, tf_time_scale)
 
     def render_scales_and_rows(self, x, y, width, height, start_date, end_date):
         logging.debug(f"Rendering scales and rows from {start_date} to {end_date}")
