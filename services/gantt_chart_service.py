@@ -164,8 +164,12 @@ class GanttChartService(QObject):
             # A task is a milestone if explicitly marked or if start_date equals finish_date
             is_milestone = task.get("is_milestone", False) or (start_date_str and finish_date_str and start_date_str == finish_date_str)
             label_placement = task.get("label_placement", "Inside")
+            # Convert old placement values to new ones for backward compatibility
+            if label_placement in ["To left", "To right"]:
+                label_placement = "Outside"
             label_hide = task.get("label_hide", "Yes") == "No"
-            label_alignment = task.get("label_alignment", "Left")
+            # Inside labels are always centre-aligned
+            label_alignment = "Centre" if label_placement == "Inside" else "Left"
             label_horizontal_offset = float(task.get("label_horizontal_offset", self.config.general.leader_line_horizontal_default))
             task_name = task.get("task_name", "Unnamed")
             if not start_date_str and not finish_date_str:
@@ -210,16 +214,8 @@ class GanttChartService(QObject):
                 if not label_hide:
                     label_y_base = center_y + font_size * self.config.general.label_vertical_offset_factor
                     text_width = self.font_metrics.horizontalAdvance(task_name)
-                    if label_placement == "To left":
-                        milestone_left = center_x - half_size
-                        label_x = milestone_left - label_horizontal_offset * tf_time_scale
-                        label_y = label_y_base
-                        leader_start = (label_x, center_y)
-                        leader_end = (milestone_left, center_y)
-                        self.dwg.add(self.dwg.text(task_name, insert=(label_x, label_y), font_size="10",
-                                                   font_family="Arial", fill="black", text_anchor="end"))
-                        self.dwg.add(self.dwg.line(leader_start, leader_end, stroke="black", stroke_width=1))
-                    elif label_placement == "To right":
+                    if label_placement == "Outside":
+                        # Outside labels for milestones are always placed to the right
                         milestone_right = center_x + half_size
                         label_x = milestone_right + label_horizontal_offset * tf_time_scale
                         label_y = label_y_base
@@ -253,32 +249,15 @@ class GanttChartService(QObject):
                             else:
                                 task_name_display = task_name
 
-                            if label_alignment == "Left":
-                                label_x = x_start
-                                anchor = "start"
-                            elif label_alignment == "Centre":
-                                label_x = x_start + width_task / 2
-                                anchor = "middle"
-                            elif label_alignment == "Right" and text_width <= width_task:
-                                label_x = x_start + width_task
-                                anchor = "end"
-                            else:
-                                label_x = x_start
-                                anchor = "start"
+                            # Inside labels are always centre-aligned
+                            label_x = x_start + width_task / 2
+                            anchor = "middle"
 
                             self.dwg.add(self.dwg.text(task_name_display, insert=(label_x, label_y_base),
                                                        font_size="10", font_family="Arial", fill="white",
                                                        text_anchor=anchor))
-                        elif label_placement == "To left":
-                            label_x = x_start - label_horizontal_offset * tf_time_scale - label_width
-                            label_y = label_y_base
-                            self.dwg.add(
-                                self.dwg.text(task_name, insert=(label_x, label_y), font_size="10", fill="black",
-                                              text_anchor="end"))
-                            self.dwg.add(self.dwg.line((label_x + label_width, rect_y + task_height / 2),
-                                                       (x_start, rect_y + task_height / 2), stroke="black",
-                                                       stroke_width=1))
-                        elif label_placement == "To right":
+                        elif label_placement == "Outside":
+                            # Outside labels are always placed to the right
                             label_x = x_end + label_horizontal_offset * tf_time_scale
                             label_y = label_y_base
                             self.dwg.add(
