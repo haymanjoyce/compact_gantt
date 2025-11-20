@@ -358,9 +358,8 @@ class GanttChartService(QObject):
                         label = current_date.strftime("%b")[0]
                 elif interval == "weeks":
                     week_num = current_date.isocalendar()[1]
-                    week_end = self.get_week_end_date(current_date)
                     if interval_width >= self.config.general.full_label_width:
-                        label = f"{week_num:02d} ({week_end.strftime('%d')})"
+                        label = f"{week_num:02d}"
                     elif interval_width >= self.config.general.short_label_width:
                         label = f"{week_num:02d}"
                 elif interval == "days":
