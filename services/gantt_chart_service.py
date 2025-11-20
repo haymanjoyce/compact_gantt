@@ -24,6 +24,10 @@ class GanttChartService(QObject):
         self.font_metrics = QFontMetrics(self.font)
         logging.debug("GanttChartService initialized")
 
+    def _get_frame_config(self, key: str, default):
+        """Get a value from frame_config with a default fallback."""
+        return self.data["frame_config"].get(key, default)
+
     @pyqtSlot(dict)
     def generate_svg(self, data):
         logging.debug("Starting generate_svg")
@@ -49,22 +53,23 @@ class GanttChartService(QObject):
             self.svg_generated.emit("")
             return
 
+    def _parse_date_safe(self, date_str: str) -> datetime:
+        """Safely parse a date string, returning None if invalid."""
+        if not date_str:
+            return None
+        try:
+            return datetime.strptime(date_str, "%Y-%m-%d")
+        except (ValueError, TypeError):
+            return None
+
     def _calculate_time_range(self):
         logging.debug("Calculating time range")
         dates = []
         for task in self.data.get("tasks", []):
-            start_date_str = task.get("start_date", "")
-            finish_date_str = task.get("finish_date", "")
-            if start_date_str:
-                try:
-                    dates.append(datetime.strptime(start_date_str, "%Y-%m-%d"))
-                except (ValueError, TypeError):
-                    pass
-            if finish_date_str:
-                try:
-                    dates.append(datetime.strptime(finish_date_str, "%Y-%m-%d"))
-                except (ValueError, TypeError):
-                    pass
+            for date_str in [task.get("start_date", ""), task.get("finish_date", "")]:
+                parsed_date = self._parse_date_safe(date_str)
+                if parsed_date:
+                    dates.append(parsed_date)
 
         if not dates:
             today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -77,18 +82,18 @@ class GanttChartService(QObject):
         return start_date
 
     def render_outer_frame(self):
-        width = self.data["frame_config"].get("outer_width", self.config.general.outer_width)
-        height = self.data["frame_config"].get("outer_height", self.config.general.outer_height)
+        width = self._get_frame_config("outer_width", self.config.general.outer_width)
+        height = self._get_frame_config("outer_height", self.config.general.outer_height)
         self.dwg.add(self.dwg.rect(insert=(0, 0), size=(width, height), fill="white", stroke="black", stroke_width=2))
         logging.debug("Outer frame rendered")
 
     def render_header(self):
-        margins = self.data["frame_config"].get("margins", (10, 10, 10, 10))
-        width = self.data["frame_config"].get("outer_width", self.config.general.outer_width) - margins[1] - margins[3]
-        height = self.data["frame_config"].get("header_height", 50)
+        margins = self._get_frame_config("margins", (10, 10, 10, 10))
+        width = self._get_frame_config("outer_width", self.config.general.outer_width) - margins[1] - margins[3]
+        height = self._get_frame_config("header_height", 50)
         self.dwg.add(self.dwg.rect(insert=(margins[3], margins[0]), size=(width, height),
                                    fill="lightgray", stroke="black", stroke_width=1))
-        header_text = self.data["frame_config"].get("header_text", "")
+        header_text = self._get_frame_config("header_text", "")
         if header_text:
             self.dwg.add(self.dwg.text(header_text,
                                        insert=(margins[3] + width / 2, margins[0] + height / 2),
@@ -96,13 +101,13 @@ class GanttChartService(QObject):
         logging.debug("Header rendered")
 
     def render_footer(self):
-        margins = self.data["frame_config"].get("margins", (10, 10, 10, 10))
-        width = self.data["frame_config"].get("outer_width", self.config.general.outer_width) - margins[1] - margins[3]
-        height = self.data["frame_config"].get("footer_height", 50)
-        y = self.data["frame_config"].get("outer_height", self.config.general.outer_height) - margins[2] - height
+        margins = self._get_frame_config("margins", (10, 10, 10, 10))
+        width = self._get_frame_config("outer_width", self.config.general.outer_width) - margins[1] - margins[3]
+        height = self._get_frame_config("footer_height", 50)
+        y = self._get_frame_config("outer_height", self.config.general.outer_height) - margins[2] - height
         self.dwg.add(self.dwg.rect(insert=(margins[3], y), size=(width, height),
                                    fill="lightgray", stroke="black", stroke_width=1))
-        footer_text = self.data["frame_config"].get("footer_text", "")
+        footer_text = self._get_frame_config("footer_text", "")
         if footer_text:
             self.dwg.add(self.dwg.text(footer_text,
                                        insert=(margins[3] + width / 2, y + height / 2),
@@ -110,24 +115,27 @@ class GanttChartService(QObject):
         logging.debug("Footer rendered")
 
     def render_inner_frame(self):
-        margins = self.data["frame_config"].get("margins", (10, 10, 10, 10))
-        width = self.data["frame_config"].get("outer_width", self.config.general.outer_width) - margins[1] - margins[3]
-        y = margins[0] + self.data["frame_config"].get("header_height", 50)
-        height = (self.data["frame_config"].get("outer_height", self.config.general.outer_height) -
-                  self.data["frame_config"].get("header_height", 50) -
-                  self.data["frame_config"].get("footer_height", 50) - margins[0] - margins[2])
+        margins = self._get_frame_config("margins", (10, 10, 10, 10))
+        width = self._get_frame_config("outer_width", self.config.general.outer_width) - margins[1] - margins[3]
+        header_height = self._get_frame_config("header_height", 50)
+        footer_height = self._get_frame_config("footer_height", 50)
+        y = margins[0] + header_height
+        height = (self._get_frame_config("outer_height", self.config.general.outer_height) -
+                  header_height - footer_height - margins[0] - margins[2])
         self.dwg.add(self.dwg.rect(insert=(margins[3], y), size=(width, height),
                                    fill="none", stroke="blue", stroke_width=1, stroke_dasharray="4"))
         logging.debug("Inner frame rendered")
 
     def render_time_frames(self):
         logging.debug("Starting render_time_frames")
-        margins = self.data["frame_config"].get("margins", (10, 10, 10, 10))
-        inner_y = margins[0] + self.data["frame_config"].get("header_height", 50)
-        inner_width = self.data["frame_config"].get("outer_width", self.config.general.outer_width) - margins[1] - margins[3]
-        inner_height = (self.data["frame_config"].get("outer_height", self.config.general.outer_height) -
-                        self.data["frame_config"].get("header_height", 50) -
-                        self.data["frame_config"].get("footer_height", 50) - margins[0] - margins[2])
+        margins = self._get_frame_config("margins", (10, 10, 10, 10))
+        header_height = self._get_frame_config("header_height", 50)
+        footer_height = self._get_frame_config("footer_height", 50)
+        outer_width = self._get_frame_config("outer_width", self.config.general.outer_width)
+        outer_height = self._get_frame_config("outer_height", self.config.general.outer_height)
+        inner_y = margins[0] + header_height
+        inner_width = outer_width - margins[1] - margins[3]
+        inner_height = outer_height - header_height - footer_height - margins[0] - margins[2]
         x_offset = margins[3]
         chart_start = datetime.strptime(self.data["frame_config"]["chart_start_date"], "%Y-%m-%d")
         prev_end = chart_start
@@ -285,16 +293,16 @@ class GanttChartService(QObject):
             current_y += scale_height
 
         row_y = current_y
-        num_rows = self.data["frame_config"].get("num_rows", 1)
+        num_rows = self._get_frame_config("num_rows", 1)
         self.dwg.add(self.dwg.rect(insert=(x, row_y), size=(width, row_frame_height),
                                    fill="none", stroke="purple", stroke_width=1))
 
-        if self.data["frame_config"].get("horizontal_gridlines", False):
+        if self._get_frame_config("horizontal_gridlines", False):
             for i in range(num_rows + 1):
                 y_pos = row_y + i * (row_frame_height / num_rows)
                 self.dwg.add(self.dwg.line((x, y_pos), (x + width, y_pos), stroke="gray", stroke_width=1))
 
-        if self.data["frame_config"].get("vertical_gridlines", False):
+        if self._get_frame_config("vertical_gridlines", False):
             for interval, _ in scale_configs:
                 current_date = self.next_period(start_date, interval)
                 while current_date <= end_date:
@@ -322,14 +330,6 @@ class GanttChartService(QObject):
             return datetime(date.year + 1, 1, 1)
         return date
 
-    def get_week_end_date(self, date):
-        year, week_num, weekday = date.isocalendar()
-        jan1 = datetime(year, 1, 1)
-        days_to_thursday = (3 - jan1.weekday()) % 7
-        first_thursday = jan1 + timedelta(days=days_to_thursday)
-        week1_start = first_thursday - timedelta(days=3)
-        week_start = week1_start + timedelta(days=(week_num - 1) * 7)
-        return week_start + timedelta(days=6)
 
     def render_scale_interval(self, x, y, width, height, start_date, end_date, interval, tf_time_scale):
         logging.debug(f"Rendering scale interval: {interval}")
@@ -358,9 +358,7 @@ class GanttChartService(QObject):
                         label = current_date.strftime("%b")[0]
                 elif interval == "weeks":
                     week_num = current_date.isocalendar()[1]
-                    if interval_width >= self.config.general.full_label_width:
-                        label = f"{week_num:02d}"
-                    elif interval_width >= self.config.general.short_label_width:
+                    if interval_width >= self.config.general.short_label_width:
                         label = f"{week_num:02d}"
                 elif interval == "days":
                     if interval_width >= self.config.general.full_label_width:
