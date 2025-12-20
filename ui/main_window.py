@@ -163,7 +163,7 @@ class MainWindow(QMainWindow):
     def _on_user_preferences_updated(self, data):
         """Handle updates from user preferences tab"""
         # Reposition data entry window if positioning preferences changed
-        if any(key in data for key in ['data_entry_screen', 'data_entry_position', 'data_entry_x', 'data_entry_y']):
+        if any(key in data for key in ['data_entry_screen', 'data_entry_x', 'data_entry_y']):
             move_window_according_to_preferences(
                 self,
                 self.app_config,
@@ -172,7 +172,7 @@ class MainWindow(QMainWindow):
             )
         
         # Reposition SVG display window if positioning preferences changed
-        if any(key in data for key in ['svg_display_screen', 'svg_display_position', 'svg_display_x', 'svg_display_y']):
+        if any(key in data for key in ['svg_display_screen', 'svg_display_x', 'svg_display_y']):
             if self.svg_display:
                 move_window_according_to_preferences(
                     self.svg_display,

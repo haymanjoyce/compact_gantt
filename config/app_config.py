@@ -41,14 +41,6 @@ class GeneralConfig:
         self.window.data_entry_screen = value
 
     @property
-    def data_entry_position(self) -> str:
-        return self.window.data_entry_position
-
-    @data_entry_position.setter
-    def data_entry_position(self, value: str):
-        self.window.data_entry_position = value
-
-    @property
     def data_entry_x(self) -> int:
         return self.window.data_entry_x
 
@@ -71,14 +63,6 @@ class GeneralConfig:
     @svg_display_screen.setter
     def svg_display_screen(self, value: int):
         self.window.svg_display_screen = value
-
-    @property
-    def svg_display_position(self) -> str:
-        return self.window.svg_display_position
-
-    @svg_display_position.setter
-    def svg_display_position(self, value: str):
-        self.window.svg_display_position = value
 
     @property
     def svg_display_x(self) -> int:

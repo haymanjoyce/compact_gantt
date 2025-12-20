@@ -69,18 +69,15 @@ def move_window_according_to_preferences(window, app_config, width=None, height=
     
     if window_type == "data_entry":
         screen_number = app_config.general.data_entry_screen
-        position = app_config.general.data_entry_position
         custom_x = app_config.general.data_entry_x
         custom_y = app_config.general.data_entry_y
     elif window_type == "svg_display":
         screen_number = app_config.general.svg_display_screen
-        position = app_config.general.svg_display_position
         custom_x = app_config.general.svg_display_x
         custom_y = app_config.general.svg_display_y
     else:
         # Fallback to data entry settings
         screen_number = app_config.general.data_entry_screen
-        position = app_config.general.data_entry_position
         custom_x = app_config.general.data_entry_x
         custom_y = app_config.general.data_entry_y
     
@@ -94,47 +91,14 @@ def move_window_according_to_preferences(window, app_config, width=None, height=
     if width and height:
         window.resize(width, height)
     
-    # Calculate position based on preference
-    if position == "center":
-        frame_geom = window.frameGeometry()
-        frame_geom.setWidth(width or frame_geom.width())
-        frame_geom.setHeight(height or frame_geom.height())
-        frame_geom.moveCenter(geometry.center())
-        window.move(frame_geom.topLeft())
+    # Use custom coordinates, but ensure window stays within screen bounds
+    x = custom_x
+    y = custom_y
     
-    elif position == "top_left":
-        window.move(geometry.left(), geometry.top())
+    # Clamp to screen bounds
+    max_x = geometry.right() - (width or window.width())
+    max_y = geometry.bottom() - (height or window.height())
+    x = max(geometry.left(), min(x, max_x))
+    y = max(geometry.top(), min(y, max_y))
     
-    elif position == "top_right":
-        x = geometry.right() - (width or window.width())
-        window.move(x, geometry.top())
-    
-    elif position == "bottom_left":
-        y = geometry.bottom() - (height or window.height())
-        window.move(geometry.left(), y)
-    
-    elif position == "bottom_right":
-        x = geometry.right() - (width or window.width())
-        y = geometry.bottom() - (height or window.height())
-        window.move(x, y)
-    
-    elif position == "custom":
-        # Use custom coordinates, but ensure window stays within screen bounds
-        x = custom_x
-        y = custom_y
-        
-        # Clamp to screen bounds
-        max_x = geometry.right() - (width or window.width())
-        max_y = geometry.bottom() - (height or window.height())
-        x = max(geometry.left(), min(x, max_x))
-        y = max(geometry.top(), min(y, max_y))
-        
-        window.move(x, y)
-    
-    else:
-        # Fallback to center
-        frame_geom = window.frameGeometry()
-        frame_geom.setWidth(width or frame_geom.width())
-        frame_geom.setHeight(height or frame_geom.height())
-        frame_geom.moveCenter(geometry.center())
-        window.move(frame_geom.topLeft())
+    window.move(x, y)
