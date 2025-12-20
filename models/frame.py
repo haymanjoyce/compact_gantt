@@ -6,8 +6,8 @@ from typing import Tuple
 class FrameConfig:
     outer_width: int = 800
     outer_height: int = 600
-    header_height: int = 50
-    footer_height: int = 50
+    header_height: int = 20
+    footer_height: int = 20
     margins: Tuple[int, int, int, int] = (10, 10, 10, 10)
     num_rows: int = 1
     header_text: str = ""

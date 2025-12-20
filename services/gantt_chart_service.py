@@ -95,7 +95,7 @@ class GanttChartService(QObject):
     def render_header(self):
         margins = self._get_frame_config("margins", (10, 10, 10, 10))
         width = self._get_frame_config("outer_width", self.config.general.outer_width) - margins[1] - margins[3]
-        height = self._get_frame_config("header_height", 50)
+        height = self._get_frame_config("header_height", 20)
         self.dwg.add(self.dwg.rect(insert=(margins[3], margins[0]), size=(width, height),
                                    fill="lightgray", stroke="black", stroke_width=1))
         header_text = self._get_frame_config("header_text", "")
@@ -109,7 +109,7 @@ class GanttChartService(QObject):
     def render_footer(self):
         margins = self._get_frame_config("margins", (10, 10, 10, 10))
         width = self._get_frame_config("outer_width", self.config.general.outer_width) - margins[1] - margins[3]
-        height = self._get_frame_config("footer_height", 50)
+        height = self._get_frame_config("footer_height", 20)
         y = self._get_frame_config("outer_height", self.config.general.outer_height) - margins[2] - height
         self.dwg.add(self.dwg.rect(insert=(margins[3], y), size=(width, height),
                                    fill="lightgray", stroke="black", stroke_width=1))
@@ -124,8 +124,8 @@ class GanttChartService(QObject):
     def render_inner_frame(self):
         margins = self._get_frame_config("margins", (10, 10, 10, 10))
         width = self._get_frame_config("outer_width", self.config.general.outer_width) - margins[1] - margins[3]
-        header_height = self._get_frame_config("header_height", 50)
-        footer_height = self._get_frame_config("footer_height", 50)
+        header_height = self._get_frame_config("header_height", 20)
+        footer_height = self._get_frame_config("footer_height", 20)
         y = margins[0] + header_height
         height = (self._get_frame_config("outer_height", self.config.general.outer_height) -
                   header_height - footer_height - margins[0] - margins[2])
@@ -137,8 +137,8 @@ class GanttChartService(QObject):
         """Render a single continuous timeline instead of multiple time frames."""
         logging.debug("Starting render_single_timeline")
         margins = self._get_frame_config("margins", (10, 10, 10, 10))
-        header_height = self._get_frame_config("header_height", 50)
-        footer_height = self._get_frame_config("footer_height", 50)
+        header_height = self._get_frame_config("header_height", 20)
+        footer_height = self._get_frame_config("footer_height", 20)
         outer_width = self._get_frame_config("outer_width", self.config.general.outer_width)
         outer_height = self._get_frame_config("outer_height", self.config.general.outer_height)
         inner_y = margins[0] + header_height

@@ -31,7 +31,7 @@ class TitlesTab(BaseTab):
         # Header height
         header_height_label = QLabel("Header Height:")
         header_height_label.setFixedWidth(label_width)
-        self.header_height = QLineEdit("50")
+        self.header_height = QLineEdit("20")
         self.header_height.setToolTip("Height of the header section in pixels")
 
         # Header text
@@ -58,7 +58,7 @@ class TitlesTab(BaseTab):
         # Footer height
         footer_height_label = QLabel("Footer Height:")
         footer_height_label.setFixedWidth(label_width)
-        self.footer_height = QLineEdit("50")
+        self.footer_height = QLineEdit("20")
         self.footer_height.setToolTip("Height of the footer section in pixels")
 
         # Footer text
