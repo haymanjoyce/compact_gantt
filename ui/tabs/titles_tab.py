@@ -37,7 +37,7 @@ class TitlesTab(BaseTab):
         # Header text
         header_text_label = QLabel("Header Text:")
         header_text_label.setFixedWidth(label_width)
-        self.header_text = QLineEdit()
+        self.header_text = QLineEdit("Header text")
         self.header_text.setToolTip("Text to display in the header")
 
         layout.addWidget(header_height_label, 0, 0)
@@ -64,7 +64,7 @@ class TitlesTab(BaseTab):
         # Footer text
         footer_text_label = QLabel("Footer Text:")
         footer_text_label.setFixedWidth(label_width)
-        self.footer_text = QLineEdit()
+        self.footer_text = QLineEdit("Footer text")
         self.footer_text.setToolTip("Text to display in the footer")
 
         layout.addWidget(footer_height_label, 0, 0)
@@ -90,11 +90,15 @@ class TitlesTab(BaseTab):
 
         # Load Header settings
         self.header_height.setText(str(frame_config.header_height))
-        self.header_text.setText(frame_config.header_text)
+        # Use default if empty, otherwise use saved value
+        header_text = frame_config.header_text if frame_config.header_text else "Header text"
+        self.header_text.setText(header_text)
 
         # Load Footer settings
         self.footer_height.setText(str(frame_config.footer_height))
-        self.footer_text.setText(frame_config.footer_text)
+        # Use default if empty, otherwise use saved value
+        footer_text = frame_config.footer_text if frame_config.footer_text else "Footer text"
+        self.footer_text.setText(footer_text)
 
     def _sync_data_impl(self):
         # Validate numeric inputs

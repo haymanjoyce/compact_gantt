@@ -100,9 +100,10 @@ class GanttChartService(QObject):
                                    fill="lightgray", stroke="black", stroke_width=1))
         header_text = self._get_frame_config("header_text", "")
         if header_text:
+            header_y = margins[0] + height * self.config.general.scale_label_vertical_alignment_factor
             self.dwg.add(self.dwg.text(header_text,
-                                       insert=(margins[3] + width / 2, margins[0] + height / 2),
-                                       text_anchor="middle", font_size="14"))
+                                       insert=(margins[3] + width / 2, header_y),
+                                       text_anchor="middle", font_size="14", dominant_baseline="middle"))
         logging.debug("Header rendered")
 
     def render_footer(self):
@@ -114,9 +115,10 @@ class GanttChartService(QObject):
                                    fill="lightgray", stroke="black", stroke_width=1))
         footer_text = self._get_frame_config("footer_text", "")
         if footer_text:
+            footer_y = y + height * self.config.general.scale_label_vertical_alignment_factor
             self.dwg.add(self.dwg.text(footer_text,
-                                       insert=(margins[3] + width / 2, y + height / 2),
-                                       text_anchor="middle", font_size="14"))
+                                       insert=(margins[3] + width / 2, footer_y),
+                                       text_anchor="middle", font_size="14", dominant_baseline="middle"))
         logging.debug("Footer rendered")
 
     def render_inner_frame(self):
@@ -186,7 +188,7 @@ class GanttChartService(QObject):
         logging.debug(f"_render_inside_label: text='{task_name_display}', x={label_x}, y={label_y_base}, width={width_task}, original_text='{task_name}'")
         self.dwg.add(self.dwg.text(task_name_display, insert=(label_x, label_y_base),
                                    font_size="10", font_family="Arial", fill="white",
-                                   text_anchor="middle"))
+                                   text_anchor="middle", dominant_baseline="middle"))
         logging.debug(f"  Text element added to SVG at position ({label_x}, {label_y_base})")
 
 
@@ -197,7 +199,7 @@ class GanttChartService(QObject):
         label_x = attachment_x + label_horizontal_offset  # Fixed pixel offset, no time scaling
         self.dwg.add(self.dwg.text(task_name, insert=(label_x, label_y_base), 
                                    font_size="10", font_family="Arial", fill="black",
-                                   text_anchor="start"))
+                                   text_anchor="start", dominant_baseline="middle"))
         self.dwg.add(self.dwg.line((label_x, attachment_y), (attachment_x, attachment_y),
                                    stroke="black", stroke_width=1))
 
