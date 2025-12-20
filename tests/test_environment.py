@@ -178,9 +178,9 @@ def test_basic_functionality():
         print("✓ GanttChartService created successfully")
         
         # Test repository creation
-        from repositories.project_repository import JsonProjectRepository
-        repo = JsonProjectRepository()
-        print("✓ JsonProjectRepository created successfully")
+        from repositories.project_repository import ProjectRepository
+        repo = ProjectRepository()
+        print("✓ ProjectRepository created successfully")
         
         # Test utility functions
         from utils.conversion import safe_int, safe_float
@@ -203,8 +203,8 @@ def test_gui_creation():
     
     try:
         from PyQt5.QtWidgets import QApplication
-        from ui.data_entry_window import DataEntryWindow
-        from ui.svg_display import FitToWindowSvgDisplay
+        from ui.main_window import MainWindow
+        from ui.svg_display import SvgDisplay
         from models.project import ProjectData
         from config.app_config import AppConfig
         
@@ -218,11 +218,11 @@ def test_gui_creation():
         print("✓ Project data and config created")
         
         # Create SVG display
-        svg_display = FitToWindowSvgDisplay(app_config)
+        svg_display = SvgDisplay(app_config)
         print("✓ SVG display created successfully")
         
         # Create data entry window
-        data_entry = DataEntryWindow(project_data, svg_display)
+        data_entry = MainWindow(project_data, svg_display)
         print("✓ Data entry window created successfully")
         
         # Test that tabs exist

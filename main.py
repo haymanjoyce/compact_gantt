@@ -1,10 +1,10 @@
 import sys
 from PyQt5.QtWidgets import QApplication
-from ui.data_entry_window import DataEntryWindow
+from ui.main_window import MainWindow
 from models.project import ProjectData
 from services.gantt_chart_service import GanttChartService
 from config.app_config import AppConfig
-from ui.svg_display import FitToWindowSvgDisplay
+from ui.svg_display import SvgDisplay
 
 
 def main():
@@ -12,8 +12,8 @@ def main():
     app_config = AppConfig()  # Single instance
     project_data = ProjectData()
     gantt_chart_service = GanttChartService()
-    svg_display = FitToWindowSvgDisplay(app_config)
-    data_entry = DataEntryWindow(project_data, svg_display)  # Pass project_data and svg_display
+    svg_display = SvgDisplay(app_config)
+    data_entry = MainWindow(project_data, svg_display)  # Pass project_data and svg_display
 
     def handle_svg_path(svg_path):
         if svg_path:

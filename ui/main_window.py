@@ -6,7 +6,7 @@ from config.app_config import AppConfig
 from .tabs.layout_tab import LayoutTab
 from .tabs.tasks_tab import TasksTab
 from .tabs.placeholder_tab import PlaceholderTab
-from repositories.project_repository import JsonProjectRepository
+from repositories.project_repository import ProjectRepository
 from models.project import ProjectData  # Import here to avoid circular import
 from ui.window_utils import move_window_according_to_preferences
 from .tabs.user_preferences_tab import UserPreferencesTab
@@ -15,7 +15,7 @@ from .tabs.scales_tab import ScalesTab
 from .tabs.grid_tab import GridTab
 from .tabs.swimlanes_tab import SwimlanesTab
 
-class DataEntryWindow(QMainWindow):
+class MainWindow(QMainWindow):
     data_updated = pyqtSignal(dict)
 
     def __init__(self, project_data, svg_display=None):
@@ -25,7 +25,7 @@ class DataEntryWindow(QMainWindow):
         self.setMinimumSize(600, 700)
         self.project_data = project_data  # Use passed project_data instance
         self.app_config = AppConfig()  # Initialize centralized config
-        self.repository = JsonProjectRepository()  # Add this line
+        self.repository = ProjectRepository()
         self.svg_display = svg_display  # Reference to SVG display window
         self.resize(self.app_config.general.data_entry_width, self.app_config.general.data_entry_height)
         move_window_according_to_preferences(
@@ -181,3 +181,4 @@ class DataEntryWindow(QMainWindow):
                     height=self.app_config.general.svg_display_height,
                     window_type="svg_display"
                 )
+

@@ -1,1 +1,1 @@
-from .project_repository import JsonProjectRepository
+from .project_repository import ProjectRepository

@@ -61,7 +61,7 @@ class ZoomableSvgWidget(QSvgRenderer):
         self.render(painter)
 
 # --- Main SVG Display Window ---
-class FitToWindowSvgDisplay(QDialog):
+class SvgDisplay(QDialog):
     def __init__(self, app_config, initial_path=None, reference_window=None):
         super().__init__()
         self.setWindowTitle("SVG Display")
@@ -191,6 +191,6 @@ class FitToWindowSvgDisplay(QDialog):
 #             svg_display_height = 800
 #         general = General()
 #     app = QApplication(sys.argv)
-#     win = FitToWindowSvgDisplay(DummyConfig(), initial_path="svg/gantt_chart.svg")
+#     win = SvgDisplay(DummyConfig(), initial_path="svg/gantt_chart.svg")
 #     win.show()
 #     sys.exit(app.exec_())

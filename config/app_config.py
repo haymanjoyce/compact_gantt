@@ -4,89 +4,145 @@ from typing import List, Dict, Callable, Any, Tuple, Optional
 from PyQt5.QtCore import QDate
 import logging
 from utils.conversion import internal_to_display_date, display_to_internal_date, is_valid_display_date
+from config.window_config import WindowConfig
+from config.chart_config import ChartConfig
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 @dataclass
 class GeneralConfig:
-    # Window settings (for application window sizes)
-    data_entry_width: int = 400
-    data_entry_height: int = 500
-    svg_display_width: int = 800
-    svg_display_height: int = 600
+    """General configuration that composes window and chart configs for backward compatibility."""
+    window: WindowConfig = field(default_factory=WindowConfig)
+    chart: ChartConfig = field(default_factory=ChartConfig)
 
-    # Window positioning settings
-    data_entry_screen: int = 0  # Which screen to display on (0 = primary screen)
-    data_entry_position: str = "center"  # Options: "center", "top_left", "top_right", "bottom_left", "bottom_right", "custom"
-    data_entry_x: int = 100  # Custom X position (used when position is "custom")
-    data_entry_y: int = 100  # Custom Y position (used when position is "custom")
+    # Backward compatibility properties - delegate to window and chart configs
+    @property
+    def data_entry_width(self) -> int:
+        return self.window.data_entry_width
 
-    # SVG display window positioning settings
-    svg_display_screen: int = 1  # Which screen to display on (1 = secondary screen if available)
-    svg_display_position: str = "center"  # Options: "center", "top_left", "top_right", "bottom_left", "bottom_right", "custom"
-    svg_display_x: int = 100  # Custom X position (used when position is "custom")
-    svg_display_y: int = 100  # Custom Y position (used when position is "custom")
+    @property
+    def data_entry_height(self) -> int:
+        return self.window.data_entry_height
 
-    # SVG/image generation settings (for chart resolution)
-    outer_width: int = 600      # Main SVG/chart width in pixels (user-facing)
-    outer_height: int = 400     # Main SVG/chart height in pixels (user-facing)
+    @property
+    def svg_display_width(self) -> int:
+        return self.window.svg_display_width
 
-    # SVG generation settings
-    svg_output_folder: str = "svg"
-    svg_output_filename: str = "gantt_chart.svg"
+    @property
+    def svg_display_height(self) -> int:
+        return self.window.svg_display_height
 
-    # Scale proportions
-    scale_proportion_years: float = 0.05
-    scale_proportion_months: float = 0.05
-    scale_proportion_weeks: float = 0.05
-    scale_proportion_days: float = 0.05
+    @property
+    def data_entry_screen(self) -> int:
+        return self.window.data_entry_screen
 
-    # Scale label thresholds
-    full_label_width: int = 50
-    short_label_width: int = 20
+    @property
+    def data_entry_position(self) -> str:
+        return self.window.data_entry_position
 
-    # Default table row counts
-    tasks_rows: int = 20         # Default number of rows for new charts
-    pipes_rows: int = 3
-    curtains_rows: int = 3
+    @property
+    def data_entry_x(self) -> int:
+        return self.window.data_entry_x
 
-    # Default colors and label settings
-    default_curtain_color: str = "red"
-    leader_line_vertical_default: float = 0.5
-    leader_line_horizontal_default: float = 10.0  # Fixed pixel offset for outside labels
-    label_vertical_offset_factor: float = 0.3
-    label_horizontal_offset_factor: float = 0.0
-    label_text_width_factor: float = 0.55
-    scale_label_vertical_alignment_factor: float = 0.7  # Vertical position within scale interval (0.0=top, 0.5=center, 1.0=bottom)
+    @property
+    def data_entry_y(self) -> int:
+        return self.window.data_entry_y
 
-    def __post_init__(self):
-        # Validate positive integers
-        for field_name in ["data_entry_width", "data_entry_height", "svg_display_width",
-                          "svg_display_height", "outer_width", "outer_height",
-                          "full_label_width", "short_label_width",
-                          "tasks_rows", "pipes_rows", "curtains_rows", "data_entry_screen",
-                          "data_entry_x", "data_entry_y", "svg_display_screen",
-                          "svg_display_x", "svg_display_y"]:
-            value = getattr(self, field_name)
-            if not isinstance(value, int) or value < 0:
-                raise ValueError(f"{field_name} must be a non-negative integer")
+    @property
+    def svg_display_screen(self) -> int:
+        return self.window.svg_display_screen
 
-        # Validate position string
-        valid_positions = ["center", "top_left", "top_right", "bottom_left", "bottom_right", "custom"]
-        if self.data_entry_position not in valid_positions:
-            raise ValueError(f"data_entry_position must be one of: {valid_positions}")
-        if self.svg_display_position not in valid_positions:
-            raise ValueError(f"svg_display_position must be one of: {valid_positions}")
+    @property
+    def svg_display_position(self) -> str:
+        return self.window.svg_display_position
 
-        # Validate floats
-        for field_name in ["scale_proportion_years", "scale_proportion_months",
-                          "scale_proportion_weeks", "scale_proportion_days",
-                          "leader_line_vertical_default", "leader_line_horizontal_default",
-                          "label_vertical_offset_factor", "label_horizontal_offset_factor",
-                          "label_text_width_factor", "scale_label_vertical_alignment_factor"]:
-            value = getattr(self, field_name)
-            if not isinstance(value, float) or value < 0:
-                raise ValueError(f"{field_name} must be a non-negative float")
+    @property
+    def svg_display_x(self) -> int:
+        return self.window.svg_display_x
+
+    @property
+    def svg_display_y(self) -> int:
+        return self.window.svg_display_y
+
+    @property
+    def outer_width(self) -> int:
+        return self.chart.outer_width
+
+    @property
+    def outer_height(self) -> int:
+        return self.chart.outer_height
+
+    @property
+    def svg_output_folder(self) -> str:
+        return self.chart.svg_output_folder
+
+    @property
+    def svg_output_filename(self) -> str:
+        return self.chart.svg_output_filename
+
+    @property
+    def scale_proportion_years(self) -> float:
+        return self.chart.scale_proportion_years
+
+    @property
+    def scale_proportion_months(self) -> float:
+        return self.chart.scale_proportion_months
+
+    @property
+    def scale_proportion_weeks(self) -> float:
+        return self.chart.scale_proportion_weeks
+
+    @property
+    def scale_proportion_days(self) -> float:
+        return self.chart.scale_proportion_days
+
+    @property
+    def full_label_width(self) -> int:
+        return self.chart.full_label_width
+
+    @property
+    def short_label_width(self) -> int:
+        return self.chart.short_label_width
+
+    @property
+    def tasks_rows(self) -> int:
+        return self.chart.tasks_rows
+
+    @property
+    def pipes_rows(self) -> int:
+        return self.chart.pipes_rows
+
+    @property
+    def curtains_rows(self) -> int:
+        return self.chart.curtains_rows
+
+    @property
+    def default_curtain_color(self) -> str:
+        return self.chart.default_curtain_color
+
+    @property
+    def leader_line_vertical_default(self) -> float:
+        return self.chart.leader_line_vertical_default
+
+    @property
+    def leader_line_horizontal_default(self) -> float:
+        return self.chart.leader_line_horizontal_default
+
+    @property
+    def label_vertical_offset_factor(self) -> float:
+        return self.chart.label_vertical_offset_factor
+
+    @property
+    def label_horizontal_offset_factor(self) -> float:
+        return self.chart.label_horizontal_offset_factor
+
+    @property
+    def label_text_width_factor(self) -> float:
+        return self.chart.label_text_width_factor
+
+    @property
+    def scale_label_vertical_alignment_factor(self) -> float:
+        return self.chart.scale_label_vertical_alignment_factor
 
 @dataclass
 class TableColumnConfig:
