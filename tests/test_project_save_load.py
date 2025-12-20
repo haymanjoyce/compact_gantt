@@ -1,0 +1,240 @@
+#!/usr/bin/env python3
+"""
+Test script to verify that all FrameConfig fields are correctly saved and loaded.
+This ensures that project files capture all frame configuration data.
+"""
+
+import sys
+import json
+import tempfile
+import os
+from pathlib import Path
+import pytest
+from models.project import ProjectData
+from models.frame import FrameConfig
+from repositories.project_repository import ProjectRepository
+
+# Ensure project root is in sys.path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+
+def test_frame_config_all_fields_saved():
+    """Test that all FrameConfig fields are saved to JSON."""
+    project = ProjectData()
+    
+    # Set all FrameConfig fields to non-default values
+    project.frame_config.outer_width = 1000
+    project.frame_config.outer_height = 800
+    project.frame_config.header_height = 30
+    project.frame_config.footer_height = 25
+    project.frame_config.margins = (15, 20, 25, 30)
+    project.frame_config.num_rows = 5
+    project.frame_config.header_text = "Test Header Text"
+    project.frame_config.footer_text = "Test Footer Text"
+    project.frame_config.horizontal_gridlines = False
+    project.frame_config.vertical_gridlines = False
+    project.frame_config.chart_start_date = "2025-01-15"
+    
+    # Convert to JSON
+    json_data = project.to_json()
+    
+    # Verify frame_config is in the JSON
+    assert "frame_config" in json_data, "frame_config should be in JSON output"
+    
+    frame_config_data = json_data["frame_config"]
+    
+    # Verify all fields are present
+    expected_fields = {
+        "outer_width": 1000,
+        "outer_height": 800,
+        "header_height": 30,
+        "footer_height": 25,
+        "margins": [15, 20, 25, 30],  # JSON converts tuples to lists
+        "num_rows": 5,
+        "header_text": "Test Header Text",
+        "footer_text": "Test Footer Text",
+        "horizontal_gridlines": False,
+        "vertical_gridlines": False,
+        "chart_start_date": "2025-01-15"
+    }
+    
+    for field_name, expected_value in expected_fields.items():
+        assert field_name in frame_config_data, f"Field '{field_name}' should be in saved frame_config"
+        assert frame_config_data[field_name] == expected_value, \
+            f"Field '{field_name}' should be {expected_value}, got {frame_config_data[field_name]}"
+
+
+def test_frame_config_all_fields_loaded():
+    """Test that all FrameConfig fields are correctly loaded from JSON."""
+    # Create test data with all fields
+    test_data = {
+        "frame_config": {
+            "outer_width": 1200,
+            "outer_height": 900,
+            "header_height": 40,
+            "footer_height": 35,
+            "margins": [20, 25, 30, 35],  # JSON stores as list
+            "num_rows": 7,
+            "header_text": "Loaded Header",
+            "footer_text": "Loaded Footer",
+            "horizontal_gridlines": True,
+            "vertical_gridlines": False,
+            "chart_start_date": "2025-02-20"
+        },
+        "tasks": [],
+        "connectors": [],
+        "swimlanes": [],
+        "pipes": [],
+        "curtains": [],
+        "text_boxes": []
+    }
+    
+    # Load from JSON
+    loaded_project = ProjectData.from_json(test_data)
+    
+    # Verify all fields are loaded correctly
+    assert loaded_project.frame_config.outer_width == 1200
+    assert loaded_project.frame_config.outer_height == 900
+    assert loaded_project.frame_config.header_height == 40
+    assert loaded_project.frame_config.footer_height == 35
+    assert loaded_project.frame_config.margins == (20, 25, 30, 35)  # Should be converted to tuple
+    assert loaded_project.frame_config.num_rows == 7
+    assert loaded_project.frame_config.header_text == "Loaded Header"
+    assert loaded_project.frame_config.footer_text == "Loaded Footer"
+    assert loaded_project.frame_config.horizontal_gridlines == True
+    assert loaded_project.frame_config.vertical_gridlines == False
+    assert loaded_project.frame_config.chart_start_date == "2025-02-20"
+
+
+def test_frame_config_save_and_load_roundtrip():
+    """Test that saving and loading preserves all FrameConfig fields."""
+    repository = ProjectRepository()
+    
+    # Create project with custom FrameConfig
+    original_project = ProjectData()
+    original_project.frame_config.outer_width = 1500
+    original_project.frame_config.outer_height = 1000
+    original_project.frame_config.header_height = 50
+    original_project.frame_config.footer_height = 45
+    original_project.frame_config.margins = (12, 15, 18, 21)
+    original_project.frame_config.num_rows = 10
+    original_project.frame_config.header_text = "Roundtrip Header"
+    original_project.frame_config.footer_text = "Roundtrip Footer"
+    original_project.frame_config.horizontal_gridlines = False
+    original_project.frame_config.vertical_gridlines = True
+    original_project.frame_config.chart_start_date = "2025-03-01"
+    
+    # Save to temporary file
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        temp_file = f.name
+    
+    try:
+        repository.save(temp_file, original_project)
+        
+        # Load from file
+        loaded_project = repository.load(temp_file, ProjectData)
+        
+        # Verify all fields match
+        assert loaded_project.frame_config.outer_width == original_project.frame_config.outer_width
+        assert loaded_project.frame_config.outer_height == original_project.frame_config.outer_height
+        assert loaded_project.frame_config.header_height == original_project.frame_config.header_height
+        assert loaded_project.frame_config.footer_height == original_project.frame_config.footer_height
+        assert loaded_project.frame_config.margins == original_project.frame_config.margins
+        assert loaded_project.frame_config.num_rows == original_project.frame_config.num_rows
+        assert loaded_project.frame_config.header_text == original_project.frame_config.header_text
+        assert loaded_project.frame_config.footer_text == original_project.frame_config.footer_text
+        assert loaded_project.frame_config.horizontal_gridlines == original_project.frame_config.horizontal_gridlines
+        assert loaded_project.frame_config.vertical_gridlines == original_project.frame_config.vertical_gridlines
+        assert loaded_project.frame_config.chart_start_date == original_project.frame_config.chart_start_date
+        
+    finally:
+        # Clean up temporary file
+        if os.path.exists(temp_file):
+            os.unlink(temp_file)
+
+
+def test_frame_config_defaults_on_missing_fields():
+    """Test that missing fields in JSON use FrameConfig defaults."""
+    # Create test data with only some fields
+    test_data = {
+        "frame_config": {
+            "outer_width": 800,
+            "outer_height": 600,
+            # Missing other fields - should use defaults
+        },
+        "tasks": [],
+        "connectors": [],
+        "swimlanes": [],
+        "pipes": [],
+        "curtains": [],
+        "text_boxes": []
+    }
+    
+    # Load from JSON
+    loaded_project = ProjectData.from_json(test_data)
+    
+    # Verify defaults are used for missing fields
+    assert loaded_project.frame_config.outer_width == 800  # From JSON
+    assert loaded_project.frame_config.outer_height == 600  # From JSON
+    assert loaded_project.frame_config.header_height == 20  # Default
+    assert loaded_project.frame_config.footer_height == 20  # Default
+    assert loaded_project.frame_config.margins == (10, 10, 10, 10)  # Default
+    assert loaded_project.frame_config.num_rows == 1  # Default
+    assert loaded_project.frame_config.header_text == ""  # Default
+    assert loaded_project.frame_config.footer_text == ""  # Default
+    assert loaded_project.frame_config.horizontal_gridlines == True  # Default
+    assert loaded_project.frame_config.vertical_gridlines == True  # Default
+    assert loaded_project.frame_config.chart_start_date == "2024-12-30"  # Default
+
+
+def test_frame_config_margins_tuple_conversion():
+    """Test that margins are correctly converted from list (JSON) to tuple."""
+    # JSON stores tuples as lists
+    test_data = {
+        "frame_config": {
+            "margins": [5, 10, 15, 20]  # List in JSON
+        },
+        "tasks": [],
+        "connectors": [],
+        "swimlanes": [],
+        "pipes": [],
+        "curtains": [],
+        "text_boxes": []
+    }
+    
+    loaded_project = ProjectData.from_json(test_data)
+    
+    # Should be converted to tuple
+    assert isinstance(loaded_project.frame_config.margins, tuple), \
+        "margins should be converted to tuple"
+    assert loaded_project.frame_config.margins == (5, 10, 15, 20)
+
+
+def test_frame_config_backward_compatibility():
+    """Test that old project files with header_height=50 still load correctly."""
+    # Simulate an old project file with old default header_height
+    test_data = {
+        "frame_config": {
+            "header_height": 50,  # Old default
+            "footer_height": 50,  # Old default
+            "header_text": "",
+            "footer_text": ""
+        },
+        "tasks": [],
+        "connectors": [],
+        "swimlanes": [],
+        "pipes": [],
+        "curtains": [],
+        "text_boxes": []
+    }
+    
+    loaded_project = ProjectData.from_json(test_data)
+    
+    # Should preserve old values, not use new defaults
+    assert loaded_project.frame_config.header_height == 50
+    assert loaded_project.frame_config.footer_height == 50
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])
+
