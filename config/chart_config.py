@@ -38,7 +38,7 @@ class ChartConfig:
     # Font sizes
     task_font_size: int = 10  # Font size for task labels
     scale_font_size: int = 10  # Font size for scale labels
-    header_footer_font_size: int = 14  # Font size for header and footer text
+    header_footer_font_size: int = 10  # Font size for header and footer text
 
     def __post_init__(self):
         # Validate positive integers
