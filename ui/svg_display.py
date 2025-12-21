@@ -70,7 +70,7 @@ class SvgDisplay(QMainWindow):
         # Create button layout with spacing
         btn_layout = QHBoxLayout()
         btn_layout.setSpacing(8)
-        btn_layout.setContentsMargins(8, 8, 8, 8)
+        btn_layout.setContentsMargins(0, 4, 0, 0)
         btn_layout.addWidget(self.zoom_in_btn)
         btn_layout.addWidget(self.zoom_out_btn)
         btn_layout.addWidget(self.fit_btn)
