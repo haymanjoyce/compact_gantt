@@ -64,6 +64,11 @@ class ZoomableSvgWidget(QSvgRenderer):
 class SvgDisplay(QDialog):
     def __init__(self, app_config, initial_path=None, reference_window=None):
         super().__init__()
+        
+        # Set window flags to match MainWindow (minimize, maximize, close)
+        self.setWindowFlags(Qt.Window | Qt.WindowMinimizeButtonHint | 
+                           Qt.WindowMaximizeButtonHint | Qt.WindowCloseButtonHint)
+        
         self.setWindowTitle("SVG Display")
         self.setWindowIcon(QIcon("assets/logo.png"))
 
