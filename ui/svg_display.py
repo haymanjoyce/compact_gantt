@@ -1,5 +1,5 @@
 from PyQt5.QtWidgets import (
-    QMainWindow, QVBoxLayout, QScrollArea, QPushButton, QHBoxLayout, QLabel, QApplication, QStatusBar, QWidget
+    QMainWindow, QVBoxLayout, QScrollArea, QPushButton, QHBoxLayout, QLabel, QApplication, QStatusBar, QWidget, QAction, QFileDialog, QMessageBox
 )
 from PyQt5.QtSvg import QSvgRenderer
 from PyQt5.QtGui import QIcon, QPixmap, QPainter, QPalette
@@ -23,6 +23,9 @@ class SvgDisplay(QMainWindow):
         width = app_config.general.svg_display_width
         height = app_config.general.svg_display_height
         self.resize(width, height)
+        
+        # Store SVG path for saving
+        self._svg_path = None
 
         self.svg_renderer = QSvgRenderer()
         self.svg_label = QLabel()
@@ -82,6 +85,14 @@ class SvgDisplay(QMainWindow):
         self.layout.addLayout(btn_layout)  # Buttons below the graphic
         self.setCentralWidget(central_widget)
         
+        # Create menu bar
+        self.menu_bar = self.menuBar()
+        file_menu = self.menu_bar.addMenu("File")
+        self.save_as_action = QAction("Save As...", self)
+        self.save_as_action.setShortcut("Ctrl+Shift+S")
+        self.save_as_action.triggered.connect(self.save_as_raster)
+        file_menu.addAction(self.save_as_action)
+        
         # Create status bar using reserved area (like MainWindow)
         self.status_bar = self.statusBar()
         self.status_bar.setStyleSheet("""
@@ -115,6 +126,7 @@ class SvgDisplay(QMainWindow):
     def load_svg(self, svg_path):
         absolute_path = os.path.abspath(svg_path)
         if os.path.exists(absolute_path):
+            self._svg_path = absolute_path  # Store path for saving
             self.svg_renderer.load(absolute_path)
             self._svg_size = self.svg_renderer.defaultSize()
             self._zoom = 1.0
@@ -211,6 +223,48 @@ class SvgDisplay(QMainWindow):
         viewport_height = area.viewport().height()
         h_bar.setValue(widget_center_x - viewport_width // 2)
         v_bar.setValue(widget_center_y - viewport_height // 2)
+
+    def save_as_raster(self):
+        """Save the SVG as a raster image (PNG, JPEG, etc.)."""
+        if not self._svg_path or not self.svg_renderer.isValid():
+            QMessageBox.warning(self, "No Image", "No SVG image loaded to save.")
+            return
+        
+        # Show file dialog for saving
+        file_path, selected_filter = QFileDialog.getSaveFileName(
+            self,
+            "Save Image As",
+            "",
+            "PNG Images (*.png);;JPEG Images (*.jpg *.jpeg);;All Files (*)"
+        )
+        
+        if not file_path:
+            return
+        
+        # Determine format from file extension
+        file_ext = os.path.splitext(file_path)[1].lower()
+        if file_ext in ['.jpg', '.jpeg']:
+            format_type = 'JPEG'
+        else:
+            format_type = 'PNG'  # Default to PNG
+        
+        try:
+            # Render SVG at native size for high quality
+            native_size = self._svg_size
+            pixmap = QPixmap(native_size)
+            pixmap.fill(Qt.white)  # White background for raster formats
+            painter = QPainter(pixmap)
+            painter.setRenderHint(QPainter.Antialiasing)
+            self.svg_renderer.render(painter)
+            painter.end()
+            
+            # Save the pixmap
+            if pixmap.save(file_path, format_type):
+                self.status_bar.showMessage(f"Image saved as {format_type}")
+            else:
+                QMessageBox.critical(self, "Error", f"Failed to save image to {file_path}")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Error saving image: {str(e)}")
 
 # --- Example usage (uncomment for standalone test) ---
 # if __name__ == "__main__":
