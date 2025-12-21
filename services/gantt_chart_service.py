@@ -19,7 +19,6 @@ class GanttChartService(QObject):
         self.output_filename = output_filename or self.config.general.svg_output_filename
         self.dwg = None
         self.data = {"frame_config": {}, "tasks": []}
-        self.start_date = None
         self.font = QFont("Arial", self.config.general.task_font_size)
         self.font_metrics = QFontMetrics(self.font)
         logging.debug("GanttChartService initialized")
@@ -42,7 +41,6 @@ class GanttChartService(QObject):
             self.dwg = svgwrite.Drawing(
                 filename=os.path.abspath(os.path.join(self.output_folder, self.output_filename)),
                 size=(width, height))
-            self.start_date = self._set_time_scale()
             self.render()
             svg_path = os.path.abspath(os.path.join(self.output_folder, self.output_filename))
             logging.debug(f"SVG generated at: {svg_path}")
@@ -61,30 +59,6 @@ class GanttChartService(QObject):
             return datetime.strptime(date_str, "%Y-%m-%d")
         except (ValueError, TypeError):
             return None
-
-    def _calculate_time_range(self):
-        logging.debug("Calculating time range")
-        dates = []
-        for task in self.data.get("tasks", []):
-            for date_str in [task.get("start_date", ""), task.get("finish_date", "")]:
-                parsed_date = self._parse_date_safe(date_str)
-                if parsed_date:
-                    dates.append(parsed_date)
-
-        if not dates:
-            today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-            return today, today + timedelta(days=30)
-        return min(dates), max(dates) + timedelta(days=1)
-
-    def _calculate_chart_end_date(self):
-        """Calculate the end date for the chart based on tasks."""
-        _, end_date = self._calculate_time_range()
-        return end_date
-
-    def _set_time_scale(self):
-        start_date, _ = self._calculate_time_range()
-        logging.debug(f"Time scale set with start_date: {start_date}")
-        return start_date
 
     def render_outer_frame(self):
         width = self._get_frame_config("outer_width", self.config.general.outer_width)
@@ -145,9 +119,21 @@ class GanttChartService(QObject):
         inner_width = outer_width - margins[1] - margins[3]
         inner_height = outer_height - header_height - footer_height - margins[0] - margins[2]
         
-        # Get chart start date from frame config
-        chart_start = datetime.strptime(self.data["frame_config"]["chart_start_date"], "%Y-%m-%d")
-        chart_end = self._calculate_chart_end_date()
+        # Get chart start and end dates from frame config
+        chart_start_str = self._get_frame_config("chart_start_date", "2024-12-30")
+        chart_end_str = self._get_frame_config("chart_end_date", None)
+        
+        # If chart_end_date doesn't exist, calculate default (30 days after start)
+        if not chart_end_str:
+            try:
+                start_dt = datetime.strptime(chart_start_str, "%Y-%m-%d")
+                end_dt = start_dt + timedelta(days=30)
+                chart_end_str = end_dt.strftime("%Y-%m-%d")
+            except ValueError:
+                chart_end_str = "2025-01-29"
+        
+        chart_start = datetime.strptime(chart_start_str, "%Y-%m-%d")
+        chart_end = datetime.strptime(chart_end_str, "%Y-%m-%d")
         
         # Render scales, rows, and tasks in one continuous timeline
         self.render_scales_and_rows(margins[3], inner_y, inner_width, inner_height, chart_start, chart_end)
@@ -440,7 +426,6 @@ class GanttChartService(QObject):
     def render(self):
         logging.debug("Starting render")
         os.makedirs(self.output_folder, exist_ok=True)
-        self.start_date = self._set_time_scale()
         self.render_outer_frame()
         self.render_header()
         self.render_footer()

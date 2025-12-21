@@ -18,6 +18,7 @@ class FrameConfig:
     vertical_gridline_weeks: bool = False
     vertical_gridline_days: bool = False
     chart_start_date: str = "2024-12-30"
+    chart_end_date: str = "2025-01-29"  # Default: 30 days after start date
     show_years: bool = True
     show_months: bool = True
     show_weeks: bool = True
