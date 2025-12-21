@@ -9,6 +9,10 @@ class GridTab(BaseTab):
         vertical_group = self._create_vertical_gridlines_group()
         layout.addWidget(horizontal_group)
         layout.addWidget(vertical_group)
+        
+        # Add stretch at the end to push all groups to the top
+        layout.addStretch(1)
+        
         self.setLayout(layout)
 
     def _create_horizontal_gridlines_group(self) -> QGroupBox:
@@ -21,7 +25,6 @@ class GridTab(BaseTab):
         self.horizontal_gridlines.setToolTip("Display horizontal gridlines at row boundaries")
 
         layout.addWidget(self.horizontal_gridlines, 0, 0)
-        layout.setRowStretch(1, 1)  # Add row stretch after the last field
         group.setLayout(layout)
         return group
 
@@ -45,7 +48,6 @@ class GridTab(BaseTab):
         layout.addWidget(self.vertical_gridline_months, 1, 0)
         layout.addWidget(self.vertical_gridline_weeks, 2, 0)
         layout.addWidget(self.vertical_gridline_days, 3, 0)
-        layout.setRowStretch(4, 1)  # Add row stretch after the last field
         group.setLayout(layout)
         return group
 

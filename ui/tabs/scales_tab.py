@@ -7,6 +7,10 @@ class ScalesTab(BaseTab):
         layout = QVBoxLayout()
         scales_group = self._create_scales_settings_group()
         layout.addWidget(scales_group)
+        
+        # Add stretch at the end to push all groups to the top
+        layout.addStretch(1)
+        
         self.setLayout(layout)
 
     def _create_scales_settings_group(self) -> QGroupBox:
@@ -29,7 +33,6 @@ class ScalesTab(BaseTab):
         layout.addWidget(self.show_months, 1, 0)
         layout.addWidget(self.show_weeks, 2, 0)
         layout.addWidget(self.show_days, 3, 0)
-        layout.setRowStretch(4, 1)  # Add row stretch after the last field
         group.setLayout(layout)
         return group
 

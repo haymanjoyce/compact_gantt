@@ -29,6 +29,9 @@ class WindowsTab(BaseTab):
         )
         layout.addWidget(svg_display_group)
 
+        # Add stretch at the end to push all groups to the top
+        layout.addStretch(1)
+
         self.setLayout(layout)
 
     def _create_positioning_group(self, title: str, prefix: str, label_width: int) -> QGroupBox:
@@ -72,7 +75,6 @@ class WindowsTab(BaseTab):
         layout.addWidget(y_label, 2, 0)
         layout.addWidget(custom_y, 2, 1)
         layout.setColumnStretch(1, 1)
-        layout.setRowStretch(3, 1)  # Add row stretch after the last field
         group.setLayout(layout)
         return group
 

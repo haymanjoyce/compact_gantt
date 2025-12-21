@@ -20,6 +20,9 @@ class TitlesTab(BaseTab):
         footer_group = self._create_footer_group(LABEL_WIDTH)
         layout.addWidget(footer_group)
 
+        # Add stretch at the end to push all groups to the top
+        layout.addStretch(1)
+
         self.setLayout(layout)
 
     def _create_header_group(self, label_width: int) -> QGroupBox:
@@ -45,7 +48,6 @@ class TitlesTab(BaseTab):
         layout.addWidget(header_text_label, 1, 0)
         layout.addWidget(self.header_text, 1, 1)
         layout.setColumnStretch(1, 1)
-        layout.setRowStretch(2, 1)  # Add row stretch after the last field
         group.setLayout(layout)
         return group
 
@@ -72,7 +74,6 @@ class TitlesTab(BaseTab):
         layout.addWidget(footer_text_label, 1, 0)
         layout.addWidget(self.footer_text, 1, 1)
         layout.setColumnStretch(1, 1)
-        layout.setRowStretch(2, 1)  # Add row stretch after the last field
         group.setLayout(layout)
         return group
 
