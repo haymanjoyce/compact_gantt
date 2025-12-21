@@ -17,7 +17,7 @@ class SvgDisplay(QMainWindow):
         self.setWindowFlags(Qt.Window | Qt.WindowMinimizeButtonHint | 
                            Qt.WindowMaximizeButtonHint | Qt.WindowCloseButtonHint)
         
-        self.setWindowTitle("Compact Gantt | Display")
+        self.setWindowTitle("Compact Gantt | Chart")
         self.setWindowIcon(QIcon("assets/logo.png"))
 
         width = app_config.general.svg_display_width
