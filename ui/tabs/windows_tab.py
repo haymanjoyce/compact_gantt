@@ -8,7 +8,7 @@ from .base_tab import BaseTab
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-class UserPreferencesTab(BaseTab):
+class WindowsTab(BaseTab):
     def setup_ui(self):
         layout = QVBoxLayout()
         LABEL_WIDTH = 150  # Consistent label width
@@ -167,3 +167,4 @@ class UserPreferencesTab(BaseTab):
             'svg_display_x': self.app_config.general.svg_display_x,
             'svg_display_y': self.app_config.general.svg_display_y
         })
+

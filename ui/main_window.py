@@ -9,7 +9,7 @@ from .tabs.placeholder_tab import PlaceholderTab
 from repositories.project_repository import ProjectRepository
 from models.project import ProjectData  # Import here to avoid circular import
 from ui.window_utils import move_window_according_to_preferences
-from .tabs.user_preferences_tab import UserPreferencesTab
+from .tabs.windows_tab import WindowsTab
 from .tabs.titles_tab import TitlesTab
 from .tabs.scales_tab import ScalesTab
 from .tabs.grid_tab import GridTab
@@ -82,8 +82,8 @@ class MainWindow(QMainWindow):
         self.status_bar.showMessage("Ready")
 
     def _create_all_tabs(self):
-        self.user_preferences_tab = UserPreferencesTab(self.project_data, self.app_config)
-        self.user_preferences_tab.data_updated.connect(self._on_user_preferences_updated)
+        self.windows_tab = WindowsTab(self.project_data, self.app_config)
+        self.windows_tab.data_updated.connect(self._on_windows_updated)
         self.layout_tab = LayoutTab(self.project_data, self.app_config)
         self.titles_tab = TitlesTab(self.project_data, self.app_config)
         self.scales_tab = ScalesTab(self.project_data, self.app_config)
@@ -96,7 +96,7 @@ class MainWindow(QMainWindow):
         self.text_boxes_tab = PlaceholderTab(self.project_data, self.app_config, "Text Boxes")
 
     def _add_all_tabs(self):
-        self.tab_widget.addTab(self.user_preferences_tab, "Windows")
+        self.tab_widget.addTab(self.windows_tab, "Windows")
         self.tab_widget.addTab(self.layout_tab, "Layout")
         self.tab_widget.addTab(self.titles_tab, "Titles")
         self.tab_widget.addTab(self.scales_tab, "Scales")
@@ -160,8 +160,8 @@ class MainWindow(QMainWindow):
         
         self.data_updated.emit(self.project_data.to_json())
 
-    def _on_user_preferences_updated(self, data):
-        """Handle updates from user preferences tab"""
+    def _on_windows_updated(self, data):
+        """Handle updates from windows tab"""
         # Reposition data entry window if positioning preferences changed
         if any(key in data for key in ['data_entry_screen', 'data_entry_x', 'data_entry_y']):
             move_window_according_to_preferences(
