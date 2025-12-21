@@ -141,6 +141,15 @@ class SvgDisplay(QMainWindow):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         if self._fit_to_window:
+            # Update _zoom to match the new fit scale so zooming continues smoothly
+            area_size = self.scroll_area.viewport().size()
+            if self._svg_size.width() > 0 and self._svg_size.height() > 0:
+                fit_scale = min(
+                    area_size.width() / self._svg_size.width(),
+                    area_size.height() / self._svg_size.height(),
+                    1.0
+                )
+                self._zoom = fit_scale
             self.update_image()
             self._update_zoom_label()
 
@@ -185,6 +194,15 @@ class SvgDisplay(QMainWindow):
 
     def fit_to_window(self):
         self._fit_to_window = True
+        # Update _zoom to match the current fit scale so zooming continues smoothly
+        area_size = self.scroll_area.viewport().size()
+        if self._svg_size.width() > 0 and self._svg_size.height() > 0:
+            fit_scale = min(
+                area_size.width() / self._svg_size.width(),
+                area_size.height() / self._svg_size.height(),
+                1.0
+            )
+            self._zoom = fit_scale
         self.update_image()
         self._update_button_states()
         self._update_zoom_label()
