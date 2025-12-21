@@ -299,12 +299,23 @@ class GanttChartService(QObject):
         total_days = max((end_date - start_date).days, 1)
         time_scale = width / total_days if total_days > 0 else width
 
-        scale_configs = [
-            ("years", self.config.general.scale_proportion_years),
-            ("months", self.config.general.scale_proportion_months),
-            ("weeks", self.config.general.scale_proportion_weeks),
-            ("days", self.config.general.scale_proportion_days)
+        # Get scale visibility settings from frame_config
+        show_years = self._get_frame_config("show_years", True)
+        show_months = self._get_frame_config("show_months", True)
+        show_weeks = self._get_frame_config("show_weeks", True)
+        show_days = self._get_frame_config("show_days", True)
+
+        # Build scale configs list, filtering by visibility
+        all_scale_configs = [
+            ("years", self.config.general.scale_proportion_years, show_years),
+            ("months", self.config.general.scale_proportion_months, show_months),
+            ("weeks", self.config.general.scale_proportion_weeks, show_weeks),
+            ("days", self.config.general.scale_proportion_days, show_days)
         ]
+        
+        # Filter to only include visible scales
+        scale_configs = [(interval, proportion) for interval, proportion, visible in all_scale_configs if visible]
+        
         row_frame_proportion = 1.0
         total_scale_proportion = sum(p for _, p in scale_configs)
         total_height_units = row_frame_proportion + total_scale_proportion
@@ -329,6 +340,7 @@ class GanttChartService(QObject):
                 self.dwg.add(self.dwg.line((x, y_pos), (x + width, y_pos), stroke="gray", stroke_width=1))
 
         if self._get_frame_config("vertical_gridlines", False):
+            # Use the filtered scale_configs for vertical gridlines
             for interval, _ in scale_configs:
                 current_date = self.next_period(start_date, interval)
                 prev_x = x
