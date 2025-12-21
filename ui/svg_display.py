@@ -8,58 +8,6 @@ import os
 from config.app_config import AppConfig
 from ui.window_utils import move_window_according_to_preferences
 
-# --- Custom Centered Scroll Area ---
-class CenteredScrollArea(QScrollArea):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setAlignment(Qt.AlignCenter)
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self.centerContent()
-
-    def centerContent(self):
-        widget = self.widget()
-        if widget is None:
-            return
-        area_w = self.viewport().width()
-        area_h = self.viewport().height()
-        w = widget.width()
-        h = widget.height()
-        x = max((area_w - w) // 2, 0)
-        y = max((area_h - h) // 2, 0)
-        widget.move(x, y)
-
-# --- Zoomable SVG Widget ---
-class ZoomableSvgWidget(QSvgRenderer):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self._zoom = 1.0
-
-    def setZoom(self, zoom):
-        self._zoom = zoom
-        self.update_size()
-        self.update()
-
-    def zoomIn(self):
-        self.setZoom(self._zoom * 1.2)
-
-    def zoomOut(self):
-        self.setZoom(self._zoom / 1.2)
-
-    def update_size(self):
-        base = self.defaultSize()
-        self.setFixedSize(int(base.width() * self._zoom), int(base.height() * self._zoom))
-
-    def sizeHint(self):
-        base = self.defaultSize()
-        return QSize(int(base.width() * self._zoom), int(base.height() * self._zoom))
-
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.scale(self._zoom, self._zoom)
-        self.render(painter)
-
 # --- Main SVG Display Window ---
 class SvgDisplay(QDialog):
     def __init__(self, app_config, initial_path=None, reference_window=None):
@@ -86,17 +34,56 @@ class SvgDisplay(QDialog):
         self.scroll_area.setWidget(self.svg_label)
         self.scroll_area.setWidgetResizable(True)
 
-        # Add zoom buttons (optional, for manual zoom)
-        zoom_in_btn = QPushButton("Zoom In")
-        zoom_out_btn = QPushButton("Zoom Out")
-        fit_btn = QPushButton("Fit to Window")
-        zoom_in_btn.clicked.connect(self.zoom_in)
-        zoom_out_btn.clicked.connect(self.zoom_out)
-        fit_btn.clicked.connect(self.fit_to_window)
+        # Create zoom control buttons with styling
+        self.zoom_in_btn = QPushButton("Zoom In")
+        self.zoom_out_btn = QPushButton("Zoom Out")
+        self.fit_btn = QPushButton("Fit to Window")
+        
+        # Add keyboard shortcuts
+        self.zoom_in_btn.setShortcut("Ctrl++")
+        self.zoom_out_btn.setShortcut("Ctrl+-")
+        self.fit_btn.setShortcut("Ctrl+0")
+        
+        # Add tooltips
+        self.zoom_in_btn.setToolTip("Zoom in (Ctrl++)")
+        self.zoom_out_btn.setToolTip("Zoom out (Ctrl+-)")
+        self.fit_btn.setToolTip("Fit to window (Ctrl+0)")
+        
+        # Connect signals
+        self.zoom_in_btn.clicked.connect(self.zoom_in)
+        self.zoom_out_btn.clicked.connect(self.zoom_out)
+        self.fit_btn.clicked.connect(self.fit_to_window)
+        
+        # Style buttons to match main window
+        button_style = """
+            QPushButton {
+                padding: 6px 12px;
+                min-width: 80px;
+            }
+            QPushButton:hover {
+                background-color: #E0E0E0;
+            }
+            QPushButton:pressed {
+                background-color: #D0D0D0;
+            }
+        """
+        self.zoom_in_btn.setStyleSheet(button_style)
+        self.zoom_out_btn.setStyleSheet(button_style)
+        self.fit_btn.setStyleSheet(button_style)
+        
+        # Create button layout with spacing
         btn_layout = QHBoxLayout()
-        btn_layout.addWidget(zoom_in_btn)
-        btn_layout.addWidget(zoom_out_btn)
-        btn_layout.addWidget(fit_btn)
+        btn_layout.setSpacing(8)
+        btn_layout.setContentsMargins(8, 8, 8, 8)
+        btn_layout.addWidget(self.zoom_in_btn)
+        btn_layout.addWidget(self.zoom_out_btn)
+        btn_layout.addWidget(self.fit_btn)
+        btn_layout.addStretch()  # Push buttons to the left
+        
+        # Add zoom level label
+        self.zoom_label = QLabel("100%")
+        self.zoom_label.setStyleSheet("padding: 6px; color: #666;")
+        btn_layout.addWidget(self.zoom_label)
 
         self.layout = QVBoxLayout()
         self.layout.addLayout(btn_layout)
@@ -109,6 +96,9 @@ class SvgDisplay(QDialog):
 
         if initial_path and os.path.exists(initial_path):
             self.load_svg(initial_path)
+        else:
+            # Initialize zoom label even if no SVG loaded
+            self._update_zoom_label()
 
         # Position window according to user preferences
         move_window_according_to_preferences(
@@ -127,6 +117,8 @@ class SvgDisplay(QDialog):
             self._zoom = 1.0
             self._fit_to_window = True
             self.update_image()
+            self._update_button_states()
+            self._update_zoom_label()
             self.show()
         else:
             print(f"SVG file not found: {absolute_path}")
@@ -135,6 +127,7 @@ class SvgDisplay(QDialog):
         super().resizeEvent(event)
         if self._fit_to_window:
             self.update_image()
+            self._update_zoom_label()
 
     def update_image(self):
         if self._fit_to_window:
@@ -165,15 +158,69 @@ class SvgDisplay(QDialog):
         self._fit_to_window = False
         self._zoom *= 1.2
         self.update_image()
+        self._update_button_states()
+        self._update_zoom_label()
 
     def zoom_out(self):
         self._fit_to_window = False
         self._zoom /= 1.2
         self.update_image()
+        self._update_button_states()
+        self._update_zoom_label()
 
     def fit_to_window(self):
         self._fit_to_window = True
         self.update_image()
+        self._update_button_states()
+        self._update_zoom_label()
+    
+    def _update_button_states(self):
+        """Update button appearance based on current state."""
+        if self._fit_to_window:
+            self.fit_btn.setStyleSheet("""
+                QPushButton {
+                    padding: 6px 12px;
+                    min-width: 80px;
+                    background-color: #D0E0F0;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #C0D0E0;
+                }
+                QPushButton:pressed {
+                    background-color: #B0C0D0;
+                }
+            """)
+        else:
+            self.fit_btn.setStyleSheet("""
+                QPushButton {
+                    padding: 6px 12px;
+                    min-width: 80px;
+                }
+                QPushButton:hover {
+                    background-color: #E0E0E0;
+                }
+                QPushButton:pressed {
+                    background-color: #D0D0D0;
+                }
+            """)
+    
+    def _update_zoom_label(self):
+        """Update zoom percentage display."""
+        if self._fit_to_window:
+            # Calculate actual scale when fitting
+            area_size = self.scroll_area.viewport().size()
+            if self._svg_size.width() > 0 and self._svg_size.height() > 0:
+                scale = min(
+                    area_size.width() / self._svg_size.width(),
+                    area_size.height() / self._svg_size.height(),
+                    1.0
+                )
+                self.zoom_label.setText(f"{int(scale * 100)}% (Fit)")
+            else:
+                self.zoom_label.setText("Fit")
+        else:
+            self.zoom_label.setText(f"{int(self._zoom * 100)}%")
 
     def center_scroll_area_on_svg(self):
         area = self.scroll_area
