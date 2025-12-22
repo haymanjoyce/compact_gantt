@@ -1,19 +1,62 @@
 from PyQt5.QtWidgets import QTableWidgetItem, QComboBox, QCheckBox, QWidget, QHBoxLayout, QMessageBox
 from PyQt5.QtCore import Qt, QDate
 from PyQt5.QtGui import QBrush
+from datetime import datetime
 import logging
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class NumericTableWidgetItem(QTableWidgetItem):
     def __lt__(self, other):
+        """Compare items numerically using UserRole data for proper numeric sorting."""
         self_data = self.data(Qt.UserRole)
-        other_data = other.data(Qt.UserRole)
+        other_data = other.data(Qt.UserRole) if other else None
+        
+        # Try numeric comparison if both have UserRole data
         if self_data is not None and other_data is not None:
             try:
                 return float(self_data) < float(other_data)
             except (TypeError, ValueError):
                 pass
+        
+        # Fallback: try to parse text as numbers
+        try:
+            self_text = self.text().strip()
+            other_text = other.text().strip() if other else ""
+            if self_text and other_text:
+                return float(self_text) < float(other_text)
+        except (ValueError, AttributeError):
+            pass
+        
+        # Final fallback: text comparison
+        return super().__lt__(other)
+
+class DateTableWidgetItem(QTableWidgetItem):
+    def __lt__(self, other):
+        """Compare items by date for proper chronological sorting."""
+        self_data = self.data(Qt.UserRole)
+        other_data = other.data(Qt.UserRole) if other else None
+        
+        # Try date comparison if both have UserRole data (datetime objects)
+        if self_data is not None and other_data is not None:
+            try:
+                if isinstance(self_data, datetime) and isinstance(other_data, datetime):
+                    return self_data < other_data
+            except (TypeError, ValueError):
+                pass
+        
+        # Fallback: try to parse text as dates (dd/mm/yyyy format)
+        try:
+            self_text = self.text().strip()
+            other_text = other.text().strip() if other else ""
+            if self_text and other_text:
+                self_date = datetime.strptime(self_text, "%d/%m/%Y")
+                other_date = datetime.strptime(other_text, "%d/%m/%Y")
+                return self_date < other_date
+        except (ValueError, AttributeError):
+            pass
+        
+        # Final fallback: text comparison
         return super().__lt__(other)
 
 class CheckBoxWidget(QWidget):
@@ -168,10 +211,11 @@ def add_row(table, table_key, table_configs, parent, id_field_name, row_index=No
             if defaults and col_idx < len(defaults):
                 default = defaults[col_idx]
 
-            # Set ID column
+            # Set ID column - use NumericTableWidgetItem for numeric sorting
             if col_idx == id_column:
-                id_item = QTableWidgetItem(str(next_id))
+                id_item = NumericTableWidgetItem(str(next_id))
                 id_item.setFlags(id_item.flags() & ~Qt.ItemIsEditable)
+                id_item.setData(Qt.UserRole, int(next_id))
                 table.setItem(row_index, col_idx, id_item)
             # Combo box column
             elif col_config and getattr(col_config, "widget_type", None) == "combo":
@@ -182,6 +226,31 @@ def add_row(table, table_key, table_configs, parent, id_field_name, row_index=No
                 if hasattr(parent, '_sync_data_if_not_initializing'):
                     combo.currentTextChanged.connect(parent._sync_data_if_not_initializing)
                 table.setCellWidget(row_index, col_idx, combo)
+            # Date column - check by column name for tasks table (Start Date, Finish Date)
+            elif header_text in ["Start Date", "Finish Date"]:
+                item = DateTableWidgetItem(str(default))
+                # Set UserRole with datetime object for sorting
+                try:
+                    if default and str(default).strip():
+                        date_obj = datetime.strptime(str(default).strip(), "%d/%m/%Y")
+                        item.setData(Qt.UserRole, date_obj)
+                    else:
+                        item.setData(Qt.UserRole, None)
+                except (ValueError, AttributeError):
+                    item.setData(Qt.UserRole, None)
+                table.setItem(row_index, col_idx, item)
+            # Numeric column - check by column name for tasks table (ID, Order, Row)
+            elif header_text in ["ID", "Order", "Row"]:
+                item = NumericTableWidgetItem(str(default))
+                # Set UserRole for numeric sorting
+                try:
+                    if header_text == "Order":
+                        item.setData(Qt.UserRole, float(str(default).strip()) if str(default).strip() else 0.0)
+                    else:  # ID or Row
+                        item.setData(Qt.UserRole, int(str(default).strip()) if str(default).strip() else (0 if header_text == "ID" else 1))
+                except (ValueError, AttributeError):
+                    item.setData(Qt.UserRole, 0.0 if header_text == "Order" else (0 if header_text == "ID" else 1))
+                table.setItem(row_index, col_idx, item)
             # Numeric column (optional: check for numeric type)
             elif col_config and getattr(col_config, "widget_type", None) == "numeric":
                 item = NumericTableWidgetItem(str(default))
