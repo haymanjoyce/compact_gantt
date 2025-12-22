@@ -418,14 +418,14 @@ class TasksTab(BaseTab):
                             self.tasks_table.setItem(row_idx, vis_col_idx, item)
 
         renumber_task_orders(self.tasks_table)
-        # Find the Order column for sorting
-        order_col_vis_idx = None
+        # Find the ID column for sorting (default sort by ID)
+        id_col_vis_idx = None
         for vis_idx, actual_idx in self._column_mapping.items():
-            if headers[actual_idx] == "Order":
-                order_col_vis_idx = vis_idx
+            if headers[actual_idx] == "ID":
+                id_col_vis_idx = vis_idx
                 break
-        if order_col_vis_idx is not None:
-            self.tasks_table.sortByColumn(order_col_vis_idx, Qt.AscendingOrder)
+        if id_col_vis_idx is not None:
+            self.tasks_table.sortByColumn(id_col_vis_idx, Qt.AscendingOrder)
         
         self._initializing = False
         self._sync_data()
