@@ -46,7 +46,12 @@ class BaseTab(QWidget):
         """Override this method to implement specific data synchronization logic."""
         try:
             self._sync_data_impl()
+        except ValueError as e:
+            # Validation errors are expected user input errors - show message but don't crash
+            logging.error(f"Error in _sync_data: {e}", exc_info=True)
+            QMessageBox.critical(self, "Error", f"Failed to save data: {e}")
         except Exception as e:
+            # Unexpected errors - log, show message, and re-raise for tests
             logging.error(f"Error in _sync_data: {e}", exc_info=True)
             QMessageBox.critical(self, "Error", f"Failed to save data: {e}")
             raise  # Re-raise the exception so tests can catch it

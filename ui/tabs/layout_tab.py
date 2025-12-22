@@ -196,10 +196,15 @@ class LayoutTab(BaseTab):
 
         for field_name, value in numeric_fields.items():
             try:
-                if not value.strip() or int(value) <= 0:
-                    raise ValueError(f"{field_name.replace('_', ' ').title()} must be a positive number")
+                # Check for empty string first
+                if not value.strip():
+                    raise ValueError(f"{field_name.replace('_', ' ').title()} must be a non-negative number")
+                # Then try to convert and validate
+                num_value = int(value)
+                if num_value < 0:
+                    raise ValueError(f"{field_name.replace('_', ' ').title()} must be a non-negative number")
             except ValueError as e:
-                if "must be a positive number" not in str(e):
+                if "must be a" not in str(e):
                     raise ValueError(f"{field_name.replace('_', ' ').title()} must be a valid number")
                 raise
 
