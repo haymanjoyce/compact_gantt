@@ -132,14 +132,13 @@ class TasksTab(BaseTab):
         self.detail_placement.setToolTip("Label placement (Inside or Outside task bar)")
         self.detail_placement.currentTextChanged.connect(self._on_detail_form_changed)
         
-        # Layout form fields
+        # Layout form fields vertically (like titles tab)
         layout.addWidget(label_label, 0, 0)
         layout.addWidget(self.detail_label, 0, 1)
-        layout.addWidget(placement_label, 0, 2)
-        layout.addWidget(self.detail_placement, 0, 3)
+        layout.addWidget(placement_label, 1, 0)
+        layout.addWidget(self.detail_placement, 1, 1)
         
         layout.setColumnStretch(1, 1)
-        layout.setColumnStretch(3, 1)
         
         group.setLayout(layout)
         return group
