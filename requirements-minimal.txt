@@ -6,4 +6,7 @@ PyQt5-stubs==5.15.6.0
 PyQt5_sip==12.17.0
 
 # SVG Generation
-svgwrite==1.4.3 
+svgwrite==1.4.3
+
+# Excel Import/Export
+openpyxl==3.1.2

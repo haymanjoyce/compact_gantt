@@ -7,6 +7,7 @@ from .tabs.layout_tab import LayoutTab
 from .tabs.tasks_tab import TasksTab
 from .tabs.placeholder_tab import PlaceholderTab
 from repositories.project_repository import ProjectRepository
+from repositories.excel_repository import ExcelRepository
 from models.project import ProjectData  # Import here to avoid circular import
 from ui.window_utils import move_window_according_to_preferences
 from .tabs.windows_tab import WindowsTab
@@ -26,6 +27,7 @@ class MainWindow(QMainWindow):
         self.project_data = project_data  # Use passed project_data instance
         self.app_config = AppConfig()  # Initialize centralized config
         self.repository = ProjectRepository()
+        self.excel_repository = ExcelRepository()
         self.svg_display = svg_display  # Reference to SVG display window
         self.resize(self.app_config.general.data_entry_width, self.app_config.general.data_entry_height)
         move_window_according_to_preferences(
@@ -40,14 +42,25 @@ class MainWindow(QMainWindow):
         # Create menu bar
         self.menu_bar = self.menuBar()
         file_menu = self.menu_bar.addMenu("File")
-        self.save_action = QAction("Save Project", self)
+        self.save_action = QAction("Save Project (JSON)", self)
         self.save_action.setShortcut("Ctrl+S")
         self.save_action.triggered.connect(self.save_to_json)
         file_menu.addAction(self.save_action)
-        self.load_action = QAction("Load Project", self)
+        
+        self.save_excel_action = QAction("Save Project (Excel)", self)
+        self.save_excel_action.triggered.connect(self.save_to_excel)
+        file_menu.addAction(self.save_excel_action)
+        
+        file_menu.addSeparator()
+        
+        self.load_action = QAction("Load Project (JSON)", self)
         self.load_action.setShortcut("Ctrl+O")
         self.load_action.triggered.connect(self.load_from_json)
         file_menu.addAction(self.load_action)
+        
+        self.load_excel_action = QAction("Load Project (Excel)", self)
+        self.load_excel_action.triggered.connect(self.load_from_excel)
+        file_menu.addAction(self.load_excel_action)
 
         # Create central widget to hold everything
         central_widget = QWidget()
@@ -138,9 +151,47 @@ class MainWindow(QMainWindow):
                 QMessageBox.critical(self, "Error", f"Error loading JSON: {e}")
                 self.status_bar.showMessage("Error loading project")
 
-    def _emit_data_updated(self):
-        """Only called when Update Image button is clicked"""
-        # Sync all tabs to ensure project_data is up to date
+    def save_to_excel(self):
+        file_path, _ = QFileDialog.getSaveFileName(self, "Save Project as Excel", "", "Excel Files (*.xlsx)")
+        if file_path:
+            try:
+                # Ensure file has .xlsx extension
+                if not file_path.endswith('.xlsx'):
+                    file_path += '.xlsx'
+                
+                # Sync all tabs before saving
+                self._sync_all_tabs()
+                
+                self.excel_repository.save(file_path, self.project_data)
+                QMessageBox.information(self, "Success", "Project saved to Excel successfully!")
+                self.status_bar.showMessage("Project saved to Excel successfully")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Error saving Excel: {e}")
+                self.status_bar.showMessage("Error saving project to Excel")
+                logging.error(f"Error saving to Excel: {e}", exc_info=True)
+
+    def load_from_excel(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, "Open Project from Excel", "", "Excel Files (*.xlsx)")
+        if file_path:
+            try:
+                loaded_project = self.excel_repository.load(file_path, ProjectData)
+                self.project_data = loaded_project  # Use the loaded instance
+
+                # Re-create all tabs with the new project_data
+                self._create_all_tabs()
+                self.tab_widget.clear()
+                self._add_all_tabs()
+
+                self.data_updated.emit(self.project_data.to_json())
+                QMessageBox.information(self, "Success", "Project loaded from Excel successfully!")
+                self.status_bar.showMessage("Project loaded from Excel successfully")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Error loading Excel: {e}")
+                self.status_bar.showMessage("Error loading project from Excel")
+                logging.error(f"Error loading from Excel: {e}", exc_info=True)
+
+    def _sync_all_tabs(self):
+        """Sync all tabs to ensure project_data is up to date."""
         try:
             if hasattr(self.layout_tab, '_sync_data'):
                 self.layout_tab._sync_data()
@@ -157,6 +208,11 @@ class MainWindow(QMainWindow):
         except Exception as e:
             logging.error(f"Error syncing tab data: {e}", exc_info=True)
             # Continue anyway - emit with whatever data we have
+
+    def _emit_data_updated(self):
+        """Only called when Update Image button is clicked"""
+        # Sync all tabs to ensure project_data is up to date
+        self._sync_all_tabs()
         
         self.data_updated.emit(self.project_data.to_json())
 
