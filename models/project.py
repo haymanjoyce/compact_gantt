@@ -154,13 +154,13 @@ class ProjectData:
                 new_links = []
                 for row_idx, row in enumerate(data, 1):
                     try:
-                        # Skip empty rows - now expects: [ID, From Task ID, To Task ID, Valid]
-                        if not row or len(row) < 4:
+                        # Skip empty rows - now expects: [ID, From Task ID, From Task Name, To Task ID, To Task Name, Valid]
+                        if not row or len(row) < 6:
                             continue
                         
-                        # Extract fields (ID is at index 0, From Task ID at index 1, To Task ID at index 2)
+                        # Extract fields (ID at index 0, From Task ID at index 1, To Task ID at index 3)
                         from_task_id_str = str(row[1]).strip() if len(row) > 1 else ""
-                        to_task_id_str = str(row[2]).strip() if len(row) > 2 else ""
+                        to_task_id_str = str(row[3]).strip() if len(row) > 3 else ""
                         
                         # Skip if either ID is empty or invalid
                         from_task_id = safe_int(from_task_id_str)
@@ -169,13 +169,10 @@ class ProjectData:
                         if from_task_id <= 0 or to_task_id <= 0:
                             # Invalid IDs - set Valid to "No" but still save the link
                             valid_status = "No"
-                            if len(row) >= 4:
-                                row[3] = valid_status  # Valid is at index 3
-                            else:
-                                # Ensure row has 4 elements
-                                while len(row) < 4:
-                                    row.append("")
-                                row[3] = valid_status
+                            # Ensure row has 6 elements: [ID, From Task ID, From Task Name, To Task ID, To Task Name, Valid]
+                            while len(row) < 6:
+                                row.append("")
+                            row[5] = valid_status  # Valid is at index 5
                             new_links.append(row)
                             continue
                         
@@ -192,13 +189,10 @@ class ProjectData:
                         if not from_task or not to_task:
                             # Task not found - set Valid to "No" but still save the link
                             valid_status = "No"
-                            if len(row) >= 4:
-                                row[3] = valid_status  # Valid is at index 3
-                            else:
-                                # Ensure row has 4 elements
-                                while len(row) < 4:
-                                    row.append("")
-                                row[3] = valid_status
+                            # Ensure row has 6 elements: [ID, From Task ID, From Task Name, To Task ID, To Task Name, Valid]
+                            while len(row) < 6:
+                                row.append("")
+                            row[5] = valid_status  # Valid is at index 5
                             new_links.append(row)
                             continue
                         
@@ -229,14 +223,12 @@ class ProjectData:
                                 # Invalid date format - set to "No"
                                 valid_status = "No"
                         
-                        # Update or add Valid field (at index 3)
-                        if len(row) >= 4:
-                            row[3] = valid_status
-                        else:
-                            # Ensure row has 4 elements: [ID, From Task ID, To Task ID, Valid]
-                            while len(row) < 4:
-                                row.append("")
-                            row[3] = valid_status
+                        # Update or add Valid field (at index 5)
+                        # Ensure row has 6 elements: [ID, From Task ID, From Task Name, To Task ID, To Task Name, Valid]
+                        while len(row) < 6:
+                            row.append("")
+                        row[5] = valid_status  # Valid is at index 5
+                        # Task names will be updated in get_table_data, so we keep them as-is here
                         
                         # Link is saved regardless of validity
                         new_links.append(row)
@@ -261,24 +253,47 @@ class ProjectData:
                     t.label_hide, t.label_placement]
                    for t in self.tasks]
         elif key == "links":
-            # Ensure all links have 4 elements: [ID, From Task ID, To Task ID, Valid]
+            # Create a mapping of task_id to task_name for quick lookup
+            task_name_map = {task.task_id: task.task_name for task in self.tasks}
+            
+            # Ensure all links have 6 elements: [ID, From Task ID, From Task Name, To Task ID, To Task Name, Valid]
             result = []
             for link in getattr(self, key, []):
                 if len(link) >= 2:  # At minimum need From Task ID
-                    # Ensure all 4 fields exist
-                    if len(link) >= 4:
-                        result.append(link[:4])  # Take first 4 elements
+                    # Ensure all 6 fields exist
+                    if len(link) >= 6:
+                        # Update task names in case tasks have changed
+                        from_id = safe_int(link[1]) if len(link) > 1 else 0
+                        to_id = safe_int(link[3]) if len(link) > 3 else 0
+                        link[2] = task_name_map.get(from_id, "")  # From Task Name
+                        link[4] = task_name_map.get(to_id, "")   # To Task Name
+                        result.append(link[:6])
+                    elif len(link) >= 4:
+                        # Old format: [ID, From Task ID, To Task ID, Valid] - add names
+                        from_id = safe_int(link[1]) if len(link) > 1 else 0
+                        to_id = safe_int(link[2]) if len(link) > 2 else 0
+                        from_name = task_name_map.get(from_id, "")
+                        to_name = task_name_map.get(to_id, "")
+                        result.append([link[0], link[1], from_name, link[2], to_name, link[3] if len(link) > 3 else "Yes"])
                     elif len(link) == 3:
-                        # Old format without ID - generate one
+                        # Old format without ID - generate one and add names
                         max_id = max([int(l[0]) for l in result if len(l) > 0 and l[0].isdigit()], default=0) if result else 0
-                        result.append([str(max_id + 1), link[0], link[1], link[2] if len(link) > 2 else "Yes"])
+                        from_id = safe_int(link[0])
+                        to_id = safe_int(link[1])
+                        from_name = task_name_map.get(from_id, "")
+                        to_name = task_name_map.get(to_id, "")
+                        result.append([str(max_id + 1), link[0], from_name, link[1], to_name, link[2] if len(link) > 2 else "Yes"])
                     elif len(link) == 2:
-                        # Old format without ID and Valid - generate both
+                        # Old format without ID and Valid - generate both and add names
                         max_id = max([int(l[0]) for l in result if len(l) > 0 and l[0].isdigit()], default=0) if result else 0
-                        result.append([str(max_id + 1), link[0], link[1], "Yes"])
+                        from_id = safe_int(link[0])
+                        to_id = safe_int(link[1])
+                        from_name = task_name_map.get(from_id, "")
+                        to_name = task_name_map.get(to_id, "")
+                        result.append([str(max_id + 1), link[0], from_name, link[1], to_name, "Yes"])
                     else:
                         # Default with ID
                         max_id = max([int(l[0]) for l in result if len(l) > 0 and l[0].isdigit()], default=0) if result else 0
-                        result.append([str(max_id + 1), "", "", "Yes"])
+                        result.append([str(max_id + 1), "", "", "", "", "Yes"])
             return result
         return getattr(self, key, [])

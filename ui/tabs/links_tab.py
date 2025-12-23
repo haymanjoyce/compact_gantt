@@ -2,6 +2,7 @@ from PyQt5.QtWidgets import (QWidget, QTableWidget, QVBoxLayout, QPushButton,
                            QHBoxLayout, QHeaderView, QTableWidgetItem, 
                            QMessageBox, QGroupBox, QSizePolicy, QComboBox)
 from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtGui import QBrush, QColor
 from typing import List, Dict, Any
 import logging
 from ui.table_utils import NumericTableWidgetItem, add_row, remove_row, CheckBoxWidget, extract_table_data, highlight_table_errors
@@ -11,6 +12,9 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 class LinksTab(BaseTab):
     data_updated = pyqtSignal(dict)
+    
+    # Read-only cell background color (light gray)
+    READ_ONLY_BG = QColor(240, 240, 240)
 
     def __init__(self, project_data, app_config):
         self.table_config = app_config.get_table_config("links")
@@ -52,11 +56,21 @@ class LinksTab(BaseTab):
         self.links_table.setHorizontalHeaderLabels(headers)
         
         # Table styling
-        self.links_table.setAlternatingRowColors(True)
+        self.links_table.setAlternatingRowColors(False)  # Disabled to avoid conflict with read-only cell backgrounds
         self.links_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.links_table.setSelectionMode(QTableWidget.ExtendedSelection)
         self.links_table.setShowGrid(True)
         self.links_table.verticalHeader().setVisible(False)
+        
+        # Add bottom border to header row
+        self.links_table.setStyleSheet("""
+            QHeaderView::section {
+                border-bottom: 1px solid #c0c0c0;
+                border-top: none;
+                border-left: none;
+                border-right: none;
+            }
+        """)
         
         # Column sizing
         header = self.links_table.horizontalHeader()
@@ -64,8 +78,10 @@ class LinksTab(BaseTab):
         self.links_table.setColumnWidth(0, 50)
         header.setSectionResizeMode(1, QHeaderView.ResizeToContents)  # ID
         header.setSectionResizeMode(2, QHeaderView.ResizeToContents)  # From Task ID
-        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)  # To Task ID
-        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)  # Valid
+        header.setSectionResizeMode(3, QHeaderView.Stretch)  # From Task Name
+        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)  # To Task ID
+        header.setSectionResizeMode(5, QHeaderView.Stretch)  # To Task Name
+        header.setSectionResizeMode(6, QHeaderView.ResizeToContents)  # Valid
         
         # Enable horizontal scroll bar
         self.links_table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
@@ -122,12 +138,12 @@ class LinksTab(BaseTab):
 
             if row_idx < len(table_data):
                 row_data = table_data[row_idx]
-                # row_data structure: [ID, From Task ID, To Task ID, Valid]
+                # row_data structure: [ID, From Task ID, From Task Name, To Task ID, To Task Name, Valid]
                 for col_idx in range(1, len(headers)):  # Skip Select column (index 0)
                     col_config = self.table_config.columns[col_idx]
                     col_name = col_config.name
                     
-                    # Get value from row_data (index 0 = ID, index 1 = From Task ID, index 2 = To Task ID, index 3 = Valid)
+                    # Get value from row_data (index 0 = ID, index 1 = From Task ID, index 2 = From Task Name, index 3 = To Task ID, index 4 = To Task Name, index 5 = Valid)
                     value_idx = col_idx - 1  # Adjust for missing Select column in row_data
                     value = row_data[value_idx] if value_idx < len(row_data) else ""
                     
@@ -146,6 +162,7 @@ class LinksTab(BaseTab):
                         if col_name == "ID":
                             item = NumericTableWidgetItem(str(value))
                             item.setFlags(item.flags() & ~Qt.ItemIsEditable)  # Make read-only
+                            item.setBackground(QBrush(self.READ_ONLY_BG))  # Gray background
                             try:
                                 item.setData(Qt.UserRole, int(str(value).strip()) if str(value).strip() else 0)
                             except (ValueError, AttributeError):
@@ -157,10 +174,17 @@ class LinksTab(BaseTab):
                                 item.setData(Qt.UserRole, int(str(value).strip()) if str(value).strip() else 0)
                             except (ValueError, AttributeError):
                                 item.setData(Qt.UserRole, 0)
+                        # Name columns (From Task Name, To Task Name) - read-only with truncation
+                        elif col_name in ["From Task Name", "To Task Name"]:
+                            item = QTableWidgetItem(self._truncate_text(str(value)))
+                            item.setFlags(item.flags() & ~Qt.ItemIsEditable)  # Make read-only
+                            item.setBackground(QBrush(self.READ_ONLY_BG))  # Gray background
+                            item.setToolTip(str(value))  # Show full text in tooltip
                         # Valid column - read-only text
                         elif col_name == "Valid":
                             item = QTableWidgetItem(str(value) if value else "Yes")
                             item.setFlags(item.flags() & ~Qt.ItemIsEditable)  # Make read-only
+                            item.setBackground(QBrush(self.READ_ONLY_BG))  # Gray background
                         else:
                             item = QTableWidgetItem(str(value))
                         self.links_table.setItem(row_idx, col_idx, item)
@@ -180,15 +204,22 @@ class LinksTab(BaseTab):
                         if col_name == "ID":
                             item = NumericTableWidgetItem("")
                             item.setFlags(item.flags() & ~Qt.ItemIsEditable)  # Make read-only
+                            item.setBackground(QBrush(self.READ_ONLY_BG))  # Gray background
                             item.setData(Qt.UserRole, 0)
                         # Numeric columns - create blank editable items
                         elif col_name in ["From Task ID", "To Task ID"]:
                             item = NumericTableWidgetItem("")
                             item.setData(Qt.UserRole, 0)
+                        # Name columns - read-only with empty text
+                        elif col_name in ["From Task Name", "To Task Name"]:
+                            item = QTableWidgetItem("")
+                            item.setFlags(item.flags() & ~Qt.ItemIsEditable)  # Make read-only
+                            item.setBackground(QBrush(self.READ_ONLY_BG))  # Gray background
                         # Valid column - read-only text with default "Yes"
                         elif col_name == "Valid":
                             item = QTableWidgetItem("Yes")
                             item.setFlags(item.flags() & ~Qt.ItemIsEditable)  # Make read-only
+                            item.setBackground(QBrush(self.READ_ONLY_BG))  # Gray background
                         else:
                             item = QTableWidgetItem("")
                         self.links_table.setItem(row_idx, col_idx, item)
@@ -207,7 +238,7 @@ class LinksTab(BaseTab):
         # Extract table data (excludes checkbox column)
         data = extract_table_data(self.links_table)
         
-        # data structure: [[ID, From Task ID, To Task ID, Valid], ...]
+        # data structure: [[ID, From Task ID, From Task Name, To Task ID, To Task Name, Valid], ...]
         # Note: Valid field will be recalculated in update_from_table
         errors = self.project_data.update_from_table("links", data)
         
@@ -218,21 +249,33 @@ class LinksTab(BaseTab):
         # Don't emit data_updated here - chart will update when user clicks "Update Chart" button
         # This matches the behavior of the tasks tab
     
+    def _truncate_text(self, text: str, max_length: int = 50) -> str:
+        """Truncate text to max_length and add ellipsis if needed."""
+        if not text:
+            return ""
+        if len(text) <= max_length:
+            return text
+        return text[:max_length - 3] + "..."
+    
     def _update_valid_column_only(self):
-        """Update only the Valid column cells without reloading the entire table."""
+        """Update only the Valid column and task name columns without reloading the entire table."""
         # Get updated data from project_data
         table_data = self.project_data.get_table_data("links")
-        valid_col_idx = 4  # Valid is column 4 (after Select, ID, From Task ID, To Task ID)
+        valid_col_idx = 6  # Valid is column 6 (after Select, ID, From Task ID, From Task Name, To Task ID, To Task Name)
+        from_name_col_idx = 3  # From Task Name is column 3
+        to_name_col_idx = 5  # To Task Name is column 5
         
         # Block signals to prevent recursive updates
         self.links_table.blockSignals(True)
         
-        # Update Valid column for each row
+        # Update Valid column and task name columns for each row
         for row_idx in range(self.links_table.rowCount()):
             if row_idx < len(table_data):
-                # Get Valid value from updated data
+                # Get values from updated data
                 row_data = table_data[row_idx]
-                valid_value = row_data[3] if len(row_data) > 3 else "Yes"  # Valid is at index 3 in row_data
+                valid_value = row_data[5] if len(row_data) > 5 else "Yes"  # Valid is at index 5 in row_data
+                from_name = row_data[2] if len(row_data) > 2 else ""  # From Task Name is at index 2
+                to_name = row_data[4] if len(row_data) > 4 else ""  # To Task Name is at index 4
                 
                 # Update the Valid cell
                 item = self.links_table.item(row_idx, valid_col_idx)
@@ -242,7 +285,32 @@ class LinksTab(BaseTab):
                     # Create item if it doesn't exist
                     item = QTableWidgetItem(valid_value)
                     item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                    item.setBackground(QBrush(self.READ_ONLY_BG))  # Gray background
                     self.links_table.setItem(row_idx, valid_col_idx, item)
+                
+                # Update From Task Name cell
+                from_name_item = self.links_table.item(row_idx, from_name_col_idx)
+                if from_name_item:
+                    from_name_item.setText(self._truncate_text(from_name))
+                    from_name_item.setToolTip(from_name)
+                elif from_name:
+                    from_name_item = QTableWidgetItem(self._truncate_text(from_name))
+                    from_name_item.setFlags(from_name_item.flags() & ~Qt.ItemIsEditable)
+                    from_name_item.setBackground(QBrush(self.READ_ONLY_BG))  # Gray background
+                    from_name_item.setToolTip(from_name)
+                    self.links_table.setItem(row_idx, from_name_col_idx, from_name_item)
+                
+                # Update To Task Name cell
+                to_name_item = self.links_table.item(row_idx, to_name_col_idx)
+                if to_name_item:
+                    to_name_item.setText(self._truncate_text(to_name))
+                    to_name_item.setToolTip(to_name)
+                elif to_name:
+                    to_name_item = QTableWidgetItem(self._truncate_text(to_name))
+                    to_name_item.setFlags(to_name_item.flags() & ~Qt.ItemIsEditable)
+                    to_name_item.setBackground(QBrush(self.READ_ONLY_BG))  # Gray background
+                    to_name_item.setToolTip(to_name)
+                    self.links_table.setItem(row_idx, to_name_col_idx, to_name_item)
         
         self.links_table.blockSignals(False)
 

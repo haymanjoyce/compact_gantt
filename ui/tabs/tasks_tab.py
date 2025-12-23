@@ -2,10 +2,13 @@ from PyQt5.QtWidgets import (QWidget, QTableWidget, QVBoxLayout, QPushButton,
                            QHBoxLayout, QComboBox, QHeaderView, QTableWidgetItem, 
                            QMessageBox, QGroupBox, QSizePolicy, QLabel, QGridLayout)
 from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QBrush
+from PyQt5.QtGui import QBrush, QColor
 from typing import List, Dict, Any
 from datetime import datetime
 import logging
+
+# Read-only cell background color (light gray)
+READ_ONLY_BG = QColor(240, 240, 240)
 from ui.table_utils import NumericTableWidgetItem, DateTableWidgetItem, add_row, remove_row, renumber_task_orders, CheckBoxWidget, highlight_table_errors, extract_table_data
 from .base_tab import BaseTab
 
@@ -70,11 +73,21 @@ class TasksTab(BaseTab):
         self._reverse_column_mapping = {actual_idx: vis_idx for vis_idx, actual_idx in enumerate(visible_indices)}
         
         # Enhanced table styling
-        self.tasks_table.setAlternatingRowColors(True)
+        self.tasks_table.setAlternatingRowColors(False)  # Disabled to avoid conflict with read-only cell backgrounds
         self.tasks_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.tasks_table.setSelectionMode(QTableWidget.SingleSelection)  # Single selection for detail form
         self.tasks_table.setShowGrid(True)
         self.tasks_table.verticalHeader().setVisible(False)
+        
+        # Add bottom border to header row
+        self.tasks_table.setStyleSheet("""
+            QHeaderView::section {
+                border-bottom: 1px solid #c0c0c0;
+                border-top: none;
+                border-left: none;
+                border-right: none;
+            }
+        """)
         
         # Column sizing
         header = self.tasks_table.horizontalHeader()
@@ -231,6 +244,9 @@ class TasksTab(BaseTab):
                 item.setData(Qt.UserRole, None)
         # Update UserRole for numeric columns (ID, Order, Row)
         elif actual_col_idx == 1:  # Task ID
+            # Ensure Task ID is read-only with gray background
+            item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+            item.setBackground(QBrush(READ_ONLY_BG))  # Gray background
             try:
                 val_str = item.text().strip()
                 item.setData(Qt.UserRole, int(val_str) if val_str else 0)
@@ -331,6 +347,7 @@ class TasksTab(BaseTab):
                         
                         if actual_col_idx == 1:  # Task ID read-only
                             item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                            item.setBackground(QBrush(READ_ONLY_BG))  # Gray background
                             # Ensure UserRole is set for numeric sorting
                             try:
                                 item.setData(Qt.UserRole, int(str(value).strip()) if str(value).strip() else 0)
@@ -397,6 +414,7 @@ class TasksTab(BaseTab):
                             
                             if actual_col_idx == 1:  # Task ID read-only
                                 item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                                item.setBackground(QBrush(READ_ONLY_BG))  # Gray background
                                 # Ensure UserRole is set for numeric sorting
                                 try:
                                     item.setData(Qt.UserRole, int(str(default).strip()) if str(default).strip() else 0)
@@ -426,6 +444,9 @@ class TasksTab(BaseTab):
                 break
         if id_col_vis_idx is not None:
             self.tasks_table.sortByColumn(id_col_vis_idx, Qt.AscendingOrder)
+        
+        # Ensure all read-only cells have proper styling
+        self._ensure_read_only_styling()
         
         self._initializing = False
         self._sync_data()
@@ -529,6 +550,21 @@ class TasksTab(BaseTab):
         if not self._initializing:
             logging.debug("Calling _sync_data from itemChanged")
             self._sync_data()
+    
+    def _ensure_read_only_styling(self):
+        """Ensure all read-only cells (Task ID) have proper styling."""
+        id_col_vis_idx = None
+        for vis_idx, act_idx in self._column_mapping.items():
+            if act_idx == 1:  # Task ID column
+                id_col_vis_idx = vis_idx
+                break
+        
+        if id_col_vis_idx is not None:
+            for row in range(self.tasks_table.rowCount()):
+                item = self.tasks_table.item(row, id_col_vis_idx)
+                if item:
+                    item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                    item.setBackground(QBrush(READ_ONLY_BG))
 
     def _extract_table_data(self) -> List[List[str]]:
         # This is now handled in _sync_data_impl
@@ -690,6 +726,7 @@ class TasksTab(BaseTab):
                         
                         if actual_col_idx == 1:  # Task ID read-only
                             item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                            item.setBackground(QBrush(READ_ONLY_BG))  # Gray background
                             try:
                                 item.setData(Qt.UserRole, int(str(value).strip()) if str(value).strip() else 0)
                             except (ValueError, AttributeError):

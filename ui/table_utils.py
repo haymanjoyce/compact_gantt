@@ -1,8 +1,11 @@
 from PyQt5.QtWidgets import QTableWidgetItem, QComboBox, QCheckBox, QWidget, QHBoxLayout, QMessageBox
 from PyQt5.QtCore import Qt, QDate
-from PyQt5.QtGui import QBrush
+from PyQt5.QtGui import QBrush, QColor
 from datetime import datetime
 import logging
+
+# Read-only cell background color (light gray)
+READ_ONLY_BG = QColor(240, 240, 240)
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -197,20 +200,22 @@ def add_row(table, table_key, table_configs, parent, id_field_name, row_index=No
             # For links, we want blank From/To Task IDs but Valid should default to "Yes"
             # ID (index 0) is already set by default_generator
             if is_links_table:
-                if len(defaults) >= 4:
+                if len(defaults) >= 6:
                     defaults[1] = ""  # From Task ID - blank (index 1)
-                    defaults[2] = ""  # To Task ID - blank (index 2)
-                    defaults[3] = "Yes"  # Valid - default to "Yes" (index 3)
+                    defaults[2] = ""  # From Task Name - blank (index 2, will be populated from task lookup)
+                    defaults[3] = ""  # To Task ID - blank (index 3)
+                    defaults[4] = ""  # To Task Name - blank (index 4, will be populated from task lookup)
+                    defaults[5] = "Yes"  # Valid - default to "Yes" (index 5)
                     # ID (index 0) is already set by default_generator
                 else:
-                    # Ensure we have 4 elements: [ID, From, To, Valid]
-                    defaults = [str(next_id), "", "", "Yes"]
+                    # Ensure we have 6 elements: [ID, From Task ID, From Task Name, To Task ID, To Task Name, Valid]
+                    defaults = [str(next_id), "", "", "", "", "Yes"]
         else:
             # If no generator, use empty strings except Valid column for links
             defaults = [""] * (table.columnCount() - 1)  # Exclude checkbox column
             # Set Valid column default to "Yes" for links
-            if is_links_table and len(defaults) >= 3:
-                defaults[2] = "Yes"  # Index 2 in defaults (0=From, 1=To, 2=Valid)
+            if is_links_table and len(defaults) >= 6:
+                defaults[5] = "Yes"  # Index 5 in defaults (0=ID, 1=From Task ID, 2=From Task Name, 3=To Task ID, 4=To Task Name, 5=Valid)
 
         # Set default values for each column (skip checkbox column)
         for col_idx in range(1, table.columnCount()):
@@ -234,10 +239,12 @@ def add_row(table, table_key, table_configs, parent, id_field_name, row_index=No
                 if is_links_table:
                     id_item = NumericTableWidgetItem(str(next_id))
                     id_item.setFlags(id_item.flags() & ~Qt.ItemIsEditable)  # Make read-only
+                    id_item.setBackground(QBrush(READ_ONLY_BG))  # Gray background
                     id_item.setData(Qt.UserRole, int(next_id))
                 else:
                     id_item = NumericTableWidgetItem(str(next_id))
                     id_item.setFlags(id_item.flags() & ~Qt.ItemIsEditable)
+                    id_item.setBackground(QBrush(READ_ONLY_BG))  # Gray background
                     id_item.setData(Qt.UserRole, int(next_id))
                 table.setItem(row_index, col_idx, id_item)
             # Combo box column
@@ -253,6 +260,7 @@ def add_row(table, table_key, table_configs, parent, id_field_name, row_index=No
             elif is_links_table and header_text == "Valid":
                 item = QTableWidgetItem(str(default) if default else "Yes")
                 item.setFlags(item.flags() & ~Qt.ItemIsEditable)  # Make read-only
+                item.setBackground(QBrush(READ_ONLY_BG))  # Gray background
                 table.setItem(row_index, col_idx, item)
             # Date column - check by column name for tasks table (Start Date, Finish Date)
             elif header_text in ["Start Date", "Finish Date"]:
@@ -286,6 +294,12 @@ def add_row(table, table_key, table_configs, parent, id_field_name, row_index=No
                     item.setData(Qt.UserRole, int(str(default).strip()) if str(default).strip() else 0)
                 except (ValueError, AttributeError):
                     item.setData(Qt.UserRole, 0)
+                table.setItem(row_index, col_idx, item)
+            # Name columns for links (From Task Name, To Task Name) - read-only text
+            elif is_links_table and header_text in ["From Task Name", "To Task Name"]:
+                item = QTableWidgetItem(str(default) if default else "")
+                item.setFlags(item.flags() & ~Qt.ItemIsEditable)  # Make read-only
+                item.setBackground(QBrush(READ_ONLY_BG))  # Gray background
                 table.setItem(row_index, col_idx, item)
             # Numeric column (optional: check for numeric type)
             elif col_config and getattr(col_config, "widget_type", None) == "numeric":
