@@ -1,6 +1,7 @@
 from typing import List, Dict, Any, Set
 from models import FrameConfig, Task
 from validators import DataValidator
+from datetime import datetime
 import logging
 from config.app_config import AppConfig
 from utils.conversion import safe_int, safe_float, display_to_internal_date, internal_to_display_date
@@ -148,6 +149,102 @@ class ProjectData:
                         errors.append(f"Row {row_idx}: {str(e)}")
                 if not errors:
                     self.tasks = new_tasks
+            elif key == "links":
+                # Validate links: check Finish-to-Start constraint and set Valid field
+                new_links = []
+                for row_idx, row in enumerate(data, 1):
+                    try:
+                        # Skip empty rows - now expects: [ID, From Task ID, To Task ID, Valid]
+                        if not row or len(row) < 4:
+                            continue
+                        
+                        # Extract fields (ID is at index 0, From Task ID at index 1, To Task ID at index 2)
+                        from_task_id_str = str(row[1]).strip() if len(row) > 1 else ""
+                        to_task_id_str = str(row[2]).strip() if len(row) > 2 else ""
+                        
+                        # Skip if either ID is empty or invalid
+                        from_task_id = safe_int(from_task_id_str)
+                        to_task_id = safe_int(to_task_id_str)
+                        
+                        if from_task_id <= 0 or to_task_id <= 0:
+                            # Invalid IDs - set Valid to "No" but still save the link
+                            valid_status = "No"
+                            if len(row) >= 4:
+                                row[3] = valid_status  # Valid is at index 3
+                            else:
+                                # Ensure row has 4 elements
+                                while len(row) < 4:
+                                    row.append("")
+                                row[3] = valid_status
+                            new_links.append(row)
+                            continue
+                        
+                        # Find the tasks to check their dates
+                        from_task = None
+                        to_task = None
+                        for task in self.tasks:
+                            if task.task_id == from_task_id:
+                                from_task = task
+                            if task.task_id == to_task_id:
+                                to_task = task
+                        
+                        # Validate that both tasks exist
+                        if not from_task or not to_task:
+                            # Task not found - set Valid to "No" but still save the link
+                            valid_status = "No"
+                            if len(row) >= 4:
+                                row[3] = valid_status  # Valid is at index 3
+                            else:
+                                # Ensure row has 4 elements
+                                while len(row) < 4:
+                                    row.append("")
+                                row[3] = valid_status
+                            new_links.append(row)
+                            continue
+                        
+                        # Validate Finish-to-Start constraint: To Task start date must be >= From Task finish date
+                        # For milestones, use the single date as both start and finish
+                        from_finish_date = from_task.finish_date
+                        if not from_finish_date:
+                            from_finish_date = from_task.start_date
+                        
+                        to_start_date = to_task.start_date
+                        if not to_start_date:
+                            to_start_date = to_task.finish_date
+                        
+                        # Determine validity
+                        valid_status = "Yes"
+                        if not from_finish_date or not to_start_date:
+                            # Missing dates - cannot validate, set to "No"
+                            valid_status = "No"
+                        else:
+                            try:
+                                from_finish = datetime.strptime(from_finish_date, "%Y-%m-%d")
+                                to_start = datetime.strptime(to_start_date, "%Y-%m-%d")
+                                
+                                # Check Finish-to-Start: target task must start on or after source task finishes
+                                if to_start < from_finish:
+                                    valid_status = "No"
+                            except (ValueError, TypeError):
+                                # Invalid date format - set to "No"
+                                valid_status = "No"
+                        
+                        # Update or add Valid field (at index 3)
+                        if len(row) >= 4:
+                            row[3] = valid_status
+                        else:
+                            # Ensure row has 4 elements: [ID, From Task ID, To Task ID, Valid]
+                            while len(row) < 4:
+                                row.append("")
+                            row[3] = valid_status
+                        
+                        # Link is saved regardless of validity
+                        new_links.append(row)
+                    except (IndexError, AttributeError) as e:
+                        errors.append(f"Row {row_idx}: {str(e)}")
+                
+                # Always update links (even if some are invalid)
+                self.links = new_links
             else:
                 setattr(self, key, data)
         except Exception as e:
@@ -163,4 +260,25 @@ class ProjectData:
                     internal_to_display_date(t.finish_date),  # Convert to display format
                     t.label_hide, t.label_placement]
                    for t in self.tasks]
+        elif key == "links":
+            # Ensure all links have 4 elements: [ID, From Task ID, To Task ID, Valid]
+            result = []
+            for link in getattr(self, key, []):
+                if len(link) >= 2:  # At minimum need From Task ID
+                    # Ensure all 4 fields exist
+                    if len(link) >= 4:
+                        result.append(link[:4])  # Take first 4 elements
+                    elif len(link) == 3:
+                        # Old format without ID - generate one
+                        max_id = max([int(l[0]) for l in result if len(l) > 0 and l[0].isdigit()], default=0) if result else 0
+                        result.append([str(max_id + 1), link[0], link[1], link[2] if len(link) > 2 else "Yes"])
+                    elif len(link) == 2:
+                        # Old format without ID and Valid - generate both
+                        max_id = max([int(l[0]) for l in result if len(l) > 0 and l[0].isdigit()], default=0) if result else 0
+                        result.append([str(max_id + 1), link[0], link[1], "Yes"])
+                    else:
+                        # Default with ID
+                        max_id = max([int(l[0]) for l in result if len(l) > 0 and l[0].isdigit()], default=0) if result else 0
+                        result.append([str(max_id + 1), "", "", "Yes"])
+            return result
         return getattr(self, key, [])

@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import (QWidget, QTableWidget, QVBoxLayout, QPushButton,
 from PyQt5.QtCore import Qt, pyqtSignal
 from typing import List, Dict, Any
 import logging
-from ui.table_utils import NumericTableWidgetItem, add_row, remove_row, CheckBoxWidget, extract_table_data
+from ui.table_utils import NumericTableWidgetItem, add_row, remove_row, CheckBoxWidget, extract_table_data, highlight_table_errors
 from .base_tab import BaseTab
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -28,7 +28,7 @@ class LinksTab(BaseTab):
         add_btn = QPushButton("Add Link")
         add_btn.setToolTip("Add a new link")
         add_btn.setMinimumWidth(120)
-        add_btn.clicked.connect(lambda: add_row(self.links_table, "links", self.app_config.tables, self, "From Task ID"))
+        add_btn.clicked.connect(lambda: add_row(self.links_table, "links", self.app_config.tables, self, "ID"))
         
         remove_btn = QPushButton("Remove Link")
         remove_btn.setToolTip("Remove selected link(s)")
@@ -62,8 +62,10 @@ class LinksTab(BaseTab):
         header = self.links_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.Fixed)  # Select
         self.links_table.setColumnWidth(0, 50)
-        header.setSectionResizeMode(1, QHeaderView.ResizeToContents)  # From Task ID
-        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)  # To Task ID
+        header.setSectionResizeMode(1, QHeaderView.ResizeToContents)  # ID
+        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)  # From Task ID
+        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)  # To Task ID
+        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)  # Valid
         
         # Enable horizontal scroll bar
         self.links_table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
@@ -90,8 +92,12 @@ class LinksTab(BaseTab):
         col = item.column()
         col_config = self.table_config.columns[col] if col < len(self.table_config.columns) else None
         
-        # Update UserRole for numeric columns (From Task ID, To Task ID)
-        if col_config and col_config.name in ["From Task ID", "To Task ID"]:
+        # Don't trigger sync for Valid or ID column changes (they're read-only and auto-calculated)
+        if col_config and col_config.name in ["Valid", "ID"]:
+            return
+        
+        # Update UserRole for numeric columns (ID, From Task ID, To Task ID)
+        if col_config and col_config.name in ["ID", "From Task ID", "To Task ID"]:
             try:
                 val_str = item.text().strip()
                 item.setData(Qt.UserRole, int(val_str) if val_str else 0)
@@ -116,19 +122,19 @@ class LinksTab(BaseTab):
 
             if row_idx < len(table_data):
                 row_data = table_data[row_idx]
-                # row_data structure: [From Task ID, To Task ID]
+                # row_data structure: [ID, From Task ID, To Task ID, Valid]
                 for col_idx in range(1, len(headers)):  # Skip Select column (index 0)
                     col_config = self.table_config.columns[col_idx]
                     col_name = col_config.name
                     
-                    # Get value from row_data (index 0 = From Task ID, index 1 = To Task ID)
+                    # Get value from row_data (index 0 = ID, index 1 = From Task ID, index 2 = To Task ID, index 3 = Valid)
                     value_idx = col_idx - 1  # Adjust for missing Select column in row_data
                     value = row_data[value_idx] if value_idx < len(row_data) else ""
                     
                     # Create appropriate widget/item based on column type
                     if col_config.widget_type == "combo":
                         combo = QComboBox()
-                        combo.addItems(col_config.options if hasattr(col_config, 'options') else [])
+                        combo.addItems(col_config.combo_items)
                         if value:
                             idx = combo.findText(str(value))
                             if idx >= 0:
@@ -136,13 +142,25 @@ class LinksTab(BaseTab):
                         combo.currentTextChanged.connect(self._sync_data_if_not_initializing)
                         self.links_table.setCellWidget(row_idx, col_idx, combo)
                     else:
+                        # ID column - read-only numeric
+                        if col_name == "ID":
+                            item = NumericTableWidgetItem(str(value))
+                            item.setFlags(item.flags() & ~Qt.ItemIsEditable)  # Make read-only
+                            try:
+                                item.setData(Qt.UserRole, int(str(value).strip()) if str(value).strip() else 0)
+                            except (ValueError, AttributeError):
+                                item.setData(Qt.UserRole, 0)
                         # Numeric columns (From Task ID, To Task ID)
-                        if col_name in ["From Task ID", "To Task ID"]:
+                        elif col_name in ["From Task ID", "To Task ID"]:
                             item = NumericTableWidgetItem(str(value))
                             try:
                                 item.setData(Qt.UserRole, int(str(value).strip()) if str(value).strip() else 0)
                             except (ValueError, AttributeError):
                                 item.setData(Qt.UserRole, 0)
+                        # Valid column - read-only text
+                        elif col_name == "Valid":
+                            item = QTableWidgetItem(str(value) if value else "Yes")
+                            item.setFlags(item.flags() & ~Qt.ItemIsEditable)  # Make read-only
                         else:
                             item = QTableWidgetItem(str(value))
                         self.links_table.setItem(row_idx, col_idx, item)
@@ -154,20 +172,29 @@ class LinksTab(BaseTab):
                     
                     if col_config.widget_type == "combo":
                         combo = QComboBox()
-                        combo.addItems(col_config.options if hasattr(col_config, 'options') else [])
+                        combo.addItems(col_config.combo_items)
                         combo.currentTextChanged.connect(self._sync_data_if_not_initializing)
                         self.links_table.setCellWidget(row_idx, col_idx, combo)
                     else:
+                        # ID column - will be set by add_row, but create placeholder
+                        if col_name == "ID":
+                            item = NumericTableWidgetItem("")
+                            item.setFlags(item.flags() & ~Qt.ItemIsEditable)  # Make read-only
+                            item.setData(Qt.UserRole, 0)
                         # Numeric columns - create blank editable items
-                        if col_name in ["From Task ID", "To Task ID"]:
+                        elif col_name in ["From Task ID", "To Task ID"]:
                             item = NumericTableWidgetItem("")
                             item.setData(Qt.UserRole, 0)
+                        # Valid column - read-only text with default "Yes"
+                        elif col_name == "Valid":
+                            item = QTableWidgetItem("Yes")
+                            item.setFlags(item.flags() & ~Qt.ItemIsEditable)  # Make read-only
                         else:
                             item = QTableWidgetItem("")
                         self.links_table.setItem(row_idx, col_idx, item)
         
-        # Sort by From Task ID by default
-        self.links_table.sortItems(1, Qt.AscendingOrder)  # Column 1 = From Task ID
+        # Sort by ID by default
+        self.links_table.sortItems(1, Qt.AscendingOrder)  # Column 1 = ID
         
         self._initializing = False
 
@@ -180,13 +207,42 @@ class LinksTab(BaseTab):
         # Extract table data (excludes checkbox column)
         data = extract_table_data(self.links_table)
         
-        # data structure: [[From Task ID, To Task ID], ...]
+        # data structure: [[ID, From Task ID, To Task ID, Valid], ...]
+        # Note: Valid field will be recalculated in update_from_table
         errors = self.project_data.update_from_table("links", data)
         
-        if errors:
-            # Highlight errors in table
-            highlight_table_errors(self.links_table, errors, self.table_config)
+        # Update Valid column for rows that have changed, without full reload
+        # This preserves user input in progress
+        self._update_valid_column_only()
         
         # Don't emit data_updated here - chart will update when user clicks "Update Chart" button
         # This matches the behavior of the tasks tab
+    
+    def _update_valid_column_only(self):
+        """Update only the Valid column cells without reloading the entire table."""
+        # Get updated data from project_data
+        table_data = self.project_data.get_table_data("links")
+        valid_col_idx = 4  # Valid is column 4 (after Select, ID, From Task ID, To Task ID)
+        
+        # Block signals to prevent recursive updates
+        self.links_table.blockSignals(True)
+        
+        # Update Valid column for each row
+        for row_idx in range(self.links_table.rowCount()):
+            if row_idx < len(table_data):
+                # Get Valid value from updated data
+                row_data = table_data[row_idx]
+                valid_value = row_data[3] if len(row_data) > 3 else "Yes"  # Valid is at index 3 in row_data
+                
+                # Update the Valid cell
+                item = self.links_table.item(row_idx, valid_col_idx)
+                if item:
+                    item.setText(valid_value)
+                else:
+                    # Create item if it doesn't exist
+                    item = QTableWidgetItem(valid_value)
+                    item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                    self.links_table.setItem(row_idx, valid_col_idx, item)
+        
+        self.links_table.blockSignals(False)
 

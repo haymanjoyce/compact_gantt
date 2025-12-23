@@ -404,12 +404,16 @@ class GanttChartService(QObject):
         row_height = row_frame_height / num_rows if num_rows > 0 else row_frame_height
         
         for link in links:
-            if len(link) < 2:
+            if len(link) < 4:  # Now expects: [ID, From Task ID, To Task ID, Valid]
                 continue
             
+            # Check if link is valid (if Valid field exists and is "No", skip rendering)
+            if len(link) >= 4 and str(link[3]).strip().lower() == "no":  # Valid is at index 3
+                continue  # Skip invalid links
+            
             try:
-                from_task_id = int(link[0])
-                to_task_id = int(link[1])
+                from_task_id = int(link[1])  # From Task ID is at index 1
+                to_task_id = int(link[2])   # To Task ID is at index 2
             except (ValueError, TypeError):
                 continue
             

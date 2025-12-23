@@ -192,11 +192,25 @@ def add_row(table, table_key, table_configs, parent, id_field_name, row_index=No
         
         # Prepare context for default_generator if available
         context = {"max_id": next_id}
-        if hasattr(config, "default_generator") and not is_links_table:
+        if hasattr(config, "default_generator"):
             defaults = config.default_generator(row_index, context)
+            # For links, we want blank From/To Task IDs but Valid should default to "Yes"
+            # ID (index 0) is already set by default_generator
+            if is_links_table:
+                if len(defaults) >= 4:
+                    defaults[1] = ""  # From Task ID - blank (index 1)
+                    defaults[2] = ""  # To Task ID - blank (index 2)
+                    defaults[3] = "Yes"  # Valid - default to "Yes" (index 3)
+                    # ID (index 0) is already set by default_generator
+                else:
+                    # Ensure we have 4 elements: [ID, From, To, Valid]
+                    defaults = [str(next_id), "", "", "Yes"]
         else:
-            # For links or if no generator, use empty strings
+            # If no generator, use empty strings except Valid column for links
             defaults = [""] * (table.columnCount() - 1)  # Exclude checkbox column
+            # Set Valid column default to "Yes" for links
+            if is_links_table and len(defaults) >= 3:
+                defaults[2] = "Yes"  # Index 2 in defaults (0=From, 1=To, 2=Valid)
 
         # Set default values for each column (skip checkbox column)
         for col_idx in range(1, table.columnCount()):
@@ -216,10 +230,11 @@ def add_row(table, table_key, table_configs, parent, id_field_name, row_index=No
 
             # Set ID column - use NumericTableWidgetItem for numeric sorting
             if col_idx == id_column:
-                # For links, make ID field editable and blank
+                # For links, ID should be auto-generated and read-only (like tasks)
                 if is_links_table:
-                    id_item = NumericTableWidgetItem("")
-                    id_item.setData(Qt.UserRole, 0)
+                    id_item = NumericTableWidgetItem(str(next_id))
+                    id_item.setFlags(id_item.flags() & ~Qt.ItemIsEditable)  # Make read-only
+                    id_item.setData(Qt.UserRole, int(next_id))
                 else:
                     id_item = NumericTableWidgetItem(str(next_id))
                     id_item.setFlags(id_item.flags() & ~Qt.ItemIsEditable)
@@ -234,6 +249,11 @@ def add_row(table, table_key, table_configs, parent, id_field_name, row_index=No
                 if hasattr(parent, '_sync_data_if_not_initializing'):
                     combo.currentTextChanged.connect(parent._sync_data_if_not_initializing)
                 table.setCellWidget(row_index, col_idx, combo)
+            # Valid column for links - read-only text
+            elif is_links_table and header_text == "Valid":
+                item = QTableWidgetItem(str(default) if default else "Yes")
+                item.setFlags(item.flags() & ~Qt.ItemIsEditable)  # Make read-only
+                table.setItem(row_index, col_idx, item)
             # Date column - check by column name for tasks table (Start Date, Finish Date)
             elif header_text in ["Start Date", "Finish Date"]:
                 item = DateTableWidgetItem(str(default))

@@ -246,7 +246,9 @@ class AppConfig:
                 ]
 
         def links_default(row_idx: int, context: Dict[str, Any]) -> List[Any]:
-            return ["1", "2"]
+            # Generate ID based on context
+            link_id = context.get("max_id", 0) + 1
+            return [str(link_id), "", "", "Yes"]  # ID, From Task ID, To Task ID, Valid
 
         def swimlanes_default(row_idx: int, context: Dict[str, Any]) -> List[Any]:
             return ["1", "2", f"Swimlane {row_idx + 1}", "lightblue"]
@@ -294,8 +296,10 @@ class AppConfig:
                 key="links",
                 columns=[
                     TableColumnConfig("Select", widget_type="checkbox"),
+                    TableColumnConfig("ID", validator=lambda x: int(x) > 0 if x else False),
                     TableColumnConfig("From Task ID", validator=lambda x: int(x) > 0 if x else False),
-                    TableColumnConfig("To Task ID", validator=lambda x: int(x) > 0 if x else False)
+                    TableColumnConfig("To Task ID", validator=lambda x: int(x) > 0 if x else False),
+                    TableColumnConfig("Valid", widget_type="text", default_value="Yes")
                 ],
                 min_rows=0,
                 default_generator=lambda row_idx, context: [False] + links_default(row_idx, context)
