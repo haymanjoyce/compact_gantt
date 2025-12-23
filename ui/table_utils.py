@@ -187,13 +187,16 @@ def add_row(table, table_key, table_configs, parent, id_field_name, row_index=No
         checkbox_widget = CheckBoxWidget()
         table.setCellWidget(row_index, 0, checkbox_widget)
 
+        # Special handling for links table - both fields should be editable and blank
+        is_links_table = (table_key == "links")
+        
         # Prepare context for default_generator if available
         context = {"max_id": next_id}
-        if hasattr(config, "default_generator"):
+        if hasattr(config, "default_generator") and not is_links_table:
             defaults = config.default_generator(row_index, context)
         else:
-            # Fallback: just use empty strings
-            defaults = [""] * table.columnCount()
+            # For links or if no generator, use empty strings
+            defaults = [""] * (table.columnCount() - 1)  # Exclude checkbox column
 
         # Set default values for each column (skip checkbox column)
         for col_idx in range(1, table.columnCount()):
@@ -208,14 +211,19 @@ def add_row(table, table_key, table_configs, parent, id_field_name, row_index=No
 
             # Use default from generator if available, else empty string
             default = ""
-            if defaults and col_idx < len(defaults):
-                default = defaults[col_idx]
+            if defaults and (col_idx - 1) < len(defaults):
+                default = defaults[col_idx - 1]  # Adjust for missing checkbox in defaults
 
             # Set ID column - use NumericTableWidgetItem for numeric sorting
             if col_idx == id_column:
-                id_item = NumericTableWidgetItem(str(next_id))
-                id_item.setFlags(id_item.flags() & ~Qt.ItemIsEditable)
-                id_item.setData(Qt.UserRole, int(next_id))
+                # For links, make ID field editable and blank
+                if is_links_table:
+                    id_item = NumericTableWidgetItem("")
+                    id_item.setData(Qt.UserRole, 0)
+                else:
+                    id_item = NumericTableWidgetItem(str(next_id))
+                    id_item.setFlags(id_item.flags() & ~Qt.ItemIsEditable)
+                    id_item.setData(Qt.UserRole, int(next_id))
                 table.setItem(row_index, col_idx, id_item)
             # Combo box column
             elif col_config and getattr(col_config, "widget_type", None) == "combo":
@@ -250,6 +258,14 @@ def add_row(table, table_key, table_configs, parent, id_field_name, row_index=No
                         item.setData(Qt.UserRole, int(str(default).strip()) if str(default).strip() else (0 if header_text == "ID" else 1))
                 except (ValueError, AttributeError):
                     item.setData(Qt.UserRole, 0.0 if header_text == "Order" else (0 if header_text == "ID" else 1))
+                table.setItem(row_index, col_idx, item)
+            # Numeric column for links (From Task ID, To Task ID) - both should be editable
+            elif is_links_table and header_text in ["From Task ID", "To Task ID"]:
+                item = NumericTableWidgetItem(str(default))
+                try:
+                    item.setData(Qt.UserRole, int(str(default).strip()) if str(default).strip() else 0)
+                except (ValueError, AttributeError):
+                    item.setData(Qt.UserRole, 0)
                 table.setItem(row_index, col_idx, item)
             # Numeric column (optional: check for numeric type)
             elif col_config and getattr(col_config, "widget_type", None) == "numeric":

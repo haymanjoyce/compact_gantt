@@ -47,7 +47,7 @@ python test_window_positioning.py
 
 ### Tab Navigation
 - [ ] All tabs are accessible and clickable
-- [ ] Tab order is correct: Windows → Layout → Titles → Scales → Grid → Time Frames → Tasks → Connectors → Swimlanes → Pipes → Curtains → Text Boxes
+- [ ] Tab order is correct: Windows → Layout → Titles → Scales → Grid → Time Frames → Tasks → Links → Swimlanes → Pipes → Curtains → Text Boxes
 
 ### Windows Tab
 - [ ] **Data Entry Window Settings**

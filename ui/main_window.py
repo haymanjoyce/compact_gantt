@@ -6,6 +6,7 @@ from config.app_config import AppConfig
 from .tabs.layout_tab import LayoutTab
 from .tabs.tasks_tab import TasksTab
 from .tabs.placeholder_tab import PlaceholderTab
+from .tabs.links_tab import LinksTab
 from repositories.project_repository import ProjectRepository
 from repositories.excel_repository import ExcelRepository
 from models.project import ProjectData  # Import here to avoid circular import
@@ -102,7 +103,9 @@ class MainWindow(QMainWindow):
         self.scales_tab = ScalesTab(self.project_data, self.app_config)
         self.grid_tab = GridTab(self.project_data, self.app_config)
         self.tasks_tab = TasksTab(self.project_data, self.app_config)
-        self.connectors_tab = PlaceholderTab(self.project_data, self.app_config, "Connectors")
+        self.tasks_tab.data_updated.connect(self._on_data_updated)
+        self.links_tab = LinksTab(self.project_data, self.app_config)
+        self.links_tab.data_updated.connect(self._on_data_updated)
         self.swimlanes_tab = SwimlanesTab(self.project_data, self.app_config)
         self.pipes_tab = PlaceholderTab(self.project_data, self.app_config, "Pipes")
         self.curtains_tab = PlaceholderTab(self.project_data, self.app_config, "Curtains")
@@ -115,7 +118,7 @@ class MainWindow(QMainWindow):
         self.tab_widget.addTab(self.scales_tab, "Scales")
         self.tab_widget.addTab(self.grid_tab, "Grid")
         self.tab_widget.addTab(self.tasks_tab, "Tasks")
-        self.tab_widget.addTab(self.connectors_tab, "Connectors")
+        self.tab_widget.addTab(self.links_tab, "Links")
         self.tab_widget.addTab(self.swimlanes_tab, "Swimlanes")
         self.tab_widget.addTab(self.pipes_tab, "Pipes")
         self.tab_widget.addTab(self.curtains_tab, "Curtains")
@@ -203,6 +206,8 @@ class MainWindow(QMainWindow):
                 self.grid_tab._sync_data()
             if hasattr(self.tasks_tab, '_sync_data'):
                 self.tasks_tab._sync_data()
+            if hasattr(self.links_tab, '_sync_data'):
+                self.links_tab._sync_data()
             if hasattr(self.swimlanes_tab, '_sync_data'):
                 self.swimlanes_tab._sync_data()
         except Exception as e:
@@ -214,6 +219,11 @@ class MainWindow(QMainWindow):
         # Sync all tabs to ensure project_data is up to date
         self._sync_all_tabs()
         
+        self.data_updated.emit(self.project_data.to_json())
+
+    def _on_data_updated(self, data):
+        """Handle updates from tabs that trigger chart refresh."""
+        # The emitting tab already synced its data; just emit to refresh the chart
         self.data_updated.emit(self.project_data.to_json())
 
     def _on_windows_updated(self, data):

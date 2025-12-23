@@ -12,7 +12,7 @@ class ProjectData:
         app_config = AppConfig()
         self.frame_config = FrameConfig(num_rows=app_config.general.tasks_rows)
         self.tasks: List[Task] = []
-        self.connectors: List[List[str]] = []
+        self.links: List[List[str]] = []
         self.swimlanes: List[List[str]] = []
         self.pipes: List[List[str]] = []
         self.curtains: List[List[str]] = []
@@ -52,7 +52,7 @@ class ProjectData:
         return {
             "frame_config": vars(self.frame_config),
             "tasks": tasks_data,
-            "connectors": self.connectors,
+            "links": self.links,
             "swimlanes": self.swimlanes,
             "pipes": self.pipes,
             "curtains": self.curtains,
@@ -82,7 +82,7 @@ class ProjectData:
             project.tasks.append(Task.from_dict(task_data))
         
         # Load other data
-        project.connectors = data.get("connectors", [])
+        project.links = data.get("links", [])
         project.swimlanes = data.get("swimlanes", [])
         project.pipes = data.get("pipes", [])
         project.curtains = data.get("curtains", [])

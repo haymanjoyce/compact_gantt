@@ -118,7 +118,7 @@ def test_frame_config_all_fields_loaded():
             "chart_start_date": "2025-02-20"
         },
         "tasks": [],
-        "connectors": [],
+        "links": [],
         "swimlanes": [],
         "pipes": [],
         "curtains": [],
@@ -218,7 +218,7 @@ def test_frame_config_defaults_on_missing_fields():
             # Missing other fields - should use defaults
         },
         "tasks": [],
-        "connectors": [],
+        "links": [],
         "swimlanes": [],
         "pipes": [],
         "curtains": [],
@@ -258,7 +258,7 @@ def test_frame_config_margins_tuple_conversion():
             "margins": [5, 10, 15, 20]  # List in JSON
         },
         "tasks": [],
-        "connectors": [],
+        "links": [],
         "swimlanes": [],
         "pipes": [],
         "curtains": [],
@@ -290,7 +290,7 @@ def test_frame_config_backward_compatibility():
             "vertical_gridlines": True  # Old format - should be migrated to individual flags
         },
         "tasks": [],
-        "connectors": [],
+        "links": [],
         "swimlanes": [],
         "pipes": [],
         "curtains": [],

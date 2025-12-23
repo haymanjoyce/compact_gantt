@@ -145,7 +145,9 @@ class GanttChartService(QObject):
         chart_end = datetime.strptime(chart_end_str, "%Y-%m-%d")
         
         # Render scales, rows, and tasks in one continuous timeline
-        self.render_scales_and_rows(margins[3], inner_y, inner_width, inner_height, chart_start, chart_end)
+        row_y, row_frame_height = self.render_scales_and_rows(margins[3], inner_y, inner_width, inner_height, chart_start, chart_end)
+        # Render links after tasks, using row frame position and height
+        self.render_links(margins[3], row_y, inner_width, row_frame_height, chart_start, chart_end)
         logging.debug("render_single_timeline completed")
 
 
@@ -289,6 +291,198 @@ class GanttChartService(QObject):
                             self._render_outside_label(task_name, x_end, rect_y + task_height / 2, 
                                                       label_y_base)
 
+    def _get_task_position(self, task_id: int, x, y, width, height, start_date, end_date, num_rows):
+        """Get the position and dimensions of a task by its ID.
+        
+        Returns:
+            dict with keys: x_start, x_end, y_center, row_num, is_milestone, or None if not found
+        """
+        total_days = max((end_date - start_date).days, 1)
+        time_scale = width / total_days if total_days > 0 else width
+        row_height = height / num_rows if num_rows > 0 else height
+        task_height = row_height * 0.8
+        
+        for task in self.data.get("tasks", []):
+            if task.get("task_id") != task_id:
+                continue
+                
+            start_date_str = task.get("start_date", "")
+            finish_date_str = task.get("finish_date", "")
+            is_milestone = task.get("is_milestone", False) or (start_date_str and finish_date_str and start_date_str == finish_date_str)
+            
+            if not start_date_str and not finish_date_str:
+                return None
+            
+            try:
+                date_to_use = start_date_str if start_date_str else finish_date_str
+                task_start = datetime.strptime(date_to_use, "%Y-%m-%d")
+                task_finish = task_start
+                if not is_milestone and start_date_str and finish_date_str:
+                    task_start = datetime.strptime(start_date_str, "%Y-%m-%d")
+                    task_finish = datetime.strptime(finish_date_str, "%Y-%m-%d")
+            except (ValueError, TypeError):
+                return None
+            
+            if task_finish < start_date or task_start > end_date:
+                return None
+            
+            row_num = min(max(task.get("row_number", 1) - 1, 0), num_rows - 1)
+            x_start = x + max((task_start - start_date).days, 0) * time_scale
+            x_end = x + min((task_finish - start_date).days + 1, total_days) * time_scale
+            width_task = time_scale if task_start == task_finish else max(x_end - x_start, time_scale)
+            y_task = y + row_num * row_height
+            
+            if is_milestone:
+                half_size = task_height / 2
+                center_x = x_end if finish_date_str else x_start
+                center_y = y_task + row_height * 0.5
+                return {
+                    "x_start": center_x - half_size,
+                    "x_end": center_x + half_size,
+                    "y_center": center_y,
+                    "row_num": row_num,
+                    "is_milestone": True
+                }
+            else:
+                y_offset = (row_height - task_height) / 2
+                rect_y = y_task + y_offset
+                return {
+                    "x_start": x_start,
+                    "x_end": x_end,
+                    "y_center": y_task + row_height * 0.5,
+                    "row_num": row_num,
+                    "is_milestone": False
+                }
+        
+        return None
+
+    def _render_arrowhead(self, x: float, y: float, direction: str = "left", size: float = 5):
+        """Render an arrowhead at the specified position.
+        
+        Args:
+            x, y: Position of arrowhead tip
+            direction: "left", "right", "up", or "down"
+            size: Size of arrowhead in pixels
+        """
+        if direction == "left":
+            # Tip at (x, y), base to the left (flipped horizontally from previous)
+            points = [(x, y), (x - size, y - size/2), (x - size, y + size/2)]
+        elif direction == "right":
+            # Tip at (x, y), base to the right (flipped horizontally from previous)
+            points = [(x, y), (x + size, y - size/2), (x + size, y + size/2)]
+        elif direction == "up":
+            points = [(x, y), (x - size/2, y + size), (x + size/2, y + size)]
+        else:  # down
+            points = [(x, y), (x - size/2, y - size), (x + size/2, y - size)]
+        
+        self.dwg.add(self.dwg.polygon(points=points, fill="black", stroke="none"))
+
+    def render_links(self, x, row_y, width, row_frame_height, start_date, end_date):
+        """Render links between tasks.
+        
+        Links show workflow dependencies from source (right edge) to target (left edge).
+        Routing is automatic based on task positions:
+        - Single segment (vertical): Same date, different rows
+        - Two segments: Different rows, not aligned
+        - Three segments: Horizontal-Vertical-Horizontal for complex routing
+        
+        Args:
+            x: The absolute x position of the timeline (in pixels)
+            row_y: The absolute y position where the row frame starts (after scales, in pixels)
+            width: The width of the timeline (in pixels)
+            row_frame_height: The height of the row frame (in pixels)
+            start_date: The start date of the timeline (datetime)
+            end_date: The end date of the timeline (datetime)
+        """
+        num_rows = self._get_frame_config("num_rows", 1)
+        links = self.data.get("links", [])
+        
+        if not links:
+            return
+        
+        # Calculate row height for vertical positioning
+        row_height = row_frame_height / num_rows if num_rows > 0 else row_frame_height
+        
+        for link in links:
+            if len(link) < 2:
+                continue
+            
+            try:
+                from_task_id = int(link[0])
+                to_task_id = int(link[1])
+            except (ValueError, TypeError):
+                continue
+            
+            # Get positions for both tasks - use row_y and row_frame_height for correct vertical positioning
+            from_task = self._get_task_position(from_task_id, x, row_y, width, row_frame_height, start_date, end_date, num_rows)
+            to_task = self._get_task_position(to_task_id, x, row_y, width, row_frame_height, start_date, end_date, num_rows)
+            
+            if not from_task or not to_task:
+                continue  # Skip if either task not found
+            
+            # Origin point: right edge of source task
+            origin_x = from_task["x_end"]
+            origin_y = from_task["y_center"]
+            
+            # Termination point: left edge of target task
+            term_x = to_task["x_start"]
+            term_y = to_task["y_center"]
+            
+            # Determine routing based on positions
+            same_row = from_task["row_num"] == to_task["row_num"]
+            same_date = abs(origin_x - term_x) < 1.0  # Very close horizontally (within 1 pixel)
+            
+            # Calculate link path
+            if same_row and same_date:
+                # Same row, same date - minimal horizontal link (shouldn't happen often)
+                # Just draw a short horizontal line
+                mid_x = (origin_x + term_x) / 2
+                self.dwg.add(self.dwg.line((origin_x, origin_y), (mid_x, origin_y),
+                                          stroke="black", stroke_width=1.5))
+                self.dwg.add(self.dwg.line((mid_x, origin_y), (term_x, term_y),
+                                          stroke="black", stroke_width=1.5))
+                self._render_arrowhead(term_x, term_y, "left", 5)
+            elif same_row:
+                # Same row, different dates - horizontal line only
+                self.dwg.add(self.dwg.line((origin_x, origin_y), (term_x, term_y),
+                                          stroke="black", stroke_width=1.5))
+                self._render_arrowhead(term_x, term_y, "left", 5)
+            elif same_date:
+                # Different rows, same date - single vertical segment
+                # Choose top or bottom of source based on which is closer to target
+                if to_task["row_num"] > from_task["row_num"]:
+                    # Target is below - exit from bottom
+                    origin_y = from_task["y_center"] + row_height * 0.4
+                    term_y = to_task["y_center"] - row_height * 0.4
+                else:
+                    # Target is above - exit from top
+                    origin_y = from_task["y_center"] - row_height * 0.4
+                    term_y = to_task["y_center"] + row_height * 0.4
+                
+                self.dwg.add(self.dwg.line((origin_x, origin_y), (term_x, term_y),
+                                          stroke="black", stroke_width=1.5))
+                self._render_arrowhead(term_x, term_y, "left", 5)
+            else:
+                # Different rows, different dates - three segments: H-V-H
+                # Segment 1: Horizontal right from source
+                horizontal_offset = 20  # Offset for horizontal segment
+                mid_x1 = origin_x + horizontal_offset
+                mid_y1 = origin_y
+                
+                # Segment 2: Vertical to align with target row
+                mid_x2 = mid_x1
+                mid_y2 = term_y
+                
+                # Segment 3: Horizontal left to target
+                # Draw the path
+                self.dwg.add(self.dwg.line((origin_x, origin_y), (mid_x1, mid_y1),
+                                          stroke="black", stroke_width=1.5))
+                self.dwg.add(self.dwg.line((mid_x1, mid_y1), (mid_x2, mid_y2),
+                                          stroke="black", stroke_width=1.5))
+                self.dwg.add(self.dwg.line((mid_x2, mid_y2), (term_x, term_y),
+                                          stroke="black", stroke_width=1.5))
+                self._render_arrowhead(term_x, term_y, "left", 5)
+
     def render_scales_and_rows(self, x, y, width, height, start_date, end_date):
         logging.debug(f"Rendering scales and rows from {start_date} to {end_date}")
         total_days = max((end_date - start_date).days, 1)
@@ -374,6 +568,9 @@ class GanttChartService(QObject):
                 current_date = self.next_period(current_date, interval)
 
         self.render_tasks(x, row_y, width, row_frame_height, start_date, end_date, num_rows)
+        
+        # Return row frame position and height for use by other rendering functions
+        return row_y, row_frame_height
 
     def next_period(self, date, interval):
         if interval == "days":

@@ -23,7 +23,7 @@ class ExcelRepository:
         self._create_scales_sheet(wb, project_data.frame_config)
         self._create_grid_sheet(wb, project_data.frame_config)
         self._create_tasks_sheet(wb, project_data.tasks)
-        self._create_connectors_sheet(wb, project_data.connectors)
+        self._create_links_sheet(wb, project_data.links)
         self._create_swimlanes_sheet(wb, project_data.swimlanes)
         self._create_pipes_sheet(wb, project_data.pipes)
         self._create_curtains_sheet(wb, project_data.curtains)
@@ -81,8 +81,8 @@ class ExcelRepository:
             project.tasks = self._read_tasks_sheet(wb["Tasks"])
         
         # Load other sheets
-        if "Connectors" in wb.sheetnames:
-            project.connectors = self._read_table_sheet(wb["Connectors"])
+        if "Links" in wb.sheetnames:
+            project.links = self._read_table_sheet(wb["Links"])
         
         if "Swimlanes" in wb.sheetnames:
             project.swimlanes = self._read_table_sheet(wb["Swimlanes"])
@@ -214,15 +214,15 @@ class ExcelRepository:
             else:
                 ws.column_dimensions[col_letter].width = 10
     
-    def _create_connectors_sheet(self, wb: Workbook, connectors: List[List[str]]) -> None:
-        """Create Connectors worksheet."""
-        ws = wb.create_sheet("Connectors")
-        if connectors:
+    def _create_links_sheet(self, wb: Workbook, links: List[List[str]]) -> None:
+        """Create Links worksheet."""
+        ws = wb.create_sheet("Links")
+        if links:
             # Use first row as headers if available
-            if connectors and len(connectors) > 0:
-                ws.append(connectors[0] if len(connectors[0]) > 0 else ["From", "To"])
+            if links and len(links) > 0:
+                ws.append(links[0] if len(links[0]) > 0 else ["From", "To"])
                 self._format_header_row(ws, 1)
-                for row in connectors[1:] if len(connectors) > 1 else []:
+                for row in links[1:] if len(links) > 1 else []:
                     ws.append(row)
             else:
                 ws.append(["From", "To"])
@@ -474,7 +474,7 @@ class ExcelRepository:
         return tasks
     
     def _read_table_sheet(self, ws) -> List[List[str]]:
-        """Read a table worksheet (Connectors, Swimlanes, Pipes, Curtains, Text Boxes)."""
+        """Read a table worksheet (Links, Swimlanes, Pipes, Curtains, Text Boxes)."""
         data = []
         for row in ws.iter_rows(values_only=True):
             if any(row):  # Only add non-empty rows

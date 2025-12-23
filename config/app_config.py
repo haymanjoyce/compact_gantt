@@ -245,7 +245,7 @@ class AppConfig:
                     "Outside"                                        # Placement (Inside or Outside)
                 ]
 
-        def connectors_default(row_idx: int, context: Dict[str, Any]) -> List[Any]:
+        def links_default(row_idx: int, context: Dict[str, Any]) -> List[Any]:
             return ["1", "2"]
 
         def swimlanes_default(row_idx: int, context: Dict[str, Any]) -> List[Any]:
@@ -290,15 +290,15 @@ class AppConfig:
                 min_rows=5,
                 default_generator=lambda row_idx, context: [False] + tasks_default(row_idx, context)
             ),
-            "connectors": TableConfig(
-                key="connectors",
+            "links": TableConfig(
+                key="links",
                 columns=[
                     TableColumnConfig("Select", widget_type="checkbox"),
                     TableColumnConfig("From Task ID", validator=lambda x: int(x) > 0 if x else False),
                     TableColumnConfig("To Task ID", validator=lambda x: int(x) > 0 if x else False)
                 ],
                 min_rows=0,
-                default_generator=lambda row_idx, context: [False] + connectors_default(row_idx, context)
+                default_generator=lambda row_idx, context: [False] + links_default(row_idx, context)
             ),
             "swimlanes": TableConfig(
                 key="swimlanes",

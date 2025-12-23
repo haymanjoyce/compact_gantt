@@ -69,7 +69,7 @@ python main.py
 - **Scales**: Time scale visibility and configuration
 - **Grid**: Gridline display options
 - **Tasks**: Task management and formatting
-- **Connectors**: Task dependency connectors (placeholder)
+- **Links**: Task dependency links (placeholder)
 - **Swimlanes**: Swimlane configuration
 - **Pipes**: Pipe elements (placeholder)
 - **Curtains**: Curtain elements (placeholder)
