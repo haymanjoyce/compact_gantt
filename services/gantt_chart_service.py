@@ -386,13 +386,12 @@ class GanttChartService(QObject):
         self.dwg.add(self.dwg.polygon(points=points, fill="black", stroke="none"))
 
     def render_links(self, x, row_y, width, row_frame_height, start_date, end_date):
-        """Render links between tasks.
+        """Render links between tasks according to Finish-to-Start (FS) dependency rules.
         
-        Links show workflow dependencies from source (right edge) to target (left edge).
-        Routing is automatic based on task positions:
-        - Single segment (vertical): Same date, different rows
-        - Two segments: Different rows, not aligned
-        - Three segments: Horizontal-Vertical-Horizontal for complex routing
+        Links show workflow dependencies from source to target with routing based on positions:
+        - Same row: Horizontal line
+        - Different rows, no gap: Single vertical segment if aligned (< 2px), otherwise V-H-V
+        - Different rows, gap: V-H-V pattern (vertical-horizontal-vertical)
         
         Args:
             x: The absolute x position of the timeline (in pixels)
@@ -432,68 +431,128 @@ class GanttChartService(QObject):
             if not from_task or not to_task:
                 continue  # Skip if either task not found
             
-            # Origin point: right edge of source task
-            origin_x = from_task["x_end"]
+            # Determine connection points based on task type (milestone vs regular task)
+            # For milestones: use center point (center_x = x_start + half_size, or calculated from date)
+            # For regular tasks: use right edge (predecessor) and left edge (successor)
+            from_is_milestone = from_task.get("is_milestone", False)
+            to_is_milestone = to_task.get("is_milestone", False)
+            
+            if from_is_milestone:
+                # Milestone: use center point
+                # For milestones, x_start and x_end represent the left and right edges of the diamond
+                # Center is at (x_start + x_end) / 2
+                origin_x = (from_task["x_start"] + from_task["x_end"]) / 2
+            else:
+                # Regular task: use right edge
+                origin_x = from_task["x_end"]
+            
             origin_y = from_task["y_center"]
             
-            # Termination point: left edge of target task
-            term_x = to_task["x_start"]
+            if to_is_milestone:
+                # Milestone: use center point
+                term_x = (to_task["x_start"] + to_task["x_end"]) / 2
+            else:
+                # Regular task: use left edge
+                term_x = to_task["x_start"]
+            
             term_y = to_task["y_center"]
             
             # Determine routing based on positions
             same_row = from_task["row_num"] == to_task["row_num"]
             same_date = abs(origin_x - term_x) < 1.0  # Very close horizontally (within 1 pixel)
+            has_gap = term_x > origin_x  # Successor starts after predecessor finishes
             
-            # Calculate link path
-            if same_row and same_date:
-                # Same row, same date - minimal horizontal link (shouldn't happen often)
-                # Just draw a short horizontal line
-                mid_x = (origin_x + term_x) / 2
-                self.dwg.add(self.dwg.line((origin_x, origin_y), (mid_x, origin_y),
-                                          stroke="black", stroke_width=1.5))
-                self.dwg.add(self.dwg.line((mid_x, origin_y), (term_x, term_y),
-                                          stroke="black", stroke_width=1.5))
-                self._render_arrowhead(term_x, term_y, "left", 5)
-            elif same_row:
-                # Same row, different dates - horizontal line only
-                self.dwg.add(self.dwg.line((origin_x, origin_y), (term_x, term_y),
-                                          stroke="black", stroke_width=1.5))
-                self._render_arrowhead(term_x, term_y, "left", 5)
-            elif same_date:
-                # Different rows, same date - single vertical segment
-                # Choose top or bottom of source based on which is closer to target
-                if to_task["row_num"] > from_task["row_num"]:
-                    # Target is below - exit from bottom
-                    origin_y = from_task["y_center"] + row_height * 0.4
-                    term_y = to_task["y_center"] - row_height * 0.4
+            # Calculate link path according to spec
+            if same_row:
+                # Case 1: Same Row
+                if same_date:
+                    # 1a. No Gap (Bars Touch or Nearly Touch)
+                    if abs(origin_x - term_x) < 5.0:
+                        # Points coincide or very close - minimal horizontal extension
+                        extended_x = origin_x + 10.0  # 10 pixel extension
+                        self.dwg.add(self.dwg.line((origin_x, origin_y), (extended_x, origin_y),
+                                                  stroke="black", stroke_width=1.5))
+                        self._render_arrowhead(extended_x, origin_y, "left", 5)
+                    else:
+                        # Straight horizontal line
+                        self.dwg.add(self.dwg.line((origin_x, origin_y), (term_x, term_y),
+                                                  stroke="black", stroke_width=1.5))
+                        self._render_arrowhead(term_x, term_y, "left", 5)
                 else:
-                    # Target is above - exit from top
-                    origin_y = from_task["y_center"] - row_height * 0.4
-                    term_y = to_task["y_center"] + row_height * 0.4
-                
-                self.dwg.add(self.dwg.line((origin_x, origin_y), (term_x, term_y),
-                                          stroke="black", stroke_width=1.5))
-                self._render_arrowhead(term_x, term_y, "left", 5)
+                    # 1b. Positive Gap/Lag (Bars Separated)
+                    self.dwg.add(self.dwg.line((origin_x, origin_y), (term_x, term_y),
+                                              stroke="black", stroke_width=1.5))
+                    self._render_arrowhead(term_x, term_y, "left", 5)
             else:
-                # Different rows, different dates - three segments: H-V-H
-                # Segment 1: Horizontal right from source
-                horizontal_offset = 20  # Offset for horizontal segment
-                mid_x1 = origin_x + horizontal_offset
-                mid_y1 = origin_y
-                
-                # Segment 2: Vertical to align with target row
-                mid_x2 = mid_x1
-                mid_y2 = term_y
-                
-                # Segment 3: Horizontal left to target
-                # Draw the path
-                self.dwg.add(self.dwg.line((origin_x, origin_y), (mid_x1, mid_y1),
-                                          stroke="black", stroke_width=1.5))
-                self.dwg.add(self.dwg.line((mid_x1, mid_y1), (mid_x2, mid_y2),
-                                          stroke="black", stroke_width=1.5))
-                self.dwg.add(self.dwg.line((mid_x2, mid_y2), (term_x, term_y),
-                                          stroke="black", stroke_width=1.5))
-                self._render_arrowhead(term_x, term_y, "left", 5)
+                # Different rows
+                if same_date:
+                    # Case 2a/3a: No Gap (Aligned Vertically)
+                    # Check if alignment is perfect enough to collapse to single vertical segment
+                    if abs(origin_x - term_x) < 2.0:
+                        # Perfect alignment - single vertical segment
+                        if to_task["row_num"] > from_task["row_num"]:
+                            # Successor below - downward arrow
+                            self.dwg.add(self.dwg.line((origin_x, origin_y), (term_x, term_y),
+                                                      stroke="black", stroke_width=1.5))
+                            self._render_arrowhead(term_x, term_y, "down", 5)
+                        else:
+                            # Successor above - upward arrow
+                            self.dwg.add(self.dwg.line((origin_x, origin_y), (term_x, term_y),
+                                                      stroke="black", stroke_width=1.5))
+                            self._render_arrowhead(term_x, term_y, "up", 5)
+                    else:
+                        # Not perfectly aligned - use V-H-V pattern
+                        # Calculate row midpoint y
+                        mid_y = (origin_y + term_y) / 2
+                        
+                        if to_task["row_num"] > from_task["row_num"]:
+                            # Successor below - V-H-V downward
+                            self.dwg.add(self.dwg.line((origin_x, origin_y), (origin_x, mid_y),
+                                                      stroke="black", stroke_width=1.5))
+                            self.dwg.add(self.dwg.line((origin_x, mid_y), (term_x, mid_y),
+                                                      stroke="black", stroke_width=1.5))
+                            self.dwg.add(self.dwg.line((term_x, mid_y), (term_x, term_y),
+                                                      stroke="black", stroke_width=1.5))
+                            self._render_arrowhead(term_x, term_y, "down", 5)
+                        else:
+                            # Successor above - V-H-V upward
+                            self.dwg.add(self.dwg.line((origin_x, origin_y), (origin_x, mid_y),
+                                                      stroke="black", stroke_width=1.5))
+                            self.dwg.add(self.dwg.line((origin_x, mid_y), (term_x, mid_y),
+                                                      stroke="black", stroke_width=1.5))
+                            self.dwg.add(self.dwg.line((term_x, mid_y), (term_x, term_y),
+                                                      stroke="black", stroke_width=1.5))
+                            self._render_arrowhead(term_x, term_y, "up", 5)
+                else:
+                    # Case 2b/3b: Positive Gap/Lag (Successor Starts Later)
+                    # V-H-V pattern
+                    # Calculate row midpoint y
+                    mid_y = (origin_y + term_y) / 2
+                    
+                    if to_task["row_num"] > from_task["row_num"]:
+                        # Successor below - V-H-V downward
+                        # Segment 1: Vertical down from origin to row midpoint
+                        # Segment 2: Horizontal right to align with successor
+                        # Segment 3: Vertical down to termination
+                        self.dwg.add(self.dwg.line((origin_x, origin_y), (origin_x, mid_y),
+                                                  stroke="black", stroke_width=1.5))
+                        self.dwg.add(self.dwg.line((origin_x, mid_y), (term_x, mid_y),
+                                                  stroke="black", stroke_width=1.5))
+                        self.dwg.add(self.dwg.line((term_x, mid_y), (term_x, term_y),
+                                                  stroke="black", stroke_width=1.5))
+                        self._render_arrowhead(term_x, term_y, "down", 5)
+                    else:
+                        # Successor above - V-H-V upward
+                        # Segment 1: Vertical up from origin to row midpoint
+                        # Segment 2: Horizontal right to align with successor
+                        # Segment 3: Vertical up to termination
+                        self.dwg.add(self.dwg.line((origin_x, origin_y), (origin_x, mid_y),
+                                                  stroke="black", stroke_width=1.5))
+                        self.dwg.add(self.dwg.line((origin_x, mid_y), (term_x, mid_y),
+                                                  stroke="black", stroke_width=1.5))
+                        self.dwg.add(self.dwg.line((term_x, mid_y), (term_x, term_y),
+                                                  stroke="black", stroke_width=1.5))
+                        self._render_arrowhead(term_x, term_y, "up", 5)
 
     def render_scales_and_rows(self, x, y, width, height, start_date, end_date):
         logging.debug(f"Rendering scales and rows from {start_date} to {end_date}")
