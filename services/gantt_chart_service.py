@@ -557,6 +557,33 @@ class GanttChartService(QObject):
                     continue
                 else:
                     # 1b. Positive Gap/Lag (Bars Separated)
+                    # Check if gap is too small to render link (suppress for close elements)
+                    gap_days = 0
+                    if from_finish_date_str and to_start_date_str:
+                        try:
+                            from_finish_date = datetime.strptime(from_finish_date_str, "%Y-%m-%d")
+                            to_start_date = datetime.strptime(to_start_date_str, "%Y-%m-%d")
+                            gap_days = (to_start_date - from_finish_date).days
+                        except (ValueError, TypeError):
+                            pass  # If date parsing fails, proceed with rendering
+                    
+                    # Determine suppression threshold based on task/milestone types
+                    should_suppress = False
+                    if from_is_milestone and to_is_milestone:
+                        # Milestone to Milestone: suppress if gap < 6 days (≤ 5 days)
+                        should_suppress = gap_days < 6
+                    elif from_is_milestone or to_is_milestone:
+                        # Task to Milestone or Milestone to Task: suppress if gap < 4 days (≤ 3 days)
+                        should_suppress = gap_days < 4
+                    else:
+                        # Task to Task: suppress if gap ≤ 3 days
+                        should_suppress = gap_days <= 3
+                    
+                    if should_suppress:
+                        # Skip rendering for close elements on same row
+                        continue
+                    
+                    # Render link for elements with sufficient gap
                     # Shorten line by arrowhead size so it ends at arrowhead base
                     arrow_size = 5
                     line_end_x = term_x - arrow_size  # Arrow points left, base is to the right
