@@ -17,6 +17,10 @@ class WindowConfig:
     svg_display_x: int = 100  # X position in pixels
     svg_display_y: int = 100  # Y position in pixels
 
+    # Last file directories (for file dialogs)
+    last_json_directory: str = ""  # Last directory used for JSON file operations
+    last_excel_directory: str = ""  # Last directory used for Excel file operations
+
     def __post_init__(self):
         # Validate positive integers
         for field_name in ["data_entry_width", "data_entry_height", "svg_display_width",

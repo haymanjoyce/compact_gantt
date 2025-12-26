@@ -432,6 +432,8 @@ class AppConfig:
                     'svg_display_screen': self.general.window.svg_display_screen,
                     'svg_display_x': self.general.window.svg_display_x,
                     'svg_display_y': self.general.window.svg_display_y,
+                    'last_json_directory': self.general.window.last_json_directory,
+                    'last_excel_directory': self.general.window.last_excel_directory,
                 }
             }
             with open(settings_file, 'w') as f:

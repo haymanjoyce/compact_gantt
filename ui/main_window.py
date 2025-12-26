@@ -2,6 +2,7 @@ from PyQt5.QtWidgets import QMainWindow, QTabWidget, QAction, QFileDialog, QMess
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import pyqtSignal, QDate
 import logging
+import os
 from config.app_config import AppConfig
 from .tabs.layout_tab import LayoutTab
 from .tabs.tasks_tab import TasksTab
@@ -126,10 +127,15 @@ class MainWindow(QMainWindow):
         self.tab_widget.addTab(self.text_boxes_tab, "Text Boxes")
 
     def save_to_json(self):
-        file_path, _ = QFileDialog.getSaveFileName(self, "Save Project", "", "JSON Files (*.json)")
+        # Use last directory if available, otherwise use empty string (current directory)
+        directory = self.app_config.general.window.last_json_directory if self.app_config.general.window.last_json_directory else ""
+        file_path, _ = QFileDialog.getSaveFileName(self, "Save Project", directory, "JSON Files (*.json)")
         if file_path:
             try:
                 self.repository.save(file_path, self.project_data)
+                # Update last directory from the saved file path
+                self.app_config.general.window.last_json_directory = os.path.dirname(file_path)
+                self.app_config.save_settings()
                 QMessageBox.information(self, "Success", "Project saved successfully!")
                 self.status_bar.showMessage("Project saved successfully")
             except Exception as e:
@@ -137,11 +143,17 @@ class MainWindow(QMainWindow):
                 self.status_bar.showMessage("Error saving project")
 
     def load_from_json(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, "Open Project", "", "JSON Files (*.json)")
+        # Use last directory if available, otherwise use empty string (current directory)
+        directory = self.app_config.general.window.last_json_directory if self.app_config.general.window.last_json_directory else ""
+        file_path, _ = QFileDialog.getOpenFileName(self, "Open Project", directory, "JSON Files (*.json)")
         if file_path:
             try:
                 loaded_project = self.repository.load(file_path, ProjectData)
                 self.project_data = loaded_project  # Use the loaded instance
+
+                # Update last directory from the loaded file path
+                self.app_config.general.window.last_json_directory = os.path.dirname(file_path)
+                self.app_config.save_settings()
 
                 # Re-create all tabs with the new project_data
                 self._create_all_tabs()
@@ -156,7 +168,9 @@ class MainWindow(QMainWindow):
                 self.status_bar.showMessage("Error loading project")
 
     def save_to_excel(self):
-        file_path, _ = QFileDialog.getSaveFileName(self, "Save Project as Excel", "", "Excel Files (*.xlsx)")
+        # Use last directory if available, otherwise use empty string (current directory)
+        directory = self.app_config.general.window.last_excel_directory if self.app_config.general.window.last_excel_directory else ""
+        file_path, _ = QFileDialog.getSaveFileName(self, "Save Project as Excel", directory, "Excel Files (*.xlsx)")
         if file_path:
             try:
                 # Ensure file has .xlsx extension
@@ -167,6 +181,9 @@ class MainWindow(QMainWindow):
                 self._sync_all_tabs()
                 
                 self.excel_repository.save(file_path, self.project_data)
+                # Update last directory from the saved file path
+                self.app_config.general.window.last_excel_directory = os.path.dirname(file_path)
+                self.app_config.save_settings()
                 QMessageBox.information(self, "Success", "Project saved to Excel successfully!")
                 self.status_bar.showMessage("Project saved to Excel successfully")
             except Exception as e:
@@ -175,11 +192,17 @@ class MainWindow(QMainWindow):
                 logging.error(f"Error saving to Excel: {e}", exc_info=True)
 
     def load_from_excel(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, "Open Project from Excel", "", "Excel Files (*.xlsx)")
+        # Use last directory if available, otherwise use empty string (current directory)
+        directory = self.app_config.general.window.last_excel_directory if self.app_config.general.window.last_excel_directory else ""
+        file_path, _ = QFileDialog.getOpenFileName(self, "Open Project from Excel", directory, "Excel Files (*.xlsx)")
         if file_path:
             try:
                 loaded_project = self.excel_repository.load(file_path, ProjectData)
                 self.project_data = loaded_project  # Use the loaded instance
+
+                # Update last directory from the loaded file path
+                self.app_config.general.window.last_excel_directory = os.path.dirname(file_path)
+                self.app_config.save_settings()
 
                 # Re-create all tabs with the new project_data
                 self._create_all_tabs()
