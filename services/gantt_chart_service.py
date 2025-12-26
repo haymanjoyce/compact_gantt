@@ -267,13 +267,10 @@ class GanttChartService(QObject):
                 half_size = task_height / 2
                 center_x = x_end if finish_date_str else x_start
                 center_y = y_task + row_height * 0.5
-                points = [
-                    (center_x, center_y - half_size),
-                    (center_x + half_size, center_y),
-                    (center_x, center_y + half_size),
-                    (center_x - half_size, center_y)
-                ]
-                self.dwg.add(self.dwg.polygon(points=points, fill="red", stroke="black", stroke_width=0.5))
+                
+                # Render as a circle - much simpler!
+                self.dwg.add(self.dwg.circle(center=(center_x, center_y), r=half_size, 
+                                             fill="red", stroke="black", stroke_width=0.5))
                 
                 if not label_hide and label_placement == "Outside":
                     # Use proportional positioning: center_y is at row_height * 0.5, apply factor to row_height
@@ -285,7 +282,10 @@ class GanttChartService(QObject):
                     y_offset = (row_height - task_height) / 2
                     rect_y = y_task + y_offset
                     logging.debug(f"Rendering task bar for '{task_name}': x={x_start}, y={rect_y}, width={width_task}, height={task_height}, row={row_num}, y_task={y_task}")
-                    self.dwg.add(self.dwg.rect(insert=(x_start, rect_y), size=(width_task, task_height), fill="blue", stroke="black", stroke_width=0.5))
+                    corner_radius = 3
+                    self.dwg.add(self.dwg.rect(insert=(x_start, rect_y), size=(width_task, task_height), 
+                                              fill="blue", stroke="black", stroke_width=0.5,
+                                              rx=corner_radius, ry=corner_radius))
                     
                     if not label_hide:
                         # Use proportional positioning within task bar
@@ -478,23 +478,25 @@ class GanttChartService(QObject):
             link_goes_right = to_center_x > from_center_x
             
             # Calculate connection points for milestones based on link direction
+            # For circles, connection points are on the circumference
             if from_is_milestone:
-                # Origin (From Milestone): choose corner based on link direction
+                # Origin (From Milestone): choose point on circle circumference based on link direction
                 from_center_x = (from_task["x_start"] + from_task["x_end"]) / 2
                 from_center_y = from_task["y_center"]
+                milestone_radius = milestone_half_size  # Circle radius
                 
                 if same_row and link_goes_right:
-                    # Link goes rightward - use right corner
-                    origin_x = from_center_x + milestone_half_size
+                    # Link goes rightward - use rightmost point on circle
+                    origin_x = from_center_x + milestone_radius
                     origin_y = from_center_y
                 elif successor_below:
-                    # Link goes downward - use bottom corner
+                    # Link goes downward - use bottommost point on circle
                     origin_x = from_center_x
-                    origin_y = from_center_y + milestone_half_size
+                    origin_y = from_center_y + milestone_radius
                 elif successor_above:
-                    # Link goes upward - use top corner
+                    # Link goes upward - use topmost point on circle
                     origin_x = from_center_x
-                    origin_y = from_center_y - milestone_half_size
+                    origin_y = from_center_y - milestone_radius
                 else:
                     # Fallback to center (shouldn't happen in FS dependencies)
                     origin_x = from_center_x
@@ -505,22 +507,23 @@ class GanttChartService(QObject):
                 origin_y = from_task["y_center"]
             
             if to_is_milestone:
-                # Termination (To Milestone): choose corner based on link approach direction
+                # Termination (To Milestone): choose point on circle circumference based on link approach direction
                 to_center_x = (to_task["x_start"] + to_task["x_end"]) / 2
                 to_center_y = to_task["y_center"]
+                milestone_radius = milestone_half_size  # Circle radius
                 
                 if same_row and link_goes_right:
-                    # Link approaches from left - use left corner
-                    term_x = to_center_x - milestone_half_size
+                    # Link approaches from left - use leftmost point on circle
+                    term_x = to_center_x - milestone_radius
                     term_y = to_center_y
                 elif successor_below:
-                    # Link approaches from above - use top corner
+                    # Link approaches from above - use topmost point on circle
                     term_x = to_center_x
-                    term_y = to_center_y - milestone_half_size
+                    term_y = to_center_y - milestone_radius
                 elif successor_above:
-                    # Link approaches from below - use bottom corner
+                    # Link approaches from below - use bottommost point on circle
                     term_x = to_center_x
-                    term_y = to_center_y + milestone_half_size
+                    term_y = to_center_y + milestone_radius
                 else:
                     # Fallback to center (shouldn't happen in FS dependencies)
                     term_x = to_center_x
