@@ -448,33 +448,88 @@ class GanttChartService(QObject):
             to_start_date_str = to_task_data.get("start_date", "")
             
             # Determine connection points based on task type (milestone vs regular task)
-            # For milestones: use center point (center_x = x_start + half_size, or calculated from date)
+            # For milestones: use appropriate corner based on link direction
             # For regular tasks: use right edge (predecessor) and left edge (successor)
             from_is_milestone = from_task.get("is_milestone", False)
             to_is_milestone = to_task.get("is_milestone", False)
             
-            if from_is_milestone:
-                # Milestone: use center point
-                # For milestones, x_start and x_end represent the left and right edges of the diamond
-                # Center is at (x_start + x_end) / 2
-                origin_x = (from_task["x_start"] + from_task["x_end"]) / 2
-            else:
-                # Regular task: use right edge
-                origin_x = from_task["x_end"]
+            # Calculate milestone half_size if needed (for corner calculations)
+            # half_size = task_height / 2, where task_height = row_height * 0.8
+            row_height = row_frame_height / num_rows if num_rows > 0 else row_frame_height
+            task_height = row_height * 0.8
+            milestone_half_size = task_height / 2
             
-            origin_y = from_task["y_center"]
+            # Determine preliminary positions to calculate link direction
+            # We'll refine these based on milestone corners
+            if from_is_milestone:
+                from_center_x = (from_task["x_start"] + from_task["x_end"]) / 2
+            else:
+                from_center_x = from_task["x_end"]
             
             if to_is_milestone:
-                # Milestone: use center point
-                term_x = (to_task["x_start"] + to_task["x_end"]) / 2
+                to_center_x = (to_task["x_start"] + to_task["x_end"]) / 2
             else:
-                # Regular task: use left edge
-                term_x = to_task["x_start"]
-            
-            term_y = to_task["y_center"]
+                to_center_x = to_task["x_start"]
             
             # Determine routing based on positions and dates
             same_row = from_task["row_num"] == to_task["row_num"]
+            successor_below = to_task["row_num"] > from_task["row_num"]
+            successor_above = to_task["row_num"] < from_task["row_num"]
+            link_goes_right = to_center_x > from_center_x
+            
+            # Calculate connection points for milestones based on link direction
+            if from_is_milestone:
+                # Origin (From Milestone): choose corner based on link direction
+                from_center_x = (from_task["x_start"] + from_task["x_end"]) / 2
+                from_center_y = from_task["y_center"]
+                
+                if same_row and link_goes_right:
+                    # Link goes rightward - use right corner
+                    origin_x = from_center_x + milestone_half_size
+                    origin_y = from_center_y
+                elif successor_below:
+                    # Link goes downward - use bottom corner
+                    origin_x = from_center_x
+                    origin_y = from_center_y + milestone_half_size
+                elif successor_above:
+                    # Link goes upward - use top corner
+                    origin_x = from_center_x
+                    origin_y = from_center_y - milestone_half_size
+                else:
+                    # Fallback to center (shouldn't happen in FS dependencies)
+                    origin_x = from_center_x
+                    origin_y = from_center_y
+            else:
+                # Regular task: use right edge
+                origin_x = from_task["x_end"]
+                origin_y = from_task["y_center"]
+            
+            if to_is_milestone:
+                # Termination (To Milestone): choose corner based on link approach direction
+                to_center_x = (to_task["x_start"] + to_task["x_end"]) / 2
+                to_center_y = to_task["y_center"]
+                
+                if same_row and link_goes_right:
+                    # Link approaches from left - use left corner
+                    term_x = to_center_x - milestone_half_size
+                    term_y = to_center_y
+                elif successor_below:
+                    # Link approaches from above - use top corner
+                    term_x = to_center_x
+                    term_y = to_center_y - milestone_half_size
+                elif successor_above:
+                    # Link approaches from below - use bottom corner
+                    term_x = to_center_x
+                    term_y = to_center_y + milestone_half_size
+                else:
+                    # Fallback to center (shouldn't happen in FS dependencies)
+                    term_x = to_center_x
+                    term_y = to_center_y
+            else:
+                # Regular task: use left edge
+                term_x = to_task["x_start"]
+                term_y = to_task["y_center"]
+            
             # Check if predecessor finishes on same date as successor starts (actual date comparison)
             same_date = False
             if from_finish_date_str and to_start_date_str:
