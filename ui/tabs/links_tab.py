@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import (QWidget, QTableWidget, QVBoxLayout, QPushButton, 
                            QHBoxLayout, QHeaderView, QTableWidgetItem, 
-                           QMessageBox, QGroupBox, QSizePolicy, QComboBox)
+                           QMessageBox, QGroupBox, QSizePolicy, QComboBox, QLabel, QGridLayout)
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QBrush, QColor
 from typing import List, Dict, Any
@@ -18,6 +18,8 @@ class LinksTab(BaseTab):
 
     def __init__(self, project_data, app_config):
         self.table_config = app_config.get_table_config("links")
+        self._selected_row = None  # Track currently selected row
+        self._updating_form = False  # Prevent circular updates
         super().__init__(project_data, app_config)
 
     def setup_ui(self):
@@ -58,7 +60,7 @@ class LinksTab(BaseTab):
         # Table styling
         self.links_table.setAlternatingRowColors(False)  # Disabled to avoid conflict with read-only cell backgrounds
         self.links_table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.links_table.setSelectionMode(QTableWidget.ExtendedSelection)
+        self.links_table.setSelectionMode(QTableWidget.SingleSelection)  # Single selection for detail form
         self.links_table.setShowGrid(True)
         self.links_table.verticalHeader().setVisible(False)
         
@@ -94,11 +96,104 @@ class LinksTab(BaseTab):
         table_group_layout.addWidget(self.links_table)
         table_group.setLayout(table_group_layout)
         
-        layout.addWidget(table_group)
+        # Add table group with stretch factor so it expands to fill available space
+        layout.addWidget(table_group, 1)  # Stretch factor of 1 makes it expand
+        
+        # Create detail form group box
+        detail_group = self._create_detail_form()
+        layout.addWidget(detail_group)  # No stretch factor - stays at natural size
+        
         self.setLayout(layout)
+
+    def _create_detail_form(self) -> QGroupBox:
+        """Create the detail form for editing link style fields."""
+        group = QGroupBox("Link Style")
+        layout = QGridLayout()
+        layout.setHorizontalSpacing(10)
+        layout.setVerticalSpacing(5)
+        layout.setContentsMargins(10, 10, 10, 10)
+        
+        LABEL_WIDTH = 120
+        
+        # Line Color
+        color_label = QLabel("Line Color:")
+        color_label.setFixedWidth(LABEL_WIDTH)
+        self.detail_line_color = QComboBox()
+        self.detail_line_color.addItems(["black", "red"])
+        self.detail_line_color.setToolTip("Color of the link line and arrowhead")
+        self.detail_line_color.currentTextChanged.connect(self._on_detail_form_changed)
+        
+        # Line Style
+        style_label = QLabel("Line Style:")
+        style_label.setFixedWidth(LABEL_WIDTH)
+        self.detail_line_style = QComboBox()
+        self.detail_line_style.addItems(["solid", "dotted", "dashed"])
+        self.detail_line_style.setToolTip("Style of the link line (solid, dotted, or dashed)")
+        self.detail_line_style.currentTextChanged.connect(self._on_detail_form_changed)
+        
+        # Layout form fields vertically (like tasks tab)
+        layout.addWidget(color_label, 0, 0)
+        layout.addWidget(self.detail_line_color, 0, 1)
+        layout.addWidget(style_label, 1, 0)
+        layout.addWidget(self.detail_line_style, 1, 1)
+        
+        layout.setColumnStretch(1, 1)
+        
+        group.setLayout(layout)
+        return group
+
+    def _on_table_selection_changed(self):
+        """Handle table selection changes - populate detail form."""
+        selected_rows = self.links_table.selectionModel().selectedRows()
+        if not selected_rows:
+            self._selected_row = None
+            self._clear_detail_form()
+            return
+        
+        row = selected_rows[0].row()
+        self._selected_row = row
+        self._populate_detail_form(row)
+
+    def _populate_detail_form(self, row: int):
+        """Populate detail form with data from selected link."""
+        self._updating_form = True
+        
+        try:
+            # Get data from project_data for the selected row
+            table_data = self.project_data.get_table_data("links")
+            if row < len(table_data):
+                row_data = table_data[row]
+                # row_data structure: [ID, From Task ID, From Task Name, To Task ID, To Task Name, Valid, Line Color, Line Style]
+                if len(row_data) >= 8:
+                    self.detail_line_color.setCurrentText(str(row_data[6]) if row_data[6] else "black")
+                    self.detail_line_style.setCurrentText(str(row_data[7]) if row_data[7] else "solid")
+                elif len(row_data) >= 6:
+                    # Old format without style fields - use defaults
+                    self.detail_line_color.setCurrentText("black")
+                    self.detail_line_style.setCurrentText("solid")
+        finally:
+            self._updating_form = False
+
+    def _clear_detail_form(self):
+        """Clear the detail form when no link is selected."""
+        self._updating_form = True
+        try:
+            self.detail_line_color.setCurrentText("black")
+            self.detail_line_style.setCurrentText("solid")
+        finally:
+            self._updating_form = False
+
+    def _on_detail_form_changed(self):
+        """Handle changes in detail form - update selected link."""
+        if self._updating_form or self._selected_row is None:
+            return
+        
+        # Trigger sync to update the data
+        self._sync_data_if_not_initializing()
 
     def _connect_signals(self):
         self.links_table.itemChanged.connect(self._on_item_changed)
+        self.links_table.selectionModel().selectionChanged.connect(self._on_table_selection_changed)
     
     def _on_item_changed(self, item):
         """Handle item changes - update UserRole for numeric columns to maintain proper sorting."""
@@ -260,7 +355,35 @@ class LinksTab(BaseTab):
         # Extract table data (excludes checkbox column)
         data = extract_table_data(self.links_table)
         
+        # Get existing link data to preserve style fields for non-selected rows
+        existing_data = self.project_data.get_table_data("links")
+        
         # data structure: [[ID, From Task ID, From Task Name, To Task ID, To Task Name, Valid], ...]
+        # Add style fields from detail form for selected row, or preserve existing values for others
+        headers = [col.name for col in self.table_config.columns]
+        for row_idx, row in enumerate(data):
+            # Ensure row has at least 6 elements
+            while len(row) < 6:
+                row.append("")
+            
+            # If this is the selected row, add style fields from detail form
+            if row_idx == self._selected_row:
+                # Add Line Color and Line Style from detail form
+                if len(row) < 8:
+                    row.extend(["", ""])  # Add placeholders if needed
+                row[6] = self.detail_line_color.currentText() if self.detail_line_color else "black"
+                row[7] = self.detail_line_style.currentText() if self.detail_line_style else "solid"
+            else:
+                # For non-selected rows, preserve existing style fields or use defaults
+                if len(row) < 8:
+                    if row_idx < len(existing_data) and len(existing_data[row_idx]) >= 8:
+                        # Preserve existing style values
+                        row.append(existing_data[row_idx][6] if existing_data[row_idx][6] else "black")
+                        row.append(existing_data[row_idx][7] if existing_data[row_idx][7] else "solid")
+                    else:
+                        # Use defaults if no existing data
+                        row.extend(["black", "solid"])
+        
         # Note: Valid field will be recalculated in update_from_table
         errors = self.project_data.update_from_table("links", data)
         

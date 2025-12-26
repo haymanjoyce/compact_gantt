@@ -281,7 +281,7 @@ class ProjectData:
                 new_links = []
                 for row_idx, row in enumerate(data, 1):
                     try:
-                        # Skip empty rows - now expects: [ID, From Task ID, From Task Name, To Task ID, To Task Name, Valid]
+                        # Skip empty rows - now expects: [ID, From Task ID, From Task Name, To Task ID, To Task Name, Valid, Line Color, Line Style]
                         if not row or len(row) < 6:
                             continue
                         
@@ -296,9 +296,14 @@ class ProjectData:
                         if from_task_id <= 0 or to_task_id <= 0:
                             # Invalid IDs - set Valid to "No" but still save the link
                             valid_status = "No"
-                            # Ensure row has 6 elements: [ID, From Task ID, From Task Name, To Task ID, To Task Name, Valid]
-                            while len(row) < 6:
-                                row.append("")
+                            # Ensure row has 8 elements: [ID, From Task ID, From Task Name, To Task ID, To Task Name, Valid, Line Color, Line Style]
+                            while len(row) < 8:
+                                if len(row) == 6:
+                                    row.append("black")  # Default Line Color
+                                elif len(row) == 7:
+                                    row.append("solid")  # Default Line Style
+                                else:
+                                    row.append("")
                             row[5] = valid_status  # Valid is at index 5
                             new_links.append(row)
                             continue
@@ -316,9 +321,14 @@ class ProjectData:
                         if not from_task or not to_task:
                             # Task not found - set Valid to "No" but still save the link
                             valid_status = "No"
-                            # Ensure row has 6 elements: [ID, From Task ID, From Task Name, To Task ID, To Task Name, Valid]
-                            while len(row) < 6:
-                                row.append("")
+                            # Ensure row has 8 elements: [ID, From Task ID, From Task Name, To Task ID, To Task Name, Valid, Line Color, Line Style]
+                            while len(row) < 8:
+                                if len(row) == 6:
+                                    row.append("black")  # Default Line Color
+                                elif len(row) == 7:
+                                    row.append("solid")  # Default Line Style
+                                else:
+                                    row.append("")
                             row[5] = valid_status  # Valid is at index 5
                             new_links.append(row)
                             continue
@@ -351,9 +361,14 @@ class ProjectData:
                                 valid_status = "No"
                         
                         # Update or add Valid field (at index 5)
-                        # Ensure row has 6 elements: [ID, From Task ID, From Task Name, To Task ID, To Task Name, Valid]
-                        while len(row) < 6:
-                            row.append("")
+                        # Ensure row has 8 elements: [ID, From Task ID, From Task Name, To Task ID, To Task Name, Valid, Line Color, Line Style]
+                        while len(row) < 8:
+                            if len(row) == 6:
+                                row.append("black")  # Default Line Color
+                            elif len(row) == 7:
+                                row.append("solid")  # Default Line Style
+                            else:
+                                row.append("")
                         row[5] = valid_status  # Valid is at index 5
                         # Task names will be updated in get_table_data, so we keep them as-is here
                         
@@ -383,44 +398,44 @@ class ProjectData:
             # Create a mapping of task_id to task_name for quick lookup
             task_name_map = {task.task_id: task.task_name for task in self.tasks}
             
-            # Ensure all links have 6 elements: [ID, From Task ID, From Task Name, To Task ID, To Task Name, Valid]
+            # Ensure all links have 8 elements: [ID, From Task ID, From Task Name, To Task ID, To Task Name, Valid, Line Color, Line Style]
             result = []
             for link in getattr(self, key, []):
                 if len(link) >= 2:  # At minimum need From Task ID
-                    # Ensure all 6 fields exist
-                    if len(link) >= 6:
+                    # Ensure all 8 fields exist
+                    if len(link) >= 8:
                         # Update task names in case tasks have changed
                         from_id = safe_int(link[1]) if len(link) > 1 else 0
                         to_id = safe_int(link[3]) if len(link) > 3 else 0
                         link[2] = task_name_map.get(from_id, "")  # From Task Name
                         link[4] = task_name_map.get(to_id, "")   # To Task Name
-                        result.append(link[:6])
+                        result.append(link[:8])
                     elif len(link) >= 4:
-                        # Old format: [ID, From Task ID, To Task ID, Valid] - add names
+                        # Old format: [ID, From Task ID, To Task ID, Valid] - add names and style fields
                         from_id = safe_int(link[1]) if len(link) > 1 else 0
                         to_id = safe_int(link[2]) if len(link) > 2 else 0
                         from_name = task_name_map.get(from_id, "")
                         to_name = task_name_map.get(to_id, "")
-                        result.append([link[0], link[1], from_name, link[2], to_name, link[3] if len(link) > 3 else "Yes"])
+                        result.append([link[0], link[1], from_name, link[2], to_name, link[3] if len(link) > 3 else "Yes", "black", "solid"])
                     elif len(link) == 3:
-                        # Old format without ID - generate one and add names
+                        # Old format without ID - generate one and add names and style fields
                         max_id = max([int(l[0]) for l in result if len(l) > 0 and l[0].isdigit()], default=0) if result else 0
                         from_id = safe_int(link[0])
                         to_id = safe_int(link[1])
                         from_name = task_name_map.get(from_id, "")
                         to_name = task_name_map.get(to_id, "")
-                        result.append([str(max_id + 1), link[0], from_name, link[1], to_name, link[2] if len(link) > 2 else "Yes"])
+                        result.append([str(max_id + 1), link[0], from_name, link[1], to_name, link[2] if len(link) > 2 else "Yes", "black", "solid"])
                     elif len(link) == 2:
-                        # Old format without ID and Valid - generate both and add names
+                        # Old format without ID and Valid - generate both and add names and style fields
                         max_id = max([int(l[0]) for l in result if len(l) > 0 and l[0].isdigit()], default=0) if result else 0
                         from_id = safe_int(link[0])
                         to_id = safe_int(link[1])
                         from_name = task_name_map.get(from_id, "")
                         to_name = task_name_map.get(to_id, "")
-                        result.append([str(max_id + 1), link[0], from_name, link[1], to_name, "Yes"])
+                        result.append([str(max_id + 1), link[0], from_name, link[1], to_name, "Yes", "black", "solid"])
                     else:
-                        # Default with ID
+                        # Default with ID and style fields
                         max_id = max([int(l[0]) for l in result if len(l) > 0 and l[0].isdigit()], default=0) if result else 0
-                        result.append([str(max_id + 1), "", "", "", "", "Yes"])
+                        result.append([str(max_id + 1), "", "", "", "", "Yes", "black", "solid"])
             return result
         return getattr(self, key, [])

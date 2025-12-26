@@ -364,13 +364,14 @@ class GanttChartService(QObject):
         
         return None
 
-    def _render_arrowhead(self, x: float, y: float, direction: str = "left", size: float = 5):
+    def _render_arrowhead(self, x: float, y: float, direction: str = "left", size: float = 5, color: str = "black"):
         """Render an arrowhead at the specified position.
         
         Args:
             x, y: Position of arrowhead tip
             direction: "left", "right", "up", or "down"
             size: Size of arrowhead in pixels
+            color: Color of the arrowhead (default: "black")
         """
         if direction == "left":
             # Tip at (x, y), base to the left (flipped horizontally from previous)
@@ -383,7 +384,7 @@ class GanttChartService(QObject):
         else:  # down
             points = [(x, y), (x - size/2, y - size), (x + size/2, y - size)]
         
-        self.dwg.add(self.dwg.polygon(points=points, fill="black", stroke="none"))
+        self.dwg.add(self.dwg.polygon(points=points, fill=color, stroke="none"))
 
     def render_links(self, x, row_y, width, row_frame_height, start_date, end_date):
         """Render links between tasks according to Finish-to-Start (FS) dependency rules.
@@ -411,18 +412,41 @@ class GanttChartService(QObject):
         row_height = row_frame_height / num_rows if num_rows > 0 else row_frame_height
         
         for link in links:
-            if len(link) < 6:  # Now expects: [ID, From Task ID, From Task Name, To Task ID, To Task Name, Valid]
+            if len(link) < 6:  # Minimum: [ID, From Task ID, From Task Name, To Task ID, To Task Name, Valid]
                 continue
             
             # Check if link is valid (if Valid field exists and is "No", skip rendering)
             if len(link) >= 6 and str(link[5]).strip().lower() == "no":  # Valid is at index 5
                 continue  # Skip invalid links
             
+            # Get style properties from link data (with defaults)
+            line_color = str(link[6]).strip() if len(link) > 6 and link[6] else "black"
+            line_style = str(link[7]).strip() if len(link) > 7 and link[7] else "solid"
+            
+            # Map line style to SVG stroke-dasharray
+            stroke_dasharray = None
+            if line_style == "dotted":
+                stroke_dasharray = "2,2"
+            elif line_style == "dashed":
+                stroke_dasharray = "5,5"
+            # "solid" uses None (no dasharray)
+            
             try:
                 from_task_id = int(link[1])  # From Task ID is at index 1
                 to_task_id = int(link[3])   # To Task ID is at index 3
             except (ValueError, TypeError):
                 continue
+            
+            # Helper function to create line with style
+            def create_line(start, end):
+                """Create a line with the link's style properties."""
+                line_attrs = {
+                    "stroke": line_color,
+                    "stroke_width": 1.5
+                }
+                if stroke_dasharray:
+                    line_attrs["stroke_dasharray"] = stroke_dasharray
+                return self.dwg.line(start, end, **line_attrs)
             
             # Get positions for both tasks - use row_y and row_frame_height for correct vertical positioning
             from_task = self._get_task_position(from_task_id, x, row_y, width, row_frame_height, start_date, end_date, num_rows)
@@ -587,9 +611,8 @@ class GanttChartService(QObject):
                     # Shorten line by arrowhead size so it ends at arrowhead base
                     arrow_size = 5
                     line_end_x = term_x - arrow_size  # Arrow points left, base is to the right
-                    self.dwg.add(self.dwg.line((origin_x, origin_y), (line_end_x, term_y),
-                                              stroke="black", stroke_width=1.5))
-                    self._render_arrowhead(term_x, term_y, "left", arrow_size)
+                    self.dwg.add(create_line((origin_x, origin_y), (line_end_x, term_y)))
+                    self._render_arrowhead(term_x, term_y, "left", arrow_size, line_color)
             else:
                 # Different rows
                 if same_date:
@@ -602,17 +625,15 @@ class GanttChartService(QObject):
                             # Shorten line by arrowhead size so it ends at arrowhead base
                             arrow_size = 5
                             line_end_y = term_y - arrow_size  # Arrow points down, base is above
-                            self.dwg.add(self.dwg.line((origin_x, origin_y), (term_x, line_end_y),
-                                                      stroke="black", stroke_width=1.5))
-                            self._render_arrowhead(term_x, term_y, "down", arrow_size)
+                            self.dwg.add(create_line((origin_x, origin_y), (term_x, line_end_y)))
+                            self._render_arrowhead(term_x, term_y, "down", arrow_size, line_color)
                         else:
                             # Successor above - upward arrow
                             # Shorten line by arrowhead size so it ends at arrowhead base
                             arrow_size = 5
                             line_end_y = term_y + arrow_size  # Arrow points up, base is below
-                            self.dwg.add(self.dwg.line((origin_x, origin_y), (term_x, line_end_y),
-                                                      stroke="black", stroke_width=1.5))
-                            self._render_arrowhead(term_x, term_y, "up", arrow_size)
+                            self.dwg.add(create_line((origin_x, origin_y), (term_x, line_end_y)))
+                            self._render_arrowhead(term_x, term_y, "up", arrow_size, line_color)
                     else:
                         # Not perfectly aligned - use V-H-V pattern
                         # Calculate row midpoint y
@@ -623,25 +644,19 @@ class GanttChartService(QObject):
                             arrow_size = 5
                             # Shorten final vertical segment so it ends at arrowhead base
                             line_end_y = term_y - arrow_size  # Arrow points down, base is above
-                            self.dwg.add(self.dwg.line((origin_x, origin_y), (origin_x, mid_y),
-                                                      stroke="black", stroke_width=1.5))
-                            self.dwg.add(self.dwg.line((origin_x, mid_y), (term_x, mid_y),
-                                                      stroke="black", stroke_width=1.5))
-                            self.dwg.add(self.dwg.line((term_x, mid_y), (term_x, line_end_y),
-                                                      stroke="black", stroke_width=1.5))
-                            self._render_arrowhead(term_x, term_y, "down", arrow_size)
+                            self.dwg.add(create_line((origin_x, origin_y), (origin_x, mid_y)))
+                            self.dwg.add(create_line((origin_x, mid_y), (term_x, mid_y)))
+                            self.dwg.add(create_line((term_x, mid_y), (term_x, line_end_y)))
+                            self._render_arrowhead(term_x, term_y, "down", arrow_size, line_color)
                         else:
                             # Successor above - V-H-V upward
                             arrow_size = 5
                             # Shorten final vertical segment so it ends at arrowhead base
                             line_end_y = term_y + arrow_size  # Arrow points up, base is below
-                            self.dwg.add(self.dwg.line((origin_x, origin_y), (origin_x, mid_y),
-                                                      stroke="black", stroke_width=1.5))
-                            self.dwg.add(self.dwg.line((origin_x, mid_y), (term_x, mid_y),
-                                                      stroke="black", stroke_width=1.5))
-                            self.dwg.add(self.dwg.line((term_x, mid_y), (term_x, line_end_y),
-                                                      stroke="black", stroke_width=1.5))
-                            self._render_arrowhead(term_x, term_y, "up", arrow_size)
+                            self.dwg.add(create_line((origin_x, origin_y), (origin_x, mid_y)))
+                            self.dwg.add(create_line((origin_x, mid_y), (term_x, mid_y)))
+                            self.dwg.add(create_line((term_x, mid_y), (term_x, line_end_y)))
+                            self._render_arrowhead(term_x, term_y, "up", arrow_size, line_color)
                 else:
                     # Case 2b/3b: Positive Gap/Lag (Successor Starts Later)
                     # V-H-V pattern
@@ -655,13 +670,10 @@ class GanttChartService(QObject):
                         # Segment 3: Vertical down to termination (shortened to arrowhead base)
                         arrow_size = 5
                         line_end_y = term_y - arrow_size  # Arrow points down, base is above
-                        self.dwg.add(self.dwg.line((origin_x, origin_y), (origin_x, mid_y),
-                                                  stroke="black", stroke_width=1.5))
-                        self.dwg.add(self.dwg.line((origin_x, mid_y), (term_x, mid_y),
-                                                  stroke="black", stroke_width=1.5))
-                        self.dwg.add(self.dwg.line((term_x, mid_y), (term_x, line_end_y),
-                                                  stroke="black", stroke_width=1.5))
-                        self._render_arrowhead(term_x, term_y, "down", arrow_size)
+                        self.dwg.add(create_line((origin_x, origin_y), (origin_x, mid_y)))
+                        self.dwg.add(create_line((origin_x, mid_y), (term_x, mid_y)))
+                        self.dwg.add(create_line((term_x, mid_y), (term_x, line_end_y)))
+                        self._render_arrowhead(term_x, term_y, "down", arrow_size, line_color)
                     else:
                         # Successor above - V-H-V upward
                         # Segment 1: Vertical up from origin to row midpoint
@@ -669,13 +681,10 @@ class GanttChartService(QObject):
                         # Segment 3: Vertical up to termination (shortened to arrowhead base)
                         arrow_size = 5
                         line_end_y = term_y + arrow_size  # Arrow points up, base is below
-                        self.dwg.add(self.dwg.line((origin_x, origin_y), (origin_x, mid_y),
-                                                  stroke="black", stroke_width=1.5))
-                        self.dwg.add(self.dwg.line((origin_x, mid_y), (term_x, mid_y),
-                                                  stroke="black", stroke_width=1.5))
-                        self.dwg.add(self.dwg.line((term_x, mid_y), (term_x, line_end_y),
-                                                  stroke="black", stroke_width=1.5))
-                        self._render_arrowhead(term_x, term_y, "up", arrow_size)
+                        self.dwg.add(create_line((origin_x, origin_y), (origin_x, mid_y)))
+                        self.dwg.add(create_line((origin_x, mid_y), (term_x, mid_y)))
+                        self.dwg.add(create_line((term_x, mid_y), (term_x, line_end_y)))
+                        self._render_arrowhead(term_x, term_y, "up", arrow_size, line_color)
 
     def render_scales_and_rows(self, x, y, width, height, start_date, end_date):
         logging.debug(f"Rendering scales and rows from {start_date} to {end_date}")
