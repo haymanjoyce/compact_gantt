@@ -249,6 +249,12 @@ def add_row(table, table_key, table_configs, parent, id_field_name, row_index=No
                     id_item.setBackground(QBrush(READ_ONLY_BG))  # Gray background
                     id_item.setData(Qt.UserRole, int(next_id))
                 table.setItem(row_index, col_idx, id_item)
+            # Valid column for links and tasks - read-only text (check BEFORE combo box to ensure it's never a combo)
+            elif header_text == "Valid":
+                item = QTableWidgetItem(str(default) if default else "Yes")
+                item.setFlags(item.flags() & ~Qt.ItemIsEditable)  # Make read-only
+                item.setBackground(QBrush(READ_ONLY_BG))  # Gray background
+                table.setItem(row_index, col_idx, item)
             # Combo box column
             elif col_config and getattr(col_config, "widget_type", None) == "combo":
                 combo = QComboBox()
@@ -258,12 +264,6 @@ def add_row(table, table_key, table_configs, parent, id_field_name, row_index=No
                 if hasattr(parent, '_sync_data_if_not_initializing'):
                     combo.currentTextChanged.connect(parent._sync_data_if_not_initializing)
                 table.setCellWidget(row_index, col_idx, combo)
-            # Valid column for links and tasks - read-only text
-            elif header_text == "Valid":
-                item = QTableWidgetItem(str(default) if default else "Yes")
-                item.setFlags(item.flags() & ~Qt.ItemIsEditable)  # Make read-only
-                item.setBackground(QBrush(READ_ONLY_BG))  # Gray background
-                table.setItem(row_index, col_idx, item)
             # Date column - check by column name for tasks table (Start Date, Finish Date)
             elif header_text in ["Start Date", "Finish Date"]:
                 item = DateTableWidgetItem(str(default))
