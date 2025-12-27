@@ -281,6 +281,12 @@ class TasksTab(BaseTab):
                     except ValueError:
                         finish_date_internal = ""
             
+            # Auto-populate missing date field for milestones (if only one date is provided)
+            if start_date_internal and not finish_date_internal:
+                finish_date_internal = start_date_internal  # Auto-populate finish date
+            elif finish_date_internal and not start_date_internal:
+                start_date_internal = finish_date_internal  # Auto-populate start date
+            
             # Extract Label and Placement from detail form if this is the selected row
             # Otherwise, get from existing Task object
             label_hide = "Yes"
@@ -495,6 +501,27 @@ class TasksTab(BaseTab):
                             normalized = normalize_display_date(val_str)
                             date_obj = datetime.strptime(normalized, "%d/%m/%Y")
                             logging.debug(f"_on_item_changed: Parsed date successfully: {date_obj}")
+                            
+                            # Auto-populate the other date field for milestones (if only one date is provided)
+                            other_col_name = "Finish Date" if col_name == "Start Date" else "Start Date"
+                            other_col_idx = self._get_column_index(other_col_name)
+                            if other_col_idx is not None:
+                                other_col_vis_idx = self._reverse_column_mapping.get(other_col_idx)
+                                if other_col_vis_idx is not None:
+                                    other_date_item = self.tasks_table.item(row, other_col_vis_idx)
+                                    if other_date_item:
+                                        other_date_text = other_date_item.text().strip()
+                                        if not other_date_text:
+                                            # Other date field is empty - auto-populate it with the same date
+                                            other_date_item.setText(normalized)
+                                            other_date_item.setData(Qt.UserRole, date_obj)
+                                            logging.debug(f"_on_item_changed: Auto-populated {other_col_name} with {normalized}")
+                                    else:
+                                        # Other date item doesn't exist - create it
+                                        other_date_item = DateTableWidgetItem(normalized)
+                                        other_date_item.setData(Qt.UserRole, date_obj)
+                                        self.tasks_table.setItem(row, other_col_vis_idx, other_date_item)
+                                        logging.debug(f"_on_item_changed: Created and auto-populated {other_col_name} with {normalized}")
                         except ValueError as e:
                             logging.debug(f"_on_item_changed: Date parsing failed: {e}")
                             date_obj = None
