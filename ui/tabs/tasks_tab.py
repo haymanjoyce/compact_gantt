@@ -778,27 +778,15 @@ class TasksTab(BaseTab):
             QMessageBox.information(self, "No Selection", "Please select task(s) to duplicate by checking their checkboxes.")
             return
         
-        # Get current table data to find max ID
-        table_data = self.project_data.get_table_data("tasks")
-        used_ids = set()
-        for row_data in table_data:
-            if row_data and len(row_data) > 0:
-                try:
-                    used_ids.add(int(row_data[0]))  # ID is at index 0
-                except (ValueError, TypeError):
-                    continue
+        # Get all used task IDs from project_data
+        used_ids = {task.task_id for task in self.project_data.tasks}
         
-        # Also check IDs in the table itself
-        id_col_idx = None
-        headers = [col.name for col in self.table_config.columns]
-        for vis_idx, actual_idx in self._column_mapping.items():
-            if headers[actual_idx] == "ID":
-                id_col_idx = vis_idx
-                break
-        
-        if id_col_idx is not None:
+        # Also check IDs currently in the table
+        id_col = self._get_column_index("ID")
+        id_vis_col = self._reverse_column_mapping.get(id_col) if id_col is not None else None
+        if id_vis_col is not None:
             for row in range(self.tasks_table.rowCount()):
-                item = self.tasks_table.item(row, id_col_idx)
+                item = self.tasks_table.item(row, id_vis_col)
                 if item and item.text():
                     try:
                         used_ids.add(int(item.text()))
@@ -810,16 +798,37 @@ class TasksTab(BaseTab):
         while next_id in used_ids:
             next_id += 1
         
-        # Create mapping from column name to index in get_table_data result
-        row_data_column_map = {
-            "ID": 0,
-            "Row": 1,
-            "Name": 2,
-            "Start Date": 3,
-            "Finish Date": 4,
-            "Label": 5,
-            "Placement": 6
-        }
+        # Extract Task objects from checked rows and create duplicates
+        tasks_to_duplicate = []
+        for row_idx in checked_rows:
+            original_task = self._task_from_table_row(row_idx)
+            if not original_task:
+                continue
+            
+            # Create a new Task object with a new ID
+            new_task = Task(
+                task_id=next_id,
+                task_name=original_task.task_name,
+                start_date=original_task.start_date,
+                finish_date=original_task.finish_date,
+                row_number=original_task.row_number,
+                is_milestone=original_task.is_milestone,
+                label_placement=original_task.label_placement,
+                label_hide=original_task.label_hide,
+                label_alignment=original_task.label_alignment,
+                label_horizontal_offset=original_task.label_horizontal_offset,
+                label_text_colour=original_task.label_text_colour
+            )
+            tasks_to_duplicate.append((row_idx, new_task))
+            used_ids.add(next_id)
+            
+            # Find next available ID
+            next_id += 1
+            while next_id in used_ids:
+                next_id += 1
+        
+        if not tasks_to_duplicate:
+            return
         
         # Disable sorting and block signals during duplication
         was_sorting = self.tasks_table.isSortingEnabled()
@@ -828,33 +837,10 @@ class TasksTab(BaseTab):
         
         try:
             # Sort checked rows in reverse order to avoid index shifting issues
-            checked_rows_sorted = sorted(checked_rows, reverse=True)
+            tasks_to_duplicate_sorted = sorted(tasks_to_duplicate, key=lambda x: x[0], reverse=True)
             
-            # Collect all row data first
-            rows_to_duplicate = []
-            for orig_row_idx in checked_rows_sorted:
-                # Get the full row data from stored data
-                if orig_row_idx < len(table_data):
-                    orig_row_data = list(table_data[orig_row_idx])  # Make a copy
-                else:
-                    # Row not in stored data, extract from table
-                    orig_row_data = self._extract_row_data_from_table(orig_row_idx)
-                
-                if not orig_row_data or len(orig_row_data) < 8:
-                    continue
-                
-                # Create new row data with new ID
-                new_row_data = list(orig_row_data)  # Make a copy
-                new_row_data[0] = str(next_id)  # Set new ID
-                next_id += 1
-                while next_id in used_ids:
-                    next_id += 1
-                used_ids.add(int(new_row_data[0]))
-                
-                rows_to_duplicate.append((orig_row_idx, new_row_data))
-            
-            # Insert rows in reverse order (from bottom to top) to maintain indices
-            for orig_row_idx, new_row_data in rows_to_duplicate:
+            # Insert new rows and populate them
+            for orig_row_idx, new_task in tasks_to_duplicate_sorted:
                 # Insert new row right after the original
                 new_row_idx = orig_row_idx + 1
                 self.tasks_table.insertRow(new_row_idx)
@@ -863,77 +849,8 @@ class TasksTab(BaseTab):
                 checkbox_widget = CheckBoxWidget()
                 self.tasks_table.setCellWidget(new_row_idx, 0, checkbox_widget)
                 
-                # Populate visible columns with duplicated data
-                headers = [col.name for col in self.table_config.columns]
-                for vis_col_idx, actual_col_idx in self._column_mapping.items():
-                    if actual_col_idx == 0:  # Skip Select, already handled
-                        continue
-                    
-                    col_config = self.table_config.columns[actual_col_idx]
-                    col_name = col_config.name
-                    
-                    # Get value from new_row_data
-                    if col_name in row_data_column_map:
-                        value_idx = row_data_column_map[col_name]
-                        if value_idx < len(new_row_data):
-                            value = new_row_data[value_idx]
-                        else:
-                            value = ""
-                    else:
-                        value = ""
-                    
-                    # Format Order value to remove .0 if it's a whole number
-                    if actual_col_idx == 2:  # Task Order
-                        try:
-                            order_float = float(str(value).strip()) if str(value).strip() else 0.0
-                            if order_float == int(order_float):
-                                value = str(int(order_float))
-                            else:
-                                value = str(order_float)
-                        except (ValueError, AttributeError):
-                            pass  # Keep original value if conversion fails
-                    
-                    # Create widget/item for this column
-                    if col_config.widget_type == "combo":
-                        combo = QComboBox()
-                        combo.addItems(col_config.combo_items)
-                        combo.setCurrentText(str(value) or col_config.combo_items[0])
-                        combo.currentTextChanged.connect(self._sync_data_if_not_initializing)
-                        self.tasks_table.setCellWidget(new_row_idx, vis_col_idx, combo)
-                    else:
-                        # Handle text and numeric columns
-                        if col_name in ["Start Date", "Finish Date"]:
-                            item = DateTableWidgetItem(str(value))
-                            try:
-                                if value and str(value).strip():
-                                    date_obj = datetime.strptime(str(value).strip(), "%d/%m/%Y")
-                                    item.setData(Qt.UserRole, date_obj)
-                                else:
-                                    item.setData(Qt.UserRole, None)
-                            except (ValueError, AttributeError):
-                                item.setData(Qt.UserRole, None)
-                        elif actual_col_idx in (1, 2):  # ID, Row are numeric
-                            item = NumericTableWidgetItem(str(value))
-                        else:
-                            item = QTableWidgetItem(str(value))
-                        
-                        if actual_col_idx == 1:  # Task ID read-only
-                            item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-                            item.setBackground(QBrush(READ_ONLY_BG))  # Gray background
-                            try:
-                                item.setData(Qt.UserRole, int(str(value).strip()) if str(value).strip() else 0)
-                            except (ValueError, AttributeError):
-                                item.setData(Qt.UserRole, 0)
-                        elif actual_col_idx == 2:  # Row number numeric
-                            try:
-                                item.setData(Qt.UserRole, int(str(value).strip()) if str(value).strip() else 1)
-                            except (ValueError, AttributeError):
-                                item.setData(Qt.UserRole, 1)
-                        elif col_name == "Valid":  # Valid column - read-only text
-                            item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-                            item.setBackground(QBrush(READ_ONLY_BG))  # Gray background
-                        
-                        self.tasks_table.setItem(new_row_idx, vis_col_idx, item)
+                # Populate the new row from the Task object
+                self._update_table_row_from_task(new_row_idx, new_task)
         finally:
             self.tasks_table.blockSignals(False)
             self.tasks_table.setSortingEnabled(was_sorting)
