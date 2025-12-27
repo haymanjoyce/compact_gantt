@@ -110,3 +110,27 @@ python tests/test_project_save_load.py
 - `validators/` - Data validation
 - `utils/` - Utility functions
 - `tests/` - Test files
+
+## Architecture
+
+### Data Structures
+**Preference: Use dataclasses with named fields instead of positional arrays.**
+
+- ✅ **DO**: Use dataclasses (e.g., `Task`, `Link`) with named fields
+- ❌ **DON'T**: Use positional lists/arrays where field access relies on index positions
+
+**Rationale**: Positional arrays are brittle—adding, removing, or reordering fields breaks existing code. Named fields (dataclasses) provide:
+- Type safety and IDE autocomplete
+- Clear field names instead of magic indices
+- Resilience to field changes
+- Self-documenting code
+
+**Current Implementation**:
+- `models/task.py` - `Task` dataclass (fully refactored)
+- `models/link.py` - `Link` dataclass (fully refactored)
+- Other entities (swimlanes, pipes, etc.) still use positional arrays (legacy, pending refactor)
+
+**Guidelines for New Code**:
+- When creating new data entities, use `@dataclass` with named fields
+- When refactoring existing positional arrays, migrate to dataclasses
+- UI boundary code should work directly with dataclass objects, not positional lists
