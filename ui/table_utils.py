@@ -195,21 +195,13 @@ def add_row(table, table_key, table_configs, parent, id_field_name, row_index=No
         
         # Prepare context for default_generator if available
         context = {"max_id": next_id}
+        defaults = None
         if hasattr(config, "default_generator"):
             defaults = config.default_generator(row_index, context)
-            # For links, we want blank From/To Task IDs but Valid should default to "Yes"
-            # ID (index 0) is already set by default_generator
-            if is_links_table:
-                if len(defaults) >= 6:
-                    defaults[1] = ""  # From Task ID - blank (index 1)
-                    defaults[2] = ""  # From Task Name - blank (index 2, will be populated from task lookup)
-                    defaults[3] = ""  # To Task ID - blank (index 3)
-                    defaults[4] = ""  # To Task Name - blank (index 4, will be populated from task lookup)
-                    defaults[5] = "Yes"  # Valid - default to "Yes" (index 5)
-                    # ID (index 0) is already set by default_generator
-                else:
-                    # Ensure we have 6 elements: [ID, From Task ID, From Task Name, To Task ID, To Task Name, Valid]
-                    defaults = [str(next_id), "", "", "", "", "Yes"]
+            # For links, defaults structure: [ID, From Task ID, From Task Name, To Task ID, To Task Name, Line Color, Line Style]
+            # Table columns: [Select, ID, From Task ID, From Task Name, To Task ID, To Task Name, Valid]
+            # Note: defaults includes Line Color and Line Style which are NOT in the table
+            # Note: table includes Valid which is NOT in defaults
         else:
             # If no generator, use empty strings except Valid column for links and tasks
             defaults = [""] * (table.columnCount() - 1)  # Exclude checkbox column
@@ -231,9 +223,27 @@ def add_row(table, table_key, table_configs, parent, id_field_name, row_index=No
                     pass
 
             # Use default from generator if available, else empty string
+            # For links table, map by column name since defaults structure doesn't match table columns
             default = ""
-            if defaults and col_idx < len(defaults):
-                default = defaults[col_idx]  # defaults already includes checkbox at index 0
+            if is_links_table and defaults and hasattr(config, "default_generator"):
+                # Map columns by name (defaults: [ID(0), From Task ID(1), From Task Name(2), To Task ID(3), To Task Name(4), Line Color(5), Line Style(6)])
+                # Table columns: [Select, ID(1), From Task ID(2), From Task Name(3), To Task ID(4), To Task Name(5), Valid(6)]
+                # For new rows added via add_row, make task IDs and names blank (they'll be entered by user)
+                if header_text == "ID":
+                    # ID is handled separately below, use next_id
+                    default = str(next_id)
+                elif header_text == "From Task ID":
+                    default = ""  # Blank for new rows
+                elif header_text == "From Task Name":
+                    default = ""  # Blank for new rows (populated from task lookup)
+                elif header_text == "To Task ID":
+                    default = ""  # Blank for new rows
+                elif header_text == "To Task Name":
+                    default = ""  # Blank for new rows (populated from task lookup)
+                # Note: Line Color (defaults[5]) and Line Style (defaults[6]) are NOT in the table - they're handled by detail form
+                # Valid column is handled separately below
+            elif defaults and col_idx < len(defaults):
+                default = defaults[col_idx]  # For non-links tables, defaults already includes checkbox at index 0
 
             # Set ID column - use NumericTableWidgetItem for numeric sorting
             if col_idx == id_column:
