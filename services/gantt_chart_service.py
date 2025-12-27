@@ -419,9 +419,48 @@ class GanttChartService(QObject):
         
         # Convert dicts to Link objects (links come from to_json() as dicts)
         links = []
+        tasks_data = self.data.get("tasks", [])
+        # Create task map for quick lookup
+        task_map = {}
+        for task_item in tasks_data:
+            if isinstance(task_item, dict):
+                task_id = task_item.get("task_id")
+            else:
+                task_id = getattr(task_item, "task_id", None)
+            if task_id:
+                task_map[task_id] = task_item
+        
         for link_item in links_data:
             if isinstance(link_item, dict):
-                links.append(Link.from_dict(link_item))
+                link = Link.from_dict(link_item)
+                # Calculate valid status (similar to update_links in project.py)
+                from_task_dict = task_map.get(link.from_task_id)
+                to_task_dict = task_map.get(link.to_task_id)
+                
+                if from_task_dict and to_task_dict:
+                    if isinstance(from_task_dict, dict):
+                        from_finish_date = from_task_dict.get("finish_date") or from_task_dict.get("start_date")
+                    else:
+                        from_finish_date = getattr(from_task_dict, "finish_date", None) or getattr(from_task_dict, "start_date", None)
+                    
+                    if isinstance(to_task_dict, dict):
+                        to_start_date = to_task_dict.get("start_date") or to_task_dict.get("finish_date")
+                    else:
+                        to_start_date = getattr(to_task_dict, "start_date", None) or getattr(to_task_dict, "finish_date", None)
+                    
+                    if from_finish_date and to_start_date:
+                        try:
+                            from_finish = datetime.strptime(from_finish_date, "%Y-%m-%d")
+                            to_start = datetime.strptime(to_start_date, "%Y-%m-%d")
+                            link.valid = "No" if to_start < from_finish else "Yes"
+                        except (ValueError, TypeError):
+                            link.valid = "No"
+                    else:
+                        link.valid = "No"
+                else:
+                    link.valid = "No"
+                
+                links.append(link)
             elif hasattr(link_item, 'link_id'):  # Already a Link object
                 links.append(link_item)
             # Skip legacy list format
@@ -430,8 +469,8 @@ class GanttChartService(QObject):
         row_height = row_frame_height / num_rows if num_rows > 0 else row_frame_height
         
         for link in links:
-            # Skip invalid links
-            if link.valid == "No":
+            # Skip invalid links (valid is None, "No", or any value other than "Yes")
+            if link.valid != "Yes":
                 continue
             
             # Get style properties
