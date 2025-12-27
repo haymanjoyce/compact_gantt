@@ -16,6 +16,18 @@ class DataValidator:
             errors.append("Invalid start date format (should be yyyy-mm-dd)")
         if not is_valid_internal_date(task.finish_date):
             errors.append("Invalid finish date format (should be yyyy-mm-dd)")
+        
+        # Check if finish date is earlier than start date (only if both dates are valid)
+        if is_valid_internal_date(task.start_date) and is_valid_internal_date(task.finish_date):
+            try:
+                start = datetime.strptime(task.start_date, "%Y-%m-%d")
+                finish = datetime.strptime(task.finish_date, "%Y-%m-%d")
+                if finish < start:
+                    errors.append("Finish date must be on or after start date")
+            except (ValueError, TypeError):
+                # Date parsing failed - format validation should have caught this, but handle gracefully
+                pass
+        
         if task.row_number <= 0:
             errors.append("Row number must be positive")
         return errors

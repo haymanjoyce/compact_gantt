@@ -146,6 +146,35 @@ class ProjectData:
             errors.append(f"Internal error: {str(e)}")
         return errors
     
+    def update_tasks(self, tasks: List[Task]) -> List[str]:
+        """
+        Update tasks from a list of Task objects directly.
+        This method validates each task and updates the tasks list.
+        
+        Args:
+            tasks: List of Task objects to update
+            
+        Returns:
+            List of error messages (empty if no errors)
+        """
+        errors = []
+        try:
+            # Validate each task
+            used_ids: Set[int] = set()
+            for task in tasks:
+                row_errors = self.validator.validate_task(task, used_ids)
+                if row_errors:
+                    errors.extend([f"Task {task.task_id}: {err}" for err in row_errors])
+                if not row_errors:
+                    used_ids.add(task.task_id)
+            
+            # Update tasks list
+            self.tasks = tasks
+        except Exception as e:
+            logging.error(f"Error in update_tasks: {e}", exc_info=True)
+            errors.append(f"Internal error: {str(e)}")
+        return errors
+    
     def update_from_table(self, key: str, data: List[List[str]]) -> List[str]:
         """Update project data from table data. Returns list of validation errors."""
         errors = []

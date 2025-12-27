@@ -3,10 +3,11 @@ from PyQt5.QtWidgets import (QWidget, QTableWidget, QVBoxLayout, QPushButton,
                            QMessageBox, QGroupBox, QSizePolicy, QLabel, QGridLayout)
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QBrush, QColor
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional, Set
 from datetime import datetime
 import logging
-from utils.conversion import normalize_display_date
+from utils.conversion import normalize_display_date, safe_int, display_to_internal_date, internal_to_display_date
+from models import Task
 
 # Read-only cell background color (light gray)
 READ_ONLY_BG = QColor(240, 240, 240)
@@ -180,14 +181,15 @@ class TasksTab(BaseTab):
         self._updating_form = True
         
         try:
-            # Get data from project_data for the selected row
-            table_data = self.project_data.get_table_data("tasks")
-            if row < len(table_data):
-                row_data = table_data[row]
-                # row_data structure: [ID, Row, Name, Start Date, Finish Date, Label, Placement]
-                if len(row_data) >= 7:
-                    self.detail_label.setCurrentText(str(row_data[5]) if row_data[5] else "Yes")
-                    self.detail_placement.setCurrentText(str(row_data[6]) if row_data[6] else "Inside")
+            # Get Task object directly from project_data
+            if row < len(self.project_data.tasks):
+                task = self.project_data.tasks[row]
+                self.detail_label.setCurrentText(task.label_hide if task.label_hide else "Yes")
+                self.detail_placement.setCurrentText(task.label_placement if task.label_placement else "Inside")
+            else:
+                # Use defaults if task doesn't exist
+                self.detail_label.setCurrentText("Yes")
+                self.detail_placement.setCurrentText("Inside")
         finally:
             self._updating_form = False
 
@@ -211,6 +213,237 @@ class TasksTab(BaseTab):
     def _connect_signals(self):
         self._item_changed_connection = self.tasks_table.itemChanged.connect(self._on_item_changed)
         self.tasks_table.selectionModel().selectionChanged.connect(self._on_table_selection_changed)
+    
+    def _get_column_index(self, column_name: str) -> Optional[int]:
+        """Get the column index for a given column name (in actual column list, not visible)."""
+        for idx, col_config in enumerate(self.table_config.columns):
+            if col_config.name == column_name:
+                return idx
+        return None
+    
+    def _task_from_table_row(self, row_idx: int) -> Optional[Task]:
+        """
+        Extract a Task object from a table row.
+        Returns None if the row is invalid or incomplete.
+        """
+        try:
+            # Get column indices by name
+            id_col = self._get_column_index("ID")
+            row_col = self._get_column_index("Row")
+            name_col = self._get_column_index("Name")
+            start_date_col = self._get_column_index("Start Date")
+            finish_date_col = self._get_column_index("Finish Date")
+            
+            if id_col is None or row_col is None or name_col is None:
+                return None
+            
+            # Map to visible column indices
+            id_vis_col = self._reverse_column_mapping.get(id_col)
+            row_vis_col = self._reverse_column_mapping.get(row_col)
+            name_vis_col = self._reverse_column_mapping.get(name_col)
+            start_date_vis_col = self._reverse_column_mapping.get(start_date_col) if start_date_col else None
+            finish_date_vis_col = self._reverse_column_mapping.get(finish_date_col) if finish_date_col else None
+            
+            if id_vis_col is None or row_vis_col is None or name_vis_col is None:
+                return None
+            
+            # Extract ID, Row, Name
+            id_item = self.tasks_table.item(row_idx, id_vis_col)
+            row_item = self.tasks_table.item(row_idx, row_vis_col)
+            name_item = self.tasks_table.item(row_idx, name_vis_col)
+            
+            if not id_item or not row_item or not name_item:
+                return None
+            
+            task_id = safe_int(id_item.text())
+            row_number = safe_int(row_item.text(), 1)
+            task_name = name_item.text().strip()
+            
+            if task_id <= 0:
+                return None
+            
+            # Extract dates (convert from display format to internal format)
+            start_date_internal = ""
+            if start_date_vis_col is not None:
+                start_date_item = self.tasks_table.item(row_idx, start_date_vis_col)
+                if start_date_item and start_date_item.text().strip():
+                    try:
+                        start_date_internal = display_to_internal_date(start_date_item.text())
+                    except ValueError:
+                        start_date_internal = ""
+            
+            finish_date_internal = ""
+            if finish_date_vis_col is not None:
+                finish_date_item = self.tasks_table.item(row_idx, finish_date_vis_col)
+                if finish_date_item and finish_date_item.text().strip():
+                    try:
+                        finish_date_internal = display_to_internal_date(finish_date_item.text())
+                    except ValueError:
+                        finish_date_internal = ""
+            
+            # Extract Label and Placement from detail form if this is the selected row
+            # Otherwise, get from existing Task object
+            label_hide = "Yes"
+            label_placement = "Inside"
+            
+            if row_idx == self._selected_row:
+                # Use values from detail form
+                if self.detail_label:
+                    label_hide = self.detail_label.currentText()
+                if self.detail_placement:
+                    label_placement = self.detail_placement.currentText()
+            else:
+                # Get from existing Task object if available (look up by task_id)
+                existing_task = next((t for t in self.project_data.tasks if t.task_id == task_id), None)
+                if existing_task:
+                    label_hide = existing_task.label_hide
+                    label_placement = existing_task.label_placement
+            
+            # Create Task object
+            task = Task(
+                task_id=task_id,
+                task_name=task_name,
+                start_date=start_date_internal,
+                finish_date=finish_date_internal,
+                row_number=row_number,
+                label_hide=label_hide,
+                label_placement=label_placement,
+                label_alignment="Centre",
+                label_horizontal_offset=1.0,
+                label_text_colour="black"
+            )
+            
+            return task
+        except (ValueError, TypeError, AttributeError) as e:
+            logging.error(f"Error extracting task from table row {row_idx}: {e}")
+            return None
+    
+    def _update_table_row_from_task(self, row_idx: int, task: Task) -> None:
+        """
+        Populate a table row from a Task object.
+        Uses column name mapping instead of positional indices.
+        """
+        # Get column indices by name
+        id_col = self._get_column_index("ID")
+        row_col = self._get_column_index("Row")
+        name_col = self._get_column_index("Name")
+        start_date_col = self._get_column_index("Start Date")
+        finish_date_col = self._get_column_index("Finish Date")
+        valid_col = self._get_column_index("Valid")
+        
+        # Map to visible column indices
+        id_vis_col = self._reverse_column_mapping.get(id_col) if id_col is not None else None
+        row_vis_col = self._reverse_column_mapping.get(row_col) if row_col is not None else None
+        name_vis_col = self._reverse_column_mapping.get(name_col) if name_col is not None else None
+        start_date_vis_col = self._reverse_column_mapping.get(start_date_col) if start_date_col is not None else None
+        finish_date_vis_col = self._reverse_column_mapping.get(finish_date_col) if finish_date_col is not None else None
+        valid_vis_col = self._reverse_column_mapping.get(valid_col) if valid_col is not None else None
+        
+        # Block signals to prevent recursive updates
+        was_blocked = self.tasks_table.signalsBlocked()
+        self.tasks_table.blockSignals(True)
+        try:
+            # Update ID column
+            if id_vis_col is not None:
+                item = self.tasks_table.item(row_idx, id_vis_col)
+                if item:
+                    item.setText(str(task.task_id))
+                    item.setData(Qt.UserRole, task.task_id)
+                else:
+                    item = NumericTableWidgetItem(str(task.task_id))
+                    item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                    item.setBackground(QBrush(READ_ONLY_BG))
+                    item.setData(Qt.UserRole, task.task_id)
+                    self.tasks_table.setItem(row_idx, id_vis_col, item)
+            
+            # Update Row column
+            if row_vis_col is not None:
+                item = self.tasks_table.item(row_idx, row_vis_col)
+                if item:
+                    item.setText(str(task.row_number))
+                    item.setData(Qt.UserRole, task.row_number)
+                else:
+                    item = NumericTableWidgetItem(str(task.row_number))
+                    item.setData(Qt.UserRole, task.row_number)
+                    self.tasks_table.setItem(row_idx, row_vis_col, item)
+            
+            # Update Name column
+            if name_vis_col is not None:
+                item = self.tasks_table.item(row_idx, name_vis_col)
+                if item:
+                    item.setText(task.task_name)
+                else:
+                    item = QTableWidgetItem(task.task_name)
+                    self.tasks_table.setItem(row_idx, name_vis_col, item)
+            
+            # Update Start Date column
+            if start_date_vis_col is not None:
+                start_date_display = internal_to_display_date(task.start_date)
+                item = self.tasks_table.item(row_idx, start_date_vis_col)
+                if item:
+                    item.setText(start_date_display)
+                    try:
+                        if start_date_display and start_date_display.strip():
+                            date_obj = datetime.strptime(start_date_display, "%d/%m/%Y")
+                            item.setData(Qt.UserRole, date_obj)
+                        else:
+                            item.setData(Qt.UserRole, None)
+                    except (ValueError, AttributeError):
+                        item.setData(Qt.UserRole, None)
+                else:
+                    item = DateTableWidgetItem(start_date_display)
+                    try:
+                        if start_date_display and start_date_display.strip():
+                            date_obj = datetime.strptime(start_date_display, "%d/%m/%Y")
+                            item.setData(Qt.UserRole, date_obj)
+                        else:
+                            item.setData(Qt.UserRole, None)
+                    except (ValueError, AttributeError):
+                        item.setData(Qt.UserRole, None)
+                    self.tasks_table.setItem(row_idx, start_date_vis_col, item)
+            
+            # Update Finish Date column
+            if finish_date_vis_col is not None:
+                finish_date_display = internal_to_display_date(task.finish_date)
+                item = self.tasks_table.item(row_idx, finish_date_vis_col)
+                if item:
+                    item.setText(finish_date_display)
+                    try:
+                        if finish_date_display and finish_date_display.strip():
+                            date_obj = datetime.strptime(finish_date_display, "%d/%m/%Y")
+                            item.setData(Qt.UserRole, date_obj)
+                        else:
+                            item.setData(Qt.UserRole, None)
+                    except (ValueError, AttributeError):
+                        item.setData(Qt.UserRole, None)
+                else:
+                    item = DateTableWidgetItem(finish_date_display)
+                    try:
+                        if finish_date_display and finish_date_display.strip():
+                            date_obj = datetime.strptime(finish_date_display, "%d/%m/%Y")
+                            item.setData(Qt.UserRole, date_obj)
+                        else:
+                            item.setData(Qt.UserRole, None)
+                    except (ValueError, AttributeError):
+                        item.setData(Qt.UserRole, None)
+                    self.tasks_table.setItem(row_idx, finish_date_vis_col, item)
+            
+            # Update Valid column (calculate valid status)
+            if valid_vis_col is not None:
+                used_ids = {t.task_id for t in self.project_data.tasks if t.task_id != task.task_id}
+                row_errors = self.project_data.validator.validate_task(task, used_ids)
+                valid_status = "No" if row_errors else "Yes"
+                
+                item = self.tasks_table.item(row_idx, valid_vis_col)
+                if item:
+                    item.setText(valid_status)
+                else:
+                    item = QTableWidgetItem(valid_status)
+                    item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                    item.setBackground(QBrush(READ_ONLY_BG))
+                    self.tasks_table.setItem(row_idx, valid_vis_col, item)
+        finally:
+            self.tasks_table.blockSignals(was_blocked)
     
     def _on_item_changed(self, item):
         """Handle item changes - update UserRole for numeric and date columns to maintain proper sorting."""
@@ -342,210 +575,75 @@ class TasksTab(BaseTab):
         self._load_initial_data_impl()
 
     def _load_initial_data_impl(self):
-        table_data = self.project_data.get_table_data("tasks")
-        row_count = len(table_data)
+        """Load initial data into the table using Task objects directly."""
+        # Get Task objects directly from project_data
+        tasks = self.project_data.tasks
+        row_count = len(tasks)
         self.tasks_table.setRowCount(row_count)
         self._initializing = True
 
-        headers = [col.name for col in self.table_config.columns]
-        
-        # Create a mapping from column name to index in row_data from get_table_data
-        # row_data structure: [ID, Row, Name, Start Date, Finish Date, Label, Placement, Valid]
-        row_data_column_map = {
-            "ID": 0,
-            "Row": 1,
-            "Name": 2,
-            "Start Date": 3,
-            "Finish Date": 4,
-            "Label": 5,
-            "Placement": 6,
-            "Valid": 7
-        }
-        
         for row_idx in range(row_count):
             # Add checkbox first (Select column)
             if 0 in self._column_mapping:  # Select column
                 checkbox_widget = CheckBoxWidget()
                 self.tasks_table.setCellWidget(row_idx, 0, checkbox_widget)
 
-            row_data = table_data[row_idx]
-            # Populate visible columns
-            for vis_col_idx, actual_col_idx in self._column_mapping.items():
-                if actual_col_idx == 0:  # Skip Select, already handled
-                    continue
-                
-                col_config = self.table_config.columns[actual_col_idx]
-                col_name = col_config.name
-                
-                # Map column name to row_data index
-                if col_name in row_data_column_map:
-                    value_idx = row_data_column_map[col_name]
-                    if value_idx < len(row_data):
-                        value = row_data[value_idx]
-                    else:
-                        value = ""
-                else:
-                    value = ""
-                
-                # Create widget/item for this column (regardless of whether it was in the map)
-                if col_config.widget_type == "combo":
-                    combo = QComboBox()
-                    combo.addItems(col_config.combo_items)
-                    combo.setCurrentText(str(value) or col_config.combo_items[0])
-                    combo.currentTextChanged.connect(self._sync_data_if_not_initializing)
-                    self.tasks_table.setCellWidget(row_idx, vis_col_idx, combo)
-                else:
-                    # Handle text and numeric columns
-                    if col_name in ["Start Date", "Finish Date"]:
-                        # Date columns - use DateTableWidgetItem for chronological sorting
-                        item = DateTableWidgetItem(str(value))
-                        # Set UserRole with datetime object for sorting
-                        try:
-                            if value and str(value).strip():
-                                # Convert from display format (dd/mm/yyyy) to datetime
-                                date_obj = datetime.strptime(str(value).strip(), "%d/%m/%Y")
-                                item.setData(Qt.UserRole, date_obj)
-                            else:
-                                item.setData(Qt.UserRole, None)
-                        except (ValueError, AttributeError):
-                            item.setData(Qt.UserRole, None)
-                    elif actual_col_idx in (1, 2):  # ID, Row are numeric
-                        item = NumericTableWidgetItem(str(value))
-                    else:
-                        item = QTableWidgetItem(str(value))
-                    
-                    if actual_col_idx == 1:  # Task ID read-only
-                        item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-                        item.setBackground(QBrush(READ_ONLY_BG))  # Gray background
-                        # Ensure UserRole is set for numeric sorting
-                        try:
-                            item.setData(Qt.UserRole, int(str(value).strip()) if str(value).strip() else 0)
-                        except (ValueError, AttributeError):
-                            item.setData(Qt.UserRole, 0)
-                    elif actual_col_idx == 2:  # Row number numeric
-                        # Ensure UserRole is set for numeric sorting
-                        try:
-                            item.setData(Qt.UserRole, int(str(value).strip()) if str(value).strip() else 1)
-                        except (ValueError, AttributeError):
-                            item.setData(Qt.UserRole, 1)
-                    elif col_name == "Valid":  # Valid column - read-only text
-                        item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-                        item.setBackground(QBrush(READ_ONLY_BG))  # Gray background
-                    
-                    self.tasks_table.setItem(row_idx, vis_col_idx, item)
-
-        # Find the ID column for sorting (default sort by ID)
+            # Use helper method to populate row from Task object
+            task = tasks[row_idx]
+            self._update_table_row_from_task(row_idx, task)
+        
+        # Sort by ID by default
+        headers = [col.name for col in self.table_config.columns]
         id_col_vis_idx = None
         for vis_idx, actual_idx in self._column_mapping.items():
             if headers[actual_idx] == "ID":
                 id_col_vis_idx = vis_idx
                 break
         if id_col_vis_idx is not None:
-            self.tasks_table.sortByColumn(id_col_vis_idx, Qt.AscendingOrder)
+            self.tasks_table.sortItems(id_col_vis_idx, Qt.AscendingOrder)
         
         # Ensure all read-only cells have proper styling
         self._ensure_read_only_styling()
         
         self._initializing = False
-        self._sync_data()
+        
+        # Calculate and update Valid column for all rows
+        self._update_valid_column_only()
 
     def _sync_data(self):
         self._sync_data_impl()
 
     def _sync_data_impl(self):
-        """Synchronize table data with project_data."""
+        """Extract data from table and update project_data using Task objects directly."""
         logging.debug("_sync_data_impl: START")
         try:
-            logging.debug("Starting _sync_data in TasksTab")
+            # Avoid emitting during initialization to prevent recursive updates
+            if self._initializing:
+                return
             
-            # Reconstruct full table data from visible columns + detail form
-            headers = [col.name for col in self.table_config.columns]
-            full_table_data = []
+            # Extract Task objects from table rows
+            tasks = []
+            for row_idx in range(self.tasks_table.rowCount()):
+                task = self._task_from_table_row(row_idx)
+                if task:
+                    tasks.append(task)
             
-            # Create mapping from column name to index in get_table_data result
-            row_data_column_map = {
-                "ID": 0,
-                "Row": 1,
-                "Name": 2,
-                "Start Date": 3,
-                "Finish Date": 4,
-                "Label": 5,
-                "Placement": 6
-            }
+            # Update project data with Task objects directly
+            errors = self.project_data.update_tasks(tasks)
             
-            for row in range(self.tasks_table.rowCount()):
-                full_row = []
-                
-                # NOTE: update_from_table expects data WITHOUT checkbox column
-                # Column order expected: ID, Row, Name, Start Date, Finish Date, Label, Placement, Valid
-                
-                # Reconstruct row data from visible columns (skip checkbox column)
-                for actual_col_idx in range(1, len(headers)):  # Skip Select column (index 0)
-                    col_name = headers[actual_col_idx]
-                    
-                    if actual_col_idx in self._reverse_column_mapping:
-                        # Visible column - get from table
-                        vis_col_idx = self._reverse_column_mapping[actual_col_idx]
-                        item = self.tasks_table.item(row, vis_col_idx)
-                        widget = self.tasks_table.cellWidget(row, vis_col_idx)
-                        
-                        if widget and isinstance(widget, QComboBox):
-                            full_row.append(widget.currentText())
-                        elif item:
-                            full_row.append(item.text())
-                        else:
-                            full_row.append("")
-                    else:
-                        # Hidden column (Label, Placement) - get from detail form if this is selected row
-                        if row == self._selected_row:
-                            if col_name == "Label":
-                                full_row.append(self.detail_label.currentText())
-                            elif col_name == "Placement":
-                                full_row.append(self.detail_placement.currentText())
-                            else:
-                                full_row.append("")
-                        else:
-                            # Not selected row - get from stored data or defaults
-                            table_data = self.project_data.get_table_data("tasks")
-                            if row < len(table_data):
-                                # Row exists in stored data - get from there
-                                stored_row = table_data[row]
-                                if col_name in row_data_column_map:
-                                    value_idx = row_data_column_map[col_name]
-                                    if value_idx < len(stored_row):
-                                        full_row.append(stored_row[value_idx])
-                                    else:
-                                        full_row.append("")
-                                else:
-                                    full_row.append("")
-                            else:
-                                # New row - use default values
-                                if col_name == "Label":
-                                    full_row.append("Yes")  # Default label visibility
-                                elif col_name == "Placement":
-                                    full_row.append("Inside")  # Default placement
-                                elif col_name == "Valid":
-                                    full_row.append("Yes")  # Default valid status
-                                else:
-                                    full_row.append("")
-                
-                full_table_data.append(full_row)
+            # Update table rows with computed fields (valid status)
+            self.tasks_table.blockSignals(True)
+            try:
+                for row_idx, task in enumerate(tasks):
+                    if row_idx < self.tasks_table.rowCount():
+                        # Update computed fields in the table (mainly Valid column)
+                        self._update_table_row_from_task(row_idx, task)
+            finally:
+                self.tasks_table.blockSignals(False)
             
-            logging.debug("_sync_data_impl: About to call update_from_table")
-            errors = self.project_data.update_from_table("tasks", full_table_data)
-            logging.debug(f"_sync_data_impl: update_from_table completed, errors={errors}")
-            
-            # No longer highlight errors - Valid column shows validation status
-            # Update only the Valid column without reloading the entire table
-            logging.debug("_sync_data_impl: About to call _update_valid_column_only")
-            self._update_valid_column_only()
-            logging.debug("_sync_data_impl: _update_valid_column_only completed")
-            
-            logging.debug("_sync_data in TasksTab completed")
             logging.debug("_sync_data_impl: END (success)")
         except Exception as e:
             logging.error(f"Error in _sync_data_impl: {e}", exc_info=True)
-            # Don't crash - log and continue
 
     def _sync_data_if_not_initializing(self):
         if not self._initializing:
@@ -586,89 +684,66 @@ class TasksTab(BaseTab):
             if not self.tasks_table or self.tasks_table.rowCount() == 0:
                 logging.debug("_update_valid_column_only: Table invalid or empty, returning")
                 return
-                
-            logging.debug(f"_update_valid_column_only: Table has {self.tasks_table.rowCount()} rows")
-            
-            # Get updated data from project_data
-            table_data = self.project_data.get_table_data("tasks")
-            logging.debug(f"_update_valid_column_only: Got {len(table_data)} rows from project_data")
             
             headers = [col.name for col in self.table_config.columns]
             
             # Find Valid column visible index
-            valid_col_vis_idx = None
-            for vis_idx, act_idx in self._column_mapping.items():
-                if act_idx < len(headers) and headers[act_idx] == "Valid":
-                    valid_col_vis_idx = vis_idx
-                    break
+            valid_col = self._get_column_index("Valid")
+            valid_col_vis_idx = self._reverse_column_mapping.get(valid_col) if valid_col is not None else None
             
             if valid_col_vis_idx is None:
                 logging.debug("_update_valid_column_only: Valid column not found, returning")
                 return
             
-            logging.debug(f"_update_valid_column_only: Valid column visible index: {valid_col_vis_idx}")
-            
             # Block signals to prevent recursive updates
             was_blocked = self.tasks_table.signalsBlocked()
-            logging.debug(f"_update_valid_column_only: Blocking signals (was_blocked={was_blocked})")
             self.tasks_table.blockSignals(True)
             
             try:
                 # Temporarily disconnect itemChanged to prevent issues
                 was_connected = False
-                logging.debug("_update_valid_column_only: Disconnecting itemChanged signal")
                 try:
                     self.tasks_table.itemChanged.disconnect(self._on_item_changed)
                     was_connected = True
-                    logging.debug("_update_valid_column_only: itemChanged signal disconnected")
-                except Exception as e:
-                    logging.debug(f"_update_valid_column_only: Failed to disconnect signal: {e}")
-                    pass  # Signal might not be connected
+                except Exception:
+                    pass
                 
                 try:
-                    # Update Valid column for each row
-                    logging.debug("_update_valid_column_only: Starting row updates")
+                    # Get tasks from project_data and update Valid column
+                    tasks = self.project_data.tasks
+                    used_ids: Set[int] = set()
+                    
                     for row_idx in range(self.tasks_table.rowCount()):
-                        if row_idx < len(table_data):
-                            # Get Valid value from updated data
-                            row_data = table_data[row_idx]
-                            valid_value = row_data[7] if len(row_data) > 7 else "Yes"  # Valid is at index 7 in row_data
-                            logging.debug(f"_update_valid_column_only: Row {row_idx}, valid_value={valid_value}")
+                        if row_idx < len(tasks):
+                            task = tasks[row_idx]
+                            # Calculate valid status
+                            row_errors = self.project_data.validator.validate_task(task, used_ids)
+                            valid_status = "No" if row_errors else "Yes"
+                            if not row_errors:
+                                used_ids.add(task.task_id)
                             
                             # Update the Valid cell
                             item = self.tasks_table.item(row_idx, valid_col_vis_idx)
                             if item:
-                                logging.debug(f"_update_valid_column_only: Updating existing item at row {row_idx}")
-                                item.setText(str(valid_value))
+                                item.setText(str(valid_status))
                             else:
-                                logging.debug(f"_update_valid_column_only: Creating new item at row {row_idx}")
-                                # Create item if it doesn't exist
-                                item = QTableWidgetItem(str(valid_value))
+                                item = QTableWidgetItem(str(valid_status))
                                 item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-                                item.setBackground(QBrush(READ_ONLY_BG))  # Gray background
+                                item.setBackground(QBrush(READ_ONLY_BG))
                                 self.tasks_table.setItem(row_idx, valid_col_vis_idx, item)
-                                logging.debug(f"_update_valid_column_only: Created item at row {row_idx}")
-                    
-                    logging.debug("_update_valid_column_only: Completed row updates")
                 finally:
                     # Reconnect itemChanged signal
                     if was_connected:
-                        logging.debug("_update_valid_column_only: Reconnecting itemChanged signal")
                         try:
                             self.tasks_table.itemChanged.connect(self._on_item_changed)
-                            logging.debug("_update_valid_column_only: itemChanged signal reconnected")
-                        except Exception as e:
-                            logging.debug(f"_update_valid_column_only: Failed to reconnect signal: {e}")
-                            pass  # Signal might already be connected
+                        except Exception:
+                            pass
             finally:
-                # Restore previous signal blocking state
                 self.tasks_table.blockSignals(was_blocked)
-                logging.debug(f"_update_valid_column_only: Restored signal blocking state (was_blocked={was_blocked})")
             
             logging.debug("_update_valid_column_only: END (success)")
         except Exception as e:
             logging.error(f"_update_valid_column_only: Error: {e}", exc_info=True)
-            # Don't crash - just log the error
 
     def _extract_table_data(self) -> List[List[str]]:
         # This is now handled in _sync_data_impl
