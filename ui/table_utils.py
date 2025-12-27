@@ -192,24 +192,6 @@ def add_row(table, table_key, table_configs, parent, id_field_name, row_index=No
 
         # Special handling for links table - both fields should be editable and blank
         is_links_table = (table_key == "links")
-        
-        # Prepare context for default_generator if available
-        context = {"max_id": next_id}
-        defaults = None
-        if hasattr(config, "default_generator"):
-            defaults = config.default_generator(row_index, context)
-            # For links, defaults structure: [ID, From Task ID, From Task Name, To Task ID, To Task Name, Line Color, Line Style]
-            # Table columns: [Select, ID, From Task ID, From Task Name, To Task ID, To Task Name, Valid]
-            # Note: defaults includes Line Color and Line Style which are NOT in the table
-            # Note: table includes Valid which is NOT in defaults
-        else:
-            # If no generator, use empty strings except Valid column for links and tasks
-            defaults = [""] * (table.columnCount() - 1)  # Exclude checkbox column
-            # Set Valid column default to "Yes" for links and tasks
-            if is_links_table and len(defaults) >= 6:
-                defaults[5] = "Yes"  # Index 5 in defaults (0=ID, 1=From Task ID, 2=From Task Name, 3=To Task ID, 4=To Task Name, 5=Valid)
-            elif table_key == "tasks" and len(defaults) >= 8:
-                defaults[7] = "Yes"  # Index 7 in defaults (0=ID, 1=Row, 2=Name, 3=Start Date, 4=Finish Date, 5=Label, 6=Placement, 7=Valid)
 
         # Set default values for each column (skip checkbox column)
         for col_idx in range(1, table.columnCount()):
@@ -221,29 +203,6 @@ def add_row(table, table_key, table_configs, parent, id_field_name, row_index=No
                     col_config = config.columns[col_idx]
                 except (IndexError, AttributeError):
                     pass
-
-            # Use default from generator if available, else empty string
-            # For links table, map by column name since defaults structure doesn't match table columns
-            default = ""
-            if is_links_table and defaults and hasattr(config, "default_generator"):
-                # Map columns by name (defaults: [ID(0), From Task ID(1), From Task Name(2), To Task ID(3), To Task Name(4), Line Color(5), Line Style(6)])
-                # Table columns: [Select, ID(1), From Task ID(2), From Task Name(3), To Task ID(4), To Task Name(5), Valid(6)]
-                # For new rows added via add_row, make task IDs and names blank (they'll be entered by user)
-                if header_text == "ID":
-                    # ID is handled separately below, use next_id
-                    default = str(next_id)
-                elif header_text == "From Task ID":
-                    default = ""  # Blank for new rows
-                elif header_text == "From Task Name":
-                    default = ""  # Blank for new rows (populated from task lookup)
-                elif header_text == "To Task ID":
-                    default = ""  # Blank for new rows
-                elif header_text == "To Task Name":
-                    default = ""  # Blank for new rows (populated from task lookup)
-                # Note: Line Color (defaults[5]) and Line Style (defaults[6]) are NOT in the table - they're handled by detail form
-                # Valid column is handled separately below
-            elif defaults and col_idx < len(defaults):
-                default = defaults[col_idx]  # For non-links tables, defaults already includes checkbox at index 0
 
             # Set ID column - use NumericTableWidgetItem for numeric sorting
             if col_idx == id_column:
@@ -261,7 +220,7 @@ def add_row(table, table_key, table_configs, parent, id_field_name, row_index=No
                 table.setItem(row_index, col_idx, id_item)
             # Valid column for links and tasks - read-only text (check BEFORE combo box to ensure it's never a combo)
             elif header_text == "Valid":
-                item = QTableWidgetItem(str(default) if default else "Yes")
+                item = QTableWidgetItem("Yes")  # Default to "Yes", will be calculated later
                 item.setFlags(item.flags() & ~Qt.ItemIsEditable)  # Make read-only
                 item.setBackground(QBrush(READ_ONLY_BG))  # Gray background
                 table.setItem(row_index, col_idx, item)
@@ -269,54 +228,39 @@ def add_row(table, table_key, table_configs, parent, id_field_name, row_index=No
             elif col_config and getattr(col_config, "widget_type", None) == "combo":
                 combo = QComboBox()
                 combo.addItems(col_config.combo_items)
-                combo.setCurrentText(str(default) if default else col_config.combo_items[0])
+                combo.setCurrentIndex(0)  # Use first item as default
                 # Connect signal to sync data when combo box value changes
                 if hasattr(parent, '_sync_data_if_not_initializing'):
                     combo.currentTextChanged.connect(parent._sync_data_if_not_initializing)
                 table.setCellWidget(row_index, col_idx, combo)
             # Date column - check by column name for tasks table (Start Date, Finish Date)
             elif header_text in ["Start Date", "Finish Date"]:
-                item = DateTableWidgetItem(str(default))
-                # Set UserRole with datetime object for sorting
-                try:
-                    if default and str(default).strip():
-                        date_obj = datetime.strptime(str(default).strip(), "%d/%m/%Y")
-                        item.setData(Qt.UserRole, date_obj)
-                    else:
-                        item.setData(Qt.UserRole, None)
-                except (ValueError, AttributeError):
-                    item.setData(Qt.UserRole, None)
+                item = DateTableWidgetItem("")
+                item.setData(Qt.UserRole, None)
                 table.setItem(row_index, col_idx, item)
-            # Numeric column - check by column name for tasks table (ID, Row)
-            elif header_text in ["ID", "Row"]:
-                item = NumericTableWidgetItem(str(default))
-                # Set UserRole for numeric sorting
-                try:
-                    item.setData(Qt.UserRole, int(str(default).strip()) if str(default).strip() else (0 if header_text == "ID" else 1))
-                except (ValueError, AttributeError):
-                    item.setData(Qt.UserRole, 0 if header_text == "ID" else 1)
+            # Numeric column - check by column name for tasks table (Row) - ID handled above
+            elif header_text == "Row":
+                item = NumericTableWidgetItem("1")  # Default row number
+                item.setData(Qt.UserRole, 1)
                 table.setItem(row_index, col_idx, item)
             # Numeric column for links (From Task ID, To Task ID) - both should be editable
             elif is_links_table and header_text in ["From Task ID", "To Task ID"]:
-                item = NumericTableWidgetItem(str(default))
-                try:
-                    item.setData(Qt.UserRole, int(str(default).strip()) if str(default).strip() else 0)
-                except (ValueError, AttributeError):
-                    item.setData(Qt.UserRole, 0)
+                item = NumericTableWidgetItem("")
+                item.setData(Qt.UserRole, 0)
                 table.setItem(row_index, col_idx, item)
             # Name columns for links (From Task Name, To Task Name) - read-only text
             elif is_links_table and header_text in ["From Task Name", "To Task Name"]:
-                item = QTableWidgetItem(str(default) if default else "")
+                item = QTableWidgetItem("")
                 item.setFlags(item.flags() & ~Qt.ItemIsEditable)  # Make read-only
                 item.setBackground(QBrush(READ_ONLY_BG))  # Gray background
                 table.setItem(row_index, col_idx, item)
             # Numeric column (optional: check for numeric type)
             elif col_config and getattr(col_config, "widget_type", None) == "numeric":
-                item = NumericTableWidgetItem(str(default))
+                item = NumericTableWidgetItem("")
                 table.setItem(row_index, col_idx, item)
             # Generic text column
             else:
-                item = QTableWidgetItem(str(default))
+                item = QTableWidgetItem("")
                 table.setItem(row_index, col_idx, item)
 
         # Restore table state

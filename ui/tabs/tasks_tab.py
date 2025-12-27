@@ -358,7 +358,7 @@ class TasksTab(BaseTab):
 
     def _load_initial_data_impl(self):
         table_data = self.project_data.get_table_data("tasks")
-        row_count = max(len(table_data), self.table_config.min_rows)
+        row_count = len(table_data)
         self.tasks_table.setRowCount(row_count)
         self._initializing = True
 
@@ -383,132 +383,71 @@ class TasksTab(BaseTab):
                 checkbox_widget = CheckBoxWidget()
                 self.tasks_table.setCellWidget(row_idx, 0, checkbox_widget)
 
-            if row_idx < len(table_data):
-                row_data = table_data[row_idx]
-                # Populate visible columns
-                for vis_col_idx, actual_col_idx in self._column_mapping.items():
-                    if actual_col_idx == 0:  # Skip Select, already handled
-                        continue
-                    
-                    col_config = self.table_config.columns[actual_col_idx]
-                    col_name = col_config.name
-                    
-                    # Map column name to row_data index
-                    if col_name in row_data_column_map:
-                        value_idx = row_data_column_map[col_name]
-                        if value_idx < len(row_data):
-                            value = row_data[value_idx]
-                        else:
-                            value = ""
+            row_data = table_data[row_idx]
+            # Populate visible columns
+            for vis_col_idx, actual_col_idx in self._column_mapping.items():
+                if actual_col_idx == 0:  # Skip Select, already handled
+                    continue
+                
+                col_config = self.table_config.columns[actual_col_idx]
+                col_name = col_config.name
+                
+                # Map column name to row_data index
+                if col_name in row_data_column_map:
+                    value_idx = row_data_column_map[col_name]
+                    if value_idx < len(row_data):
+                        value = row_data[value_idx]
                     else:
                         value = ""
-                    
-                    # Create widget/item for this column (regardless of whether it was in the map)
-                    if col_config.widget_type == "combo":
-                        combo = QComboBox()
-                        combo.addItems(col_config.combo_items)
-                        combo.setCurrentText(str(value) or col_config.combo_items[0])
-                        combo.currentTextChanged.connect(self._sync_data_if_not_initializing)
-                        self.tasks_table.setCellWidget(row_idx, vis_col_idx, combo)
-                    else:
-                        # Handle text and numeric columns
-                        if col_name in ["Start Date", "Finish Date"]:
-                            # Date columns - use DateTableWidgetItem for chronological sorting
-                            item = DateTableWidgetItem(str(value))
-                            # Set UserRole with datetime object for sorting
-                            try:
-                                if value and str(value).strip():
-                                    # Convert from display format (dd/mm/yyyy) to datetime
-                                    date_obj = datetime.strptime(str(value).strip(), "%d/%m/%Y")
-                                    item.setData(Qt.UserRole, date_obj)
-                                else:
-                                    item.setData(Qt.UserRole, None)
-                            except (ValueError, AttributeError):
-                                item.setData(Qt.UserRole, None)
-                        elif actual_col_idx in (1, 2):  # ID, Row are numeric
-                            item = NumericTableWidgetItem(str(value))
-                        else:
-                            item = QTableWidgetItem(str(value))
-                        
-                        if actual_col_idx == 1:  # Task ID read-only
-                            item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-                            item.setBackground(QBrush(READ_ONLY_BG))  # Gray background
-                            # Ensure UserRole is set for numeric sorting
-                            try:
-                                item.setData(Qt.UserRole, int(str(value).strip()) if str(value).strip() else 0)
-                            except (ValueError, AttributeError):
-                                item.setData(Qt.UserRole, 0)
-                        elif actual_col_idx == 2:  # Row number numeric
-                            # Ensure UserRole is set for numeric sorting
-                            try:
-                                item.setData(Qt.UserRole, int(str(value).strip()) if str(value).strip() else 1)
-                            except (ValueError, AttributeError):
-                                item.setData(Qt.UserRole, 1)
-                        elif col_name == "Valid":  # Valid column - read-only text
-                            item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-                            item.setBackground(QBrush(READ_ONLY_BG))  # Gray background
-                        
-                        self.tasks_table.setItem(row_idx, vis_col_idx, item)
-            else:
-                # New row - use defaults
-                context = {
-                    "max_task_id": len(table_data)  # Maximum existing task ID, not len + row_idx
-                }
-                defaults = self.table_config.default_generator(row_idx, context)
-                # defaults structure: [False, ID, Row, Name, Start Date, Finish Date, Label, Placement]
-                # defaults[0] is checkbox, defaults[1] is ID (actual_col_idx 1), etc.
+                else:
+                    value = ""
                 
-                for vis_col_idx, actual_col_idx in self._column_mapping.items():
-                    if actual_col_idx == 0:  # Skip Select
-                        continue
-                    
-                    # defaults includes checkbox at 0, so actual_col_idx maps directly to defaults[actual_col_idx]
-                    default_idx = actual_col_idx
-                    if default_idx < len(defaults):
-                        default = defaults[default_idx]
-                        col_config = self.table_config.columns[actual_col_idx]
-                        col_name = col_config.name
-                        
-                        if col_config.widget_type == "combo":
-                            combo = QComboBox()
-                            combo.addItems(col_config.combo_items)
-                            combo.setCurrentText(str(default))
-                            combo.currentTextChanged.connect(self._sync_data_if_not_initializing)
-                            self.tasks_table.setCellWidget(row_idx, vis_col_idx, combo)
-                        else:
-                            if col_name in ["Start Date", "Finish Date"]:
-                                # Date columns - use DateTableWidgetItem for chronological sorting
-                                item = DateTableWidgetItem(str(default))
-                                # Set UserRole with datetime object for sorting
-                                try:
-                                    if default and str(default).strip():
-                                        date_obj = datetime.strptime(str(default).strip(), "%d/%m/%Y")
-                                        item.setData(Qt.UserRole, date_obj)
-                                    else:
-                                        item.setData(Qt.UserRole, None)
-                                except (ValueError, AttributeError):
-                                    item.setData(Qt.UserRole, None)
-                            elif actual_col_idx in (1, 2, 3):
-                                item = NumericTableWidgetItem(str(default))
+                # Create widget/item for this column (regardless of whether it was in the map)
+                if col_config.widget_type == "combo":
+                    combo = QComboBox()
+                    combo.addItems(col_config.combo_items)
+                    combo.setCurrentText(str(value) or col_config.combo_items[0])
+                    combo.currentTextChanged.connect(self._sync_data_if_not_initializing)
+                    self.tasks_table.setCellWidget(row_idx, vis_col_idx, combo)
+                else:
+                    # Handle text and numeric columns
+                    if col_name in ["Start Date", "Finish Date"]:
+                        # Date columns - use DateTableWidgetItem for chronological sorting
+                        item = DateTableWidgetItem(str(value))
+                        # Set UserRole with datetime object for sorting
+                        try:
+                            if value and str(value).strip():
+                                # Convert from display format (dd/mm/yyyy) to datetime
+                                date_obj = datetime.strptime(str(value).strip(), "%d/%m/%Y")
+                                item.setData(Qt.UserRole, date_obj)
                             else:
-                                item = QTableWidgetItem(str(default))
-                            
-                            if actual_col_idx == 1:  # Task ID read-only
-                                item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-                                item.setBackground(QBrush(READ_ONLY_BG))  # Gray background
-                                # Ensure UserRole is set for numeric sorting
-                                try:
-                                    item.setData(Qt.UserRole, int(str(default).strip()) if str(default).strip() else 0)
-                                except (ValueError, AttributeError):
-                                    item.setData(Qt.UserRole, 0)
-                            elif actual_col_idx == 2:  # Row number numeric
-                                # Ensure UserRole is set for numeric sorting
-                                try:
-                                    item.setData(Qt.UserRole, int(str(default).strip()) if str(default).strip() else 1)
-                                except (ValueError, AttributeError):
-                                    item.setData(Qt.UserRole, 1)
-                            
-                            self.tasks_table.setItem(row_idx, vis_col_idx, item)
+                                item.setData(Qt.UserRole, None)
+                        except (ValueError, AttributeError):
+                            item.setData(Qt.UserRole, None)
+                    elif actual_col_idx in (1, 2):  # ID, Row are numeric
+                        item = NumericTableWidgetItem(str(value))
+                    else:
+                        item = QTableWidgetItem(str(value))
+                    
+                    if actual_col_idx == 1:  # Task ID read-only
+                        item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                        item.setBackground(QBrush(READ_ONLY_BG))  # Gray background
+                        # Ensure UserRole is set for numeric sorting
+                        try:
+                            item.setData(Qt.UserRole, int(str(value).strip()) if str(value).strip() else 0)
+                        except (ValueError, AttributeError):
+                            item.setData(Qt.UserRole, 0)
+                    elif actual_col_idx == 2:  # Row number numeric
+                        # Ensure UserRole is set for numeric sorting
+                        try:
+                            item.setData(Qt.UserRole, int(str(value).strip()) if str(value).strip() else 1)
+                        except (ValueError, AttributeError):
+                            item.setData(Qt.UserRole, 1)
+                    elif col_name == "Valid":  # Valid column - read-only text
+                        item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                        item.setBackground(QBrush(READ_ONLY_BG))  # Gray background
+                    
+                    self.tasks_table.setItem(row_idx, vis_col_idx, item)
 
         # Find the ID column for sorting (default sort by ID)
         id_col_vis_idx = None

@@ -222,7 +222,7 @@ class LinksTab(BaseTab):
         """Load initial data into the table using Link objects directly."""
         # Get Link objects directly from project_data
         links = self.project_data.links
-        row_count = max(len(links), self.table_config.min_rows)
+        row_count = len(links)
         self.links_table.setRowCount(row_count)
         self._initializing = True
 
@@ -234,79 +234,9 @@ class LinksTab(BaseTab):
             checkbox_widget = CheckBoxWidget()
             self.links_table.setCellWidget(row_idx, 0, checkbox_widget)
 
-            if row_idx < len(links):
-                # Use helper method to populate row from Link object
-                link = links[row_idx]
-                self._update_table_row_from_link(row_idx, link, task_name_map)
-            else:
-                # New row - use defaults from config
-                context = {
-                    "max_id": max([link.link_id for link in links] + [0])  # Maximum existing link ID
-                }
-                defaults = self.table_config.default_generator(row_idx, context)
-                # defaults structure: [False(0), ID(1), From Task ID(2), From Task Name(3), To Task ID(4), To Task Name(5), Line Color(6), Line Style(7)]
-                # Note: defaults includes Select checkbox at 0, but does NOT include Valid (calculated field)
-                
-                # Get column indices by name
-                id_col = self._get_column_index("ID")
-                from_id_col = self._get_column_index("From Task ID")
-                from_name_col = self._get_column_index("From Task Name")
-                to_id_col = self._get_column_index("To Task ID")
-                to_name_col = self._get_column_index("To Task Name")
-                valid_col = self._get_column_index("Valid")
-                
-                # Populate row from defaults
-                if id_col is not None and 1 < len(defaults):
-                    # ID column
-                    item = NumericTableWidgetItem(str(defaults[1]))
-                    item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-                    item.setBackground(QBrush(self.READ_ONLY_BG))
-                    try:
-                        item.setData(Qt.UserRole, int(str(defaults[1]).strip()) if str(defaults[1]).strip() else 0)
-                    except (ValueError, AttributeError):
-                        item.setData(Qt.UserRole, 0)
-                    self.links_table.setItem(row_idx, id_col, item)
-                
-                if from_id_col is not None and 2 < len(defaults):
-                    # From Task ID column
-                    item = NumericTableWidgetItem(str(defaults[2]))
-                    try:
-                        item.setData(Qt.UserRole, int(str(defaults[2]).strip()) if str(defaults[2]).strip() else 0)
-                    except (ValueError, AttributeError):
-                        item.setData(Qt.UserRole, 0)
-                    self.links_table.setItem(row_idx, from_id_col, item)
-                
-                if from_name_col is not None and 3 < len(defaults):
-                    # From Task Name column (read-only)
-                    item = QTableWidgetItem(self._truncate_text(str(defaults[3])))
-                    item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-                    item.setBackground(QBrush(self.READ_ONLY_BG))
-                    item.setToolTip(str(defaults[3]))
-                    self.links_table.setItem(row_idx, from_name_col, item)
-                
-                if to_id_col is not None and 4 < len(defaults):
-                    # To Task ID column
-                    item = NumericTableWidgetItem(str(defaults[4]))
-                    try:
-                        item.setData(Qt.UserRole, int(str(defaults[4]).strip()) if str(defaults[4]).strip() else 0)
-                    except (ValueError, AttributeError):
-                        item.setData(Qt.UserRole, 0)
-                    self.links_table.setItem(row_idx, to_id_col, item)
-                
-                if to_name_col is not None and 5 < len(defaults):
-                    # To Task Name column (read-only)
-                    item = QTableWidgetItem(self._truncate_text(str(defaults[5])))
-                    item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-                    item.setBackground(QBrush(self.READ_ONLY_BG))
-                    item.setToolTip(str(defaults[5]))
-                    self.links_table.setItem(row_idx, to_name_col, item)
-                
-                if valid_col is not None:
-                    # Valid column (calculated, placeholder)
-                    item = QTableWidgetItem("Yes")
-                    item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-                    item.setBackground(QBrush(self.READ_ONLY_BG))
-                    self.links_table.setItem(row_idx, valid_col, item)
+            # Use helper method to populate row from Link object
+            link = links[row_idx]
+            self._update_table_row_from_link(row_idx, link, task_name_map)
         
         # Sort by ID by default
         self.links_table.sortItems(1, Qt.AscendingOrder)  # Column 1 = ID

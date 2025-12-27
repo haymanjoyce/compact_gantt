@@ -184,7 +184,6 @@ class TableConfig:
     key: str
     columns: List[TableColumnConfig]
     min_rows: int
-    default_generator: Callable[[int, Dict[str, Any]], List[Any]]
 
 @dataclass
 class AppConfig:
@@ -195,118 +194,6 @@ class AppConfig:
         # Load settings first, before initializing tables
         self._load_settings()
         
-        # Define default value generators
-        def tasks_default(row_idx: int, context: Dict[str, Any]) -> List[Any]:
-            """
-            Generate default task data for a given row index.
-            Tasks are designed to demonstrate all link rendering scenarios.
-            Returns: [ID, Row, Name, Start Date, Finish Date, Label, Placement, Valid]
-            """
-            # Default tasks configuration covering all linking scenarios
-            # Spread across 3 rows to demonstrate all link types including successor-above
-            # Format: name, start date, finish date, row, placement, label
-            defaults = [
-                # Row 1: Tasks for same-row and successor-above scenarios (targets for row 2→row 1 links)
-                {"name": "Task A", "start": "2025-01-02", "finish": "2025-01-15", "row": 1, "placement": "Inside", "label": "Yes"},
-                {"name": "Task B", "start": "2025-01-15", "finish": "2025-01-28", "row": 1, "placement": "Inside", "label": "Yes"},  # Same row, no gap after A
-                {"name": "Task C", "start": "2025-02-01", "finish": "2025-02-14", "row": 1, "placement": "Inside", "label": "Yes"},  # Same row, gap after B
-                {"name": "Milestone M1", "start": "2025-03-14", "finish": "2025-03-14", "row": 1, "placement": "Outside", "label": "Yes"},  # Milestone, successor above row 2
-                # Row 2: Tasks for successor-below (from row 1), same-row, and successor-above (to row 1) scenarios
-                {"name": "Task D", "start": "2025-02-14", "finish": "2025-02-27", "row": 2, "placement": "Inside", "label": "Yes"},  # Below row 1, no gap after C
-                {"name": "Task E", "start": "2025-03-01", "finish": "2025-03-13", "row": 2, "placement": "Inside", "label": "Yes"},  # Below row 1, gap after D
-                {"name": "Milestone M2", "start": "2025-03-28", "finish": "2025-03-28", "row": 2, "placement": "Outside", "label": "Yes"},  # Milestone, successor above row 1, gap after F
-                # Row 3: Tasks for successor-below scenarios (from row 2)
-                {"name": "Task F", "start": "2025-03-15", "finish": "2025-03-28", "row": 3, "placement": "Inside", "label": "Yes"},  # Below row 2, gap after E
-                {"name": "Task G", "start": "2025-04-01", "finish": "2025-04-14", "row": 3, "placement": "Inside", "label": "Yes"},  # Below row 2, gap after F
-            ]
-            
-            if row_idx < len(defaults):
-                default = defaults[row_idx]
-                task_id = context.get("max_task_id", 0) + row_idx + 1
-                # Return format: [ID, Row, Name, Start Date, Finish Date, Label, Placement, Valid]
-                return [
-                    str(task_id),                                    # ID
-                    str(default["row"]),                            # Row
-                    default["name"],                                 # Name
-                    internal_to_display_date(default["start"]),      # Start Date (converted to dd/mm/yyyy)
-                    internal_to_display_date(default["finish"]),     # Finish Date (converted to dd/mm/yyyy)
-                    default.get("label", "Yes"),                     # Label (Yes = Show, No = Hide)
-                    default["placement"],                            # Placement (Inside or Outside)
-                    "Yes"                                            # Valid (default to Yes)
-                ]
-            else:
-                # Fallback for additional rows beyond the 9 defaults
-                task_id = context.get("max_task_id", 0) + 1
-                row_number = str(row_idx + 1)
-                internal_start = QDate.currentDate().toString("yyyy-MM-dd")
-                internal_finish = QDate.currentDate().toString("yyyy-MM-dd")
-                # Return format: [ID, Row, Name, Start Date, Finish Date, Label, Placement, Valid]
-                return [
-                    str(task_id),                                    # ID
-                    row_number,                                      # Row
-                    "New Task",                                      # Name
-                    internal_to_display_date(internal_start),       # Start Date (converted to dd/mm/yyyy)
-                    internal_to_display_date(internal_finish),       # Finish Date (converted to dd/mm/yyyy)
-                    "Yes",                                          # Label (Yes = Show, No = Hide)
-                    "Outside",                                       # Placement (Inside or Outside)
-                    "Yes"                                            # Valid (default to Yes)
-                ]
-
-        def links_default(row_idx: int, context: Dict[str, Any]) -> List[Any]:
-            """
-            Generate default link data for a given row index.
-            Links are designed to demonstrate all link rendering scenarios.
-            Returns: [ID, From Task ID, From Task Name, To Task ID, To Task Name, Line Color, Line Style]
-            """
-            # Default links configuration covering all linking scenarios
-            # Links demonstrate: same row (no gap/gap), successor below (no gap/gap), 
-            # successor above (no gap/gap), milestone connections (regular↔milestone)
-            defaults = [
-                {"from_id": 1, "to_id": 2, "from_name": "Task A", "to_name": "Task B", "line_color": "black", "line_style": "solid"},      # Same row, no gap (1a)
-                {"from_id": 2, "to_id": 3, "from_name": "Task B", "to_name": "Task C", "line_color": "black", "line_style": "solid"},      # Same row, gap (1b)
-                {"from_id": 3, "to_id": 5, "from_name": "Task C", "to_name": "Task D", "line_color": "black", "line_style": "solid"},      # Successor below, no gap (2a)
-                {"from_id": 5, "to_id": 6, "from_name": "Task D", "to_name": "Task E", "line_color": "black", "line_style": "solid"},      # Same row, gap (1b) - row 2
-                {"from_id": 6, "to_id": 4, "from_name": "Task E", "to_name": "Milestone M1", "line_color": "black", "line_style": "solid"}, # Successor above, no gap (3a) - row 2 to row 1, regular to milestone
-                {"from_id": 4, "to_id": 5, "from_name": "Milestone M1", "to_name": "Task D", "line_color": "black", "line_style": "solid"}, # Successor below, no gap (2a) - row 1 to row 2, milestone to regular
-                {"from_id": 6, "to_id": 8, "from_name": "Task E", "to_name": "Task F", "line_color": "black", "line_style": "solid"},      # Successor below, gap (2b) - row 2 to row 3
-                {"from_id": 8, "to_id": 7, "from_name": "Task F", "to_name": "Milestone M2", "line_color": "black", "line_style": "solid"}, # Successor above, gap (3b) - row 3 to row 2, regular to milestone
-                {"from_id": 7, "to_id": 1, "from_name": "Milestone M2", "to_name": "Task A", "line_color": "black", "line_style": "solid"}, # Successor above, gap (3b) - row 2 to row 1, milestone to regular
-            ]
-            
-            if row_idx < len(defaults):
-                default = defaults[row_idx]
-                link_id = context.get("max_id", 0) + row_idx + 1
-                return [
-                    str(link_id),                                    # ID
-                    str(default["from_id"]),                         # From Task ID
-                    default["from_name"],                             # From Task Name
-                    str(default["to_id"]),                           # To Task ID
-                    default["to_name"],                               # To Task Name
-                    default.get("line_color", "black"),              # Line Color
-                    default.get("line_style", "solid")               # Line Style
-                ]
-            else:
-                # Fallback for additional links beyond the defaults
-                link_id = context.get("max_id", 0) + 1
-                return [str(link_id), "", "", "", "", "black", "solid"]  # ID, From Task ID, From Task Name, To Task ID, To Task Name, Line Color, Line Style
-
-        def swimlanes_default(row_idx: int, context: Dict[str, Any]) -> List[Any]:
-            return ["1", "2", f"Swimlane {row_idx + 1}", "lightblue"]
-
-        def pipes_default(row_idx: int, context: Dict[str, Any]) -> List[Any]:
-            internal_date = QDate.currentDate().toString("yyyy-MM-dd")
-            return [internal_to_display_date(internal_date), "red"]
-
-        def curtains_default(row_idx: int, context: Dict[str, Any]) -> List[Any]:
-            internal_date = QDate.currentDate().toString("yyyy-MM-dd")
-            return [
-                internal_to_display_date(internal_date),
-                internal_to_display_date(internal_date), "gray"
-            ]
-
-        def text_boxes_default(row_idx: int, context: Dict[str, Any]) -> List[Any]:
-            return [f"Text {row_idx + 1}", "100", "100", "black"]
-
         # Define robust date validator function
         def validate_display_date(x):
             """Validate date in dd/mm/yyyy format."""
@@ -329,8 +216,7 @@ class AppConfig:
                     TableColumnConfig("Placement", widget_type="combo", combo_items=["Inside", "Outside"]),
                     TableColumnConfig("Valid", widget_type="text", default_value="Yes")
                 ],
-                min_rows=0,  # Allow users to delete all rows
-                default_generator=lambda row_idx, context: [False] + tasks_default(row_idx, context)
+                min_rows=0  # Allow users to delete all rows
             ),
             "links": TableConfig(
                 key="links",
@@ -343,8 +229,7 @@ class AppConfig:
                     TableColumnConfig("To Task Name", widget_type="text"),
                     TableColumnConfig("Valid", widget_type="text", default_value="Yes")
                 ],
-                min_rows=0,  # Allow users to delete all rows
-                default_generator=lambda row_idx, context: [False] + links_default(row_idx, context)
+                min_rows=0  # Allow users to delete all rows
             ),
             "swimlanes": TableConfig(
                 key="swimlanes",
@@ -355,8 +240,7 @@ class AppConfig:
                     TableColumnConfig("Title"),
                     TableColumnConfig("Colour")
                 ],
-                min_rows=0,
-                default_generator=lambda row_idx, context: [False] + swimlanes_default(row_idx, context)
+                min_rows=0
             ),
             "pipes": TableConfig(
                 key="pipes",
@@ -365,8 +249,7 @@ class AppConfig:
                     TableColumnConfig("Date", validator=validate_display_date),
                     TableColumnConfig("Colour")
                 ],
-                min_rows=0,
-                default_generator=lambda row_idx, context: [False] + pipes_default(row_idx, context)
+                min_rows=0
             ),
             "curtains": TableConfig(
                 key="curtains",
@@ -376,8 +259,7 @@ class AppConfig:
                     TableColumnConfig("To Date", validator=validate_display_date),
                     TableColumnConfig("Colour")
                 ],
-                min_rows=0,
-                default_generator=lambda row_idx, context: [False] + curtains_default(row_idx, context)
+                min_rows=0
             ),
             "text_boxes": TableConfig(
                 key="text_boxes",
@@ -388,8 +270,7 @@ class AppConfig:
                     TableColumnConfig("Y Coordinate", validator=lambda x: float(x) >= 0 if x else False),
                     TableColumnConfig("Colour")
                 ],
-                min_rows=0,
-                default_generator=lambda row_idx, context: [False] + text_boxes_default(row_idx, context)
+                min_rows=0
             )
         }
 
