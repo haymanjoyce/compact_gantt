@@ -18,11 +18,21 @@ class Task:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Task':
+        # Normalize dates: if only one date is provided, auto-populate the other (milestone behavior)
+        start_date = data.get("start_date", "")
+        finish_date = data.get("finish_date", "")
+        
+        # Auto-populate missing date field for milestones (if only one date is provided)
+        if start_date and not finish_date:
+            finish_date = start_date  # Auto-populate finish date
+        elif finish_date and not start_date:
+            start_date = finish_date  # Auto-populate start date
+        
         return cls(
             task_id=data["task_id"],
             task_name=data["task_name"],
-            start_date=data["start_date"],
-            finish_date=data["finish_date"],
+            start_date=start_date,
+            finish_date=finish_date,
             row_number=data["row_number"],
             is_milestone=data.get("is_milestone", False),
             label_placement=data.get("label_placement", "Outside"),
