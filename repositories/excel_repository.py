@@ -81,26 +81,9 @@ class ExcelRepository:
         if "Tasks" in wb.sheetnames:
             project.tasks = self._read_tasks_sheet(wb["Tasks"])
         
-        # Load other sheets
+        # Load Links sheet - using header-based mapping instead of positional arrays
         if "Links" in wb.sheetnames:
-            rows = self._read_table_sheet(wb["Links"])
-            # Convert rows to Link objects
-            project.links = []
-            for row in rows:
-                if len(row) >= 5:  # Minimum: ID, From Task ID, From Task Name, To Task ID, To Task Name
-                    try:
-                        link = Link(
-                            link_id=int(row[0]),
-                            from_task_id=int(row[1]),
-                            to_task_id=int(row[3]),
-                            line_color=row[5] if len(row) > 5 else "black",
-                            line_style=row[6] if len(row) > 6 else "solid",
-                            from_task_name=row[2] if len(row) > 2 else "",
-                            to_task_name=row[4] if len(row) > 4 else ""
-                        )
-                        project.links.append(link)
-                    except (ValueError, IndexError):
-                        continue
+            project.links = self._read_links_sheet(wb["Links"])
         
         if "Swimlanes" in wb.sheetnames:
             project.swimlanes = self._read_table_sheet(wb["Swimlanes"])
@@ -195,16 +178,20 @@ class ExcelRepository:
         ws.column_dimensions['B'].width = 10
     
     def _create_tasks_sheet(self, wb: Workbook, tasks: List[Task]) -> None:
-        """Create Tasks worksheet with task data as a table."""
+        """Create Tasks worksheet with task data as a table.
+        
+        Only saves visible/editable fields that match the UI table columns.
+        Redundant fields (Is Milestone, Label Alignment, Label Horizontal Offset, Label Text Colour)
+        are excluded as they are either auto-calculated or have default values.
+        """
         ws = wb.create_sheet("Tasks")
         
-        # Headers
-        headers = ["ID", "Row", "Name", "Start Date", "Finish Date", "Label", "Placement", 
-                   "Is Milestone", "Label Alignment", "Label Horizontal Offset", "Label Text Colour"]
+        # Headers - only include fields that are visible/editable in UI
+        headers = ["ID", "Row", "Name", "Start Date", "Finish Date", "Label", "Placement"]
         ws.append(headers)
         self._format_header_row(ws, 1)
         
-        # Task rows
+        # Task rows - only save visible/editable fields
         for task in tasks:
             row = [
                 task.task_id,
@@ -213,18 +200,14 @@ class ExcelRepository:
                 internal_to_display_date(task.start_date),
                 internal_to_display_date(task.finish_date),
                 task.label_hide,
-                task.label_placement,
-                "Yes" if task.is_milestone else "No",
-                task.label_alignment,
-                task.label_horizontal_offset,
-                task.label_text_colour
+                task.label_placement
             ]
             ws.append(row)
         
         # Auto-adjust column widths
         for col_idx, header in enumerate(headers, 1):
             col_letter = openpyxl.utils.get_column_letter(col_idx)
-            if header in ["Name", "Label Alignment", "Label Text Colour"]:
+            if header == "Name":
                 ws.column_dimensions[col_letter].width = 15
             elif header in ["Start Date", "Finish Date"]:
                 ws.column_dimensions[col_letter].width = 12
@@ -504,6 +487,59 @@ class ExcelRepository:
                     continue
         
         return tasks
+    
+    def _read_links_sheet(self, ws) -> List[Link]:
+        """Read Links worksheet and return list of Link objects using header-based mapping.
+        
+        This method uses header-based mapping instead of positional arrays to avoid
+        index brittleness when columns are added, removed, or reordered.
+        """
+        links = []
+        headers = None
+        
+        for row_idx, row in enumerate(ws.iter_rows(values_only=True), 1):
+            if row_idx == 1:
+                # Header row
+                headers = [str(cell).strip() if cell else "" for cell in row]
+                continue
+            
+            if not any(row):  # Skip empty rows
+                continue
+            
+            # Create link dict from row data using header mapping
+            link_data = {}
+            for col_idx, value in enumerate(row):
+                if col_idx < len(headers) and headers[col_idx]:
+                    header = headers[col_idx]
+                    
+                    # Map Excel headers to link fields
+                    if header == "ID":
+                        link_data["link_id"] = int(value) if value is not None else 0
+                    elif header == "From Task ID":
+                        link_data["from_task_id"] = int(value) if value is not None else 0
+                    elif header == "From Task Name":
+                        link_data["from_task_name"] = str(value) if value is not None else ""
+                    elif header == "To Task ID":
+                        link_data["to_task_id"] = int(value) if value is not None else 0
+                    elif header == "To Task Name":
+                        link_data["to_task_name"] = str(value) if value is not None else ""
+                    elif header == "Line Color":
+                        link_data["line_color"] = str(value) if value is not None else "black"
+                    elif header == "Line Style":
+                        link_data["line_style"] = str(value) if value is not None else "solid"
+            
+            # Only create link if we have required fields
+            if ("link_id" in link_data and link_data["link_id"] > 0 and
+                "from_task_id" in link_data and link_data["from_task_id"] > 0 and
+                "to_task_id" in link_data and link_data["to_task_id"] > 0):
+                try:
+                    link = Link.from_dict(link_data)
+                    links.append(link)
+                except (KeyError, ValueError) as e:
+                    # Skip invalid links
+                    continue
+        
+        return links
     
     def _read_table_sheet(self, ws) -> List[List[str]]:
         """Read a table worksheet (Links, Swimlanes, Pipes, Curtains, Text Boxes)."""
