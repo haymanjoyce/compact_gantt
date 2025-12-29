@@ -46,6 +46,8 @@ class ProjectData:
                 task_dict["label_horizontal_offset"] = task.label_horizontal_offset
             if task.label_text_colour != "black":
                 task_dict["label_text_colour"] = task.label_text_colour
+            if task.fill_color != "blue":
+                task_dict["fill_color"] = task.fill_color
             tasks_data.append(task_dict)
         
         # FrameConfig: save all fields (all are necessary)

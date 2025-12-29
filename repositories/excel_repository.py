@@ -179,7 +179,7 @@ class ExcelRepository:
         ws = wb.create_sheet("Tasks")
         
         # Headers - only include fields that are visible/editable in UI
-        headers = ["ID", "Row", "Name", "Start Date", "Finish Date", "Label", "Placement"]
+        headers = ["ID", "Row", "Name", "Start Date", "Finish Date", "Label", "Placement", "Fill Color"]
         ws.append(headers)
         self._format_header_row(ws, 1)
         
@@ -192,7 +192,8 @@ class ExcelRepository:
                 internal_to_display_date(task.start_date),
                 internal_to_display_date(task.finish_date),
                 task.label_hide,
-                task.label_placement
+                task.label_placement,
+                task.fill_color
             ]
             ws.append(row)
         
@@ -460,6 +461,8 @@ class ExcelRepository:
                         task_data["label_hide"] = str(value) if value is not None else "Yes"
                     elif header == "Placement":
                         task_data["label_placement"] = str(value) if value is not None else "Outside"
+                    elif header == "Fill Color":
+                        task_data["fill_color"] = str(value) if value is not None else "blue"
                     elif header == "Is Milestone":
                         task_data["is_milestone"] = str(value).strip().lower() in ["yes", "true", "1"]
                     elif header == "Label Alignment":

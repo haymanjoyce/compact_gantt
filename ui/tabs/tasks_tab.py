@@ -153,11 +153,21 @@ class TasksTab(BaseTab):
         self.detail_placement.setToolTip("Label placement (Inside or Outside task bar)")
         self.detail_placement.currentTextChanged.connect(self._on_detail_form_changed)
         
+        # Fill Color
+        color_label = QLabel("Fill Color:")
+        color_label.setFixedWidth(LABEL_WIDTH)
+        self.detail_fill_color = QComboBox()
+        self.detail_fill_color.addItems(["blue", "red", "green", "yellow", "orange", "purple", "gray", "black", "white", "cyan", "magenta", "brown"])
+        self.detail_fill_color.setToolTip("Fill color for task bar or milestone circle")
+        self.detail_fill_color.currentTextChanged.connect(self._on_detail_form_changed)
+        
         # Layout form fields vertically (like titles tab)
         layout.addWidget(label_label, 0, 0)
         layout.addWidget(self.detail_label, 0, 1)
         layout.addWidget(placement_label, 1, 0)
         layout.addWidget(self.detail_placement, 1, 1)
+        layout.addWidget(color_label, 2, 0)
+        layout.addWidget(self.detail_fill_color, 2, 1)
         
         layout.setColumnStretch(1, 1)
         
@@ -186,10 +196,12 @@ class TasksTab(BaseTab):
                 task = self.project_data.tasks[row]
                 self.detail_label.setCurrentText(task.label_hide if task.label_hide else "Yes")
                 self.detail_placement.setCurrentText(task.label_placement if task.label_placement else "Inside")
+                self.detail_fill_color.setCurrentText(task.fill_color if task.fill_color else "blue")
             else:
                 # Use defaults if task doesn't exist
                 self.detail_label.setCurrentText("Yes")
                 self.detail_placement.setCurrentText("Inside")
+                self.detail_fill_color.setCurrentText("blue")
         finally:
             self._updating_form = False
 
@@ -199,6 +211,7 @@ class TasksTab(BaseTab):
         try:
             self.detail_label.setCurrentText("Yes")
             self.detail_placement.setCurrentText("Inside")
+            self.detail_fill_color.setCurrentText("blue")
         finally:
             self._updating_form = False
 
@@ -287,10 +300,11 @@ class TasksTab(BaseTab):
             elif finish_date_internal and not start_date_internal:
                 start_date_internal = finish_date_internal  # Auto-populate start date
             
-            # Extract Label and Placement from detail form if this is the selected row
+            # Extract Label, Placement, and Fill Color from detail form if this is the selected row
             # Otherwise, get from existing Task object
             label_hide = "Yes"
             label_placement = "Inside"
+            fill_color = "blue"
             
             if row_idx == self._selected_row:
                 # Use values from detail form
@@ -298,12 +312,15 @@ class TasksTab(BaseTab):
                     label_hide = self.detail_label.currentText()
                 if self.detail_placement:
                     label_placement = self.detail_placement.currentText()
+                if self.detail_fill_color:
+                    fill_color = self.detail_fill_color.currentText()
             else:
                 # Get from existing Task object if available (look up by task_id)
                 existing_task = next((t for t in self.project_data.tasks if t.task_id == task_id), None)
                 if existing_task:
                     label_hide = existing_task.label_hide
                     label_placement = existing_task.label_placement
+                    fill_color = existing_task.fill_color if hasattr(existing_task, 'fill_color') else "blue"
             
             # Create Task object
             task = Task(
@@ -316,7 +333,8 @@ class TasksTab(BaseTab):
                 label_placement=label_placement,
                 label_alignment="Centre",
                 label_horizontal_offset=1.0,
-                label_text_colour="black"
+                label_text_colour="black",
+                fill_color=fill_color
             )
             
             return task
@@ -844,7 +862,8 @@ class TasksTab(BaseTab):
                 label_hide=original_task.label_hide,
                 label_alignment=original_task.label_alignment,
                 label_horizontal_offset=original_task.label_horizontal_offset,
-                label_text_colour=original_task.label_text_colour
+                label_text_colour=original_task.label_text_colour,
+                fill_color=original_task.fill_color
             )
             tasks_to_duplicate.append((row_idx, new_task))
             used_ids.add(next_id)

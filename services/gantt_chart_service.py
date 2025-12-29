@@ -236,6 +236,7 @@ class GanttChartService(QObject):
             label_placement = task.get("label_placement", "Outside")
             label_hide = task.get("label_hide", "Yes") == "No"
             task_name = task.get("task_name", "Unnamed")
+            fill_color = task.get("fill_color", "blue")  # Get fill color, default to blue
             
             if not start_date_str and not finish_date_str:
                 continue
@@ -270,9 +271,9 @@ class GanttChartService(QObject):
                 center_x = x_end if finish_date_str else x_start
                 center_y = y_task + row_height * 0.5
                 
-                # Render as a circle - much simpler!
+                # Render as a circle - use fill_color from task
                 self.dwg.add(self.dwg.circle(center=(center_x, center_y), r=half_size, 
-                                             fill="red", stroke="black", stroke_width=0.5))
+                                             fill=fill_color, stroke="black", stroke_width=0.5))
                 
                 if not label_hide and label_placement == "Outside":
                     # Use proportional positioning: center_y is at row_height * 0.5, apply factor to row_height
@@ -286,7 +287,7 @@ class GanttChartService(QObject):
                     logging.debug(f"Rendering task bar for '{task_name}': x={x_start}, y={rect_y}, width={width_task}, height={task_height}, row={row_num}, y_task={y_task}")
                     corner_radius = 3
                     self.dwg.add(self.dwg.rect(insert=(x_start, rect_y), size=(width_task, task_height), 
-                                              fill="blue", stroke="black", stroke_width=0.5,
+                                              fill=fill_color, stroke="black", stroke_width=0.5,
                                               rx=corner_radius, ry=corner_radius))
                     
                     if not label_hide:
