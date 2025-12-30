@@ -172,11 +172,33 @@ class GanttChartService(QObject):
                 right = mid - 1
         return text[:right] + "…" if right > 0 else ""
 
+    def _get_inside_label_text_color(self, fill_color: str) -> str:
+        """Determine text color for inside labels based on fill color.
+        
+        Args:
+            fill_color: The fill color of the task/milestone
+            
+        Returns:
+            "black" for light backgrounds (yellow, white, cyan, orange, magenta),
+            "white" for all other backgrounds
+        """
+        # Normalize color name to lowercase for comparison
+        fill_color_lower = fill_color.lower() if fill_color else "blue"
+        
+        # Colors that need black text for visibility
+        light_colors = {"yellow", "white", "cyan", "orange", "magenta"}
+        
+        if fill_color_lower in light_colors:
+            return "black"
+        else:
+            return "white"
+
     def _render_inside_label(self, task_name: str, x_start: float, width_task: float, 
-                             label_y_base: float):
+                             label_y_base: float, fill_color: str = "blue"):
         """Render a label inside a task bar, with truncation if needed.
         
-        This method renders white text centered horizontally within the specified task width.
+        This method renders text centered horizontally within the specified task width.
+        Text color is automatically determined based on the fill color for optimal visibility.
         The text is automatically truncated with ellipsis if it doesn't fit within the width.
         
         Args:
@@ -184,12 +206,14 @@ class GanttChartService(QObject):
             x_start: The absolute x position where the task starts (in pixels)
             width_task: The total width of the task in pixels (for centering and truncation)
             label_y_base: The y position for the label baseline (in pixels)
+            fill_color: The fill color of the task (used to determine text color)
         """
         task_name_display = self._truncate_text_to_fit(task_name, width_task)
         label_x = x_start + width_task / 2
-        logging.debug(f"_render_inside_label: text='{task_name_display}', x={label_x}, y={label_y_base}, width={width_task}, original_text='{task_name}'")
+        text_color = self._get_inside_label_text_color(fill_color)
+        logging.debug(f"_render_inside_label: text='{task_name_display}', x={label_x}, y={label_y_base}, width={width_task}, fill_color={fill_color}, text_color={text_color}, original_text='{task_name}'")
         self.dwg.add(self.dwg.text(task_name_display, insert=(label_x, label_y_base),
-                                   font_size=str(self.config.general.task_font_size), font_family="Arial", fill="white",
+                                   font_size=str(self.config.general.task_font_size), font_family="Arial", fill=text_color,
                                    text_anchor="middle", dominant_baseline="middle"))
         logging.debug(f"  Text element added to SVG at position ({label_x}, {label_y_base})")
 
@@ -297,7 +321,7 @@ class GanttChartService(QObject):
                         
                         if label_placement == "Inside":
                             # Simple inside label rendering - no multi-time-frame logic needed
-                            self._render_inside_label(task_name, x_start, width_task, label_y_base)
+                            self._render_inside_label(task_name, x_start, width_task, label_y_base, fill_color)
                         elif label_placement == "Outside":
                             self._render_outside_label(task_name, x_end, rect_y + task_height / 2, 
                                                       label_y_base)
