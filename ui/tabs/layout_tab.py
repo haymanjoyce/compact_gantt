@@ -1,5 +1,5 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QGridLayout, QGroupBox, QLineEdit, 
-                           QLabel, QMessageBox, QDateEdit)
+                           QLabel, QMessageBox, QDateEdit, QCheckBox, QComboBox)
 from PyQt5.QtCore import pyqtSignal, Qt, QDate
 from typing import Dict, Any, Tuple
 from datetime import datetime, timedelta
@@ -73,8 +73,17 @@ class LayoutTab(BaseTab):
         self.num_rows = QLineEdit(str(self.app_config.general.tasks_rows))
         self.num_rows.setToolTip("Number of rows in the chart")
 
+        # Show Row Numbers (using combobox instead of checkbox)
+        row_numbers_label = QLabel("Row Numbers:")
+        row_numbers_label.setFixedWidth(label_width)
+        self.show_row_numbers = QComboBox()
+        self.show_row_numbers.addItems(["No", "Yes"])
+        self.show_row_numbers.setToolTip("Display row numbers on the left side of each row")
+
         layout.addWidget(rows_label, 0, 0)
         layout.addWidget(self.num_rows, 0, 1)
+        layout.addWidget(row_numbers_label, 1, 0)
+        layout.addWidget(self.show_row_numbers, 1, 1)
         layout.setColumnStretch(1, 1)
         group.setLayout(layout)
         return group
@@ -136,6 +145,7 @@ class LayoutTab(BaseTab):
         self.outer_width.textChanged.connect(self._sync_data_if_not_initializing)
         self.outer_height.textChanged.connect(self._sync_data_if_not_initializing)
         self.num_rows.textChanged.connect(self._sync_data_if_not_initializing)
+        self.show_row_numbers.currentTextChanged.connect(self._sync_data_if_not_initializing)
         for margin in self.margin_inputs:
             margin.textChanged.connect(self._sync_data_if_not_initializing)
         self.start_date.dateChanged.connect(self._sync_data_if_not_initializing)
@@ -148,6 +158,8 @@ class LayoutTab(BaseTab):
         self.outer_width.setText(str(frame_config.outer_width))
         self.outer_height.setText(str(frame_config.outer_height))
         self.num_rows.setText(str(frame_config.num_rows))
+        show_row_numbers = getattr(frame_config, 'show_row_numbers', False)
+        self.show_row_numbers.setCurrentText("Yes" if show_row_numbers else "No")
 
         # Load Margins
         margins = frame_config.margins
@@ -224,6 +236,7 @@ class LayoutTab(BaseTab):
             int(self.margin_right.text())
         )
         self.project_data.frame_config.num_rows = int(self.num_rows.text())
+        self.project_data.frame_config.show_row_numbers = self.show_row_numbers.currentText() == "Yes"
         
         # Update timeframe dates (convert QDate to internal format yyyy-mm-dd)
         start_date_str = start_qdate.toString("yyyy-MM-dd")

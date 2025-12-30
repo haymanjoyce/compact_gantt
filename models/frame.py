@@ -33,6 +33,7 @@ class FrameConfig:
     vertical_gridline_months: bool = True
     vertical_gridline_weeks: bool = False
     vertical_gridline_days: bool = False
+    show_row_numbers: bool = False
     chart_start_date: str = field(default_factory=_default_start_date)
     chart_end_date: str = field(default_factory=_default_end_date)
     show_years: bool = True

@@ -474,6 +474,7 @@ class GanttChartService(QObject):
             # Get style properties
             line_color = link.line_color or "black"
             line_style = link.line_style or "solid"
+            link_routing = link.link_routing or "auto"
             
             # Map line style to SVG stroke-dasharray
             stroke_dasharray = None
@@ -700,59 +701,121 @@ class GanttChartService(QObject):
                             self._render_arrowhead(term_x, term_y, "up", arrow_size, line_color)
                             add_origin_marker()
                     else:
-                        # Not perfectly aligned - use V-H-V pattern
+                        # Not perfectly aligned - use routing pattern
+                        arrow_size = 5
+                        
+                        if link_routing == "HV":
+                            # Horizontal-Vertical: Go horizontal first, then vertical
+                            if to_task["row_num"] > from_task["row_num"]:
+                                # Successor below - H-V downward
+                                line_end_y = term_y - arrow_size  # Arrow points down, base is above
+                                self.dwg.add(create_line((origin_x, origin_y), (term_x, origin_y)))
+                                self.dwg.add(create_line((term_x, origin_y), (term_x, line_end_y)))
+                                self._render_arrowhead(term_x, term_y, "down", arrow_size, line_color)
+                            else:
+                                # Successor above - H-V upward
+                                line_end_y = term_y + arrow_size  # Arrow points up, base is below
+                                self.dwg.add(create_line((origin_x, origin_y), (term_x, origin_y)))
+                                self.dwg.add(create_line((term_x, origin_y), (term_x, line_end_y)))
+                                self._render_arrowhead(term_x, term_y, "up", arrow_size, line_color)
+                            add_origin_marker()
+                        elif link_routing == "VH":
+                            # Vertical-Horizontal: Go vertical first, then horizontal
+                            # Determine arrow direction based on link direction (left/right)
+                            if link_goes_right:
+                                # Link goes right - arrow points left (into task)
+                                line_end_x = term_x - arrow_size  # Arrow points left, base is to the right
+                                self.dwg.add(create_line((origin_x, origin_y), (origin_x, term_y)))
+                                self.dwg.add(create_line((origin_x, term_y), (line_end_x, term_y)))
+                                self._render_arrowhead(term_x, term_y, "left", arrow_size, line_color)
+                            else:
+                                # Link goes left (shouldn't happen in FS, but handle gracefully)
+                                line_end_x = term_x + arrow_size  # Arrow points right, base is to the left
+                                self.dwg.add(create_line((origin_x, origin_y), (origin_x, term_y)))
+                                self.dwg.add(create_line((origin_x, term_y), (line_end_x, term_y)))
+                                self._render_arrowhead(term_x, term_y, "right", arrow_size, line_color)
+                            add_origin_marker()
+                        else:
+                            # Auto: Use V-H-V pattern (default behavior)
+                            # Calculate row midpoint y
+                            mid_y = (origin_y + term_y) / 2
+                            
+                            if to_task["row_num"] > from_task["row_num"]:
+                                # Successor below - V-H-V downward
+                                # Shorten final vertical segment so it ends at arrowhead base
+                                line_end_y = term_y - arrow_size  # Arrow points down, base is above
+                                self.dwg.add(create_line((origin_x, origin_y), (origin_x, mid_y)))
+                                self.dwg.add(create_line((origin_x, mid_y), (term_x, mid_y)))
+                                self.dwg.add(create_line((term_x, mid_y), (term_x, line_end_y)))
+                                self._render_arrowhead(term_x, term_y, "down", arrow_size, line_color)
+                            else:
+                                # Successor above - V-H-V upward
+                                line_end_y = term_y + arrow_size  # Arrow points up, base is below
+                                self.dwg.add(create_line((origin_x, origin_y), (origin_x, mid_y)))
+                                self.dwg.add(create_line((origin_x, mid_y), (term_x, mid_y)))
+                                self.dwg.add(create_line((term_x, mid_y), (term_x, line_end_y)))
+                                self._render_arrowhead(term_x, term_y, "up", arrow_size, line_color)
+                            add_origin_marker()
+                else:
+                    # Case 2b/3b: Positive Gap/Lag (Successor Starts Later)
+                    arrow_size = 5
+                    
+                    if link_routing == "HV":
+                        # Horizontal-Vertical: Go horizontal first, then vertical
+                        if to_task["row_num"] > from_task["row_num"]:
+                            # Successor below - H-V downward
+                            line_end_y = term_y - arrow_size  # Arrow points down, base is above
+                            self.dwg.add(create_line((origin_x, origin_y), (term_x, origin_y)))
+                            self.dwg.add(create_line((term_x, origin_y), (term_x, line_end_y)))
+                            self._render_arrowhead(term_x, term_y, "down", arrow_size, line_color)
+                        else:
+                            # Successor above - H-V upward
+                            line_end_y = term_y + arrow_size  # Arrow points up, base is below
+                            self.dwg.add(create_line((origin_x, origin_y), (term_x, origin_y)))
+                            self.dwg.add(create_line((term_x, origin_y), (term_x, line_end_y)))
+                            self._render_arrowhead(term_x, term_y, "up", arrow_size, line_color)
+                        add_origin_marker()
+                    elif link_routing == "VH":
+                        # Vertical-Horizontal: Go vertical first, then horizontal
+                        # Determine arrow direction based on link direction (left/right)
+                        if link_goes_right:
+                            # Link goes right - arrow points left (into task)
+                            line_end_x = term_x - arrow_size  # Arrow points left, base is to the right
+                            self.dwg.add(create_line((origin_x, origin_y), (origin_x, term_y)))
+                            self.dwg.add(create_line((origin_x, term_y), (line_end_x, term_y)))
+                            self._render_arrowhead(term_x, term_y, "left", arrow_size, line_color)
+                        else:
+                            # Link goes left (shouldn't happen in FS, but handle gracefully)
+                            line_end_x = term_x + arrow_size  # Arrow points right, base is to the left
+                            self.dwg.add(create_line((origin_x, origin_y), (origin_x, term_y)))
+                            self.dwg.add(create_line((origin_x, term_y), (line_end_x, term_y)))
+                            self._render_arrowhead(term_x, term_y, "right", arrow_size, line_color)
+                        add_origin_marker()
+                    else:
+                        # Auto: Use V-H-V pattern (default behavior)
                         # Calculate row midpoint y
                         mid_y = (origin_y + term_y) / 2
                         
                         if to_task["row_num"] > from_task["row_num"]:
                             # Successor below - V-H-V downward
-                            arrow_size = 5
-                            # Shorten final vertical segment so it ends at arrowhead base
+                            # Segment 1: Vertical down from origin to row midpoint
+                            # Segment 2: Horizontal right to align with successor
+                            # Segment 3: Vertical down to termination (shortened to arrowhead base)
                             line_end_y = term_y - arrow_size  # Arrow points down, base is above
                             self.dwg.add(create_line((origin_x, origin_y), (origin_x, mid_y)))
                             self.dwg.add(create_line((origin_x, mid_y), (term_x, mid_y)))
                             self.dwg.add(create_line((term_x, mid_y), (term_x, line_end_y)))
                             self._render_arrowhead(term_x, term_y, "down", arrow_size, line_color)
-                            add_origin_marker()
                         else:
                             # Successor above - V-H-V upward
-                            arrow_size = 5
-                            # Shorten final vertical segment so it ends at arrowhead base
+                            # Segment 1: Vertical up from origin to row midpoint
+                            # Segment 2: Horizontal right to align with successor
+                            # Segment 3: Vertical up to termination (shortened to arrowhead base)
                             line_end_y = term_y + arrow_size  # Arrow points up, base is below
                             self.dwg.add(create_line((origin_x, origin_y), (origin_x, mid_y)))
                             self.dwg.add(create_line((origin_x, mid_y), (term_x, mid_y)))
                             self.dwg.add(create_line((term_x, mid_y), (term_x, line_end_y)))
                             self._render_arrowhead(term_x, term_y, "up", arrow_size, line_color)
-                            add_origin_marker()
-                else:
-                    # Case 2b/3b: Positive Gap/Lag (Successor Starts Later)
-                    # V-H-V pattern
-                    # Calculate row midpoint y
-                    mid_y = (origin_y + term_y) / 2
-                    
-                    if to_task["row_num"] > from_task["row_num"]:
-                        # Successor below - V-H-V downward
-                        # Segment 1: Vertical down from origin to row midpoint
-                        # Segment 2: Horizontal right to align with successor
-                        # Segment 3: Vertical down to termination (shortened to arrowhead base)
-                        arrow_size = 5
-                        line_end_y = term_y - arrow_size  # Arrow points down, base is above
-                        self.dwg.add(create_line((origin_x, origin_y), (origin_x, mid_y)))
-                        self.dwg.add(create_line((origin_x, mid_y), (term_x, mid_y)))
-                        self.dwg.add(create_line((term_x, mid_y), (term_x, line_end_y)))
-                        self._render_arrowhead(term_x, term_y, "down", arrow_size, line_color)
-                        add_origin_marker()
-                    else:
-                        # Successor above - V-H-V upward
-                        # Segment 1: Vertical up from origin to row midpoint
-                        # Segment 2: Horizontal right to align with successor
-                        # Segment 3: Vertical up to termination (shortened to arrowhead base)
-                        arrow_size = 5
-                        line_end_y = term_y + arrow_size  # Arrow points up, base is below
-                        self.dwg.add(create_line((origin_x, origin_y), (origin_x, mid_y)))
-                        self.dwg.add(create_line((origin_x, mid_y), (term_x, mid_y)))
-                        self.dwg.add(create_line((term_x, mid_y), (term_x, line_end_y)))
-                        self._render_arrowhead(term_x, term_y, "up", arrow_size, line_color)
                         add_origin_marker()
 
     def render_scales_and_rows(self, x, y, width, height, start_date, end_date):
@@ -799,6 +862,27 @@ class GanttChartService(QObject):
             for i in range(1, num_rows):  # Exclude first and last to avoid overlapping row frame border
                 y_pos = row_y + i * (row_frame_height / num_rows)
                 self.dwg.add(self.dwg.line((x, y_pos), (x + width, y_pos), stroke="#d3d3d3", stroke_width=1))
+        
+        # Render row numbers if enabled (after gridlines, before tasks)
+        if self._get_frame_config("show_row_numbers", False):
+            row_height = row_frame_height / num_rows if num_rows > 0 else row_frame_height
+            for i in range(num_rows):
+                # Calculate Y position using the same alignment factor as scales
+                row_top = row_y + i * row_height
+                row_center_y = row_top + row_height * self.config.general.text_vertical_alignment_factor
+                # Position text 5px from left edge
+                text_x = x + 5
+                # Create text element with grey color
+                text_element = self.dwg.text(
+                    str(i + 1),  # 1-based row number
+                    insert=(text_x, row_center_y),
+                    fill="#808080",  # Medium grey (darker than gridlines #d3d3d3)
+                    font_size="11px",
+                    font_family="Arial, sans-serif",
+                    text_anchor="start",
+                    dominant_baseline="middle"
+                )
+                self.dwg.add(text_element)
 
         # Render vertical gridlines based on individual interval settings
         # Define line weights for visual hierarchy: larger intervals = thicker lines

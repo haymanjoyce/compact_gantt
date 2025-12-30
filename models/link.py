@@ -10,6 +10,7 @@ class Link:
     to_task_id: int
     line_color: str = "black"
     line_style: str = "solid"
+    link_routing: str = "auto"  # "auto", "HV", or "VH"
     
     # Computed/derived fields (not stored, populated when needed)
     from_task_name: Optional[str] = None
@@ -25,6 +26,7 @@ class Link:
             to_task_id=int(data["to_task_id"]),
             line_color=data.get("line_color", "black"),
             line_style=data.get("line_style", "solid"),
+            link_routing=data.get("link_routing", "auto"),
             from_task_name=data.get("from_task_name"),  # May be None
             to_task_name=data.get("to_task_name"),      # May be None
             valid=None  # Never stored, always calculated
@@ -37,7 +39,8 @@ class Link:
             "from_task_id": self.from_task_id,
             "to_task_id": self.to_task_id,
             "line_color": self.line_color,
-            "line_style": self.line_style
+            "line_style": self.line_style,
+            "link_routing": self.link_routing
         }
         # Only include computed fields if explicitly requested (for debugging)
         if include_computed:

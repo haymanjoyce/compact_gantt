@@ -164,6 +164,7 @@ class ExcelRepository:
         ws.append(["Vertical Gridline Months", "Yes" if frame_config.vertical_gridline_months else "No"])
         ws.append(["Vertical Gridline Weeks", "Yes" if frame_config.vertical_gridline_weeks else "No"])
         ws.append(["Vertical Gridline Days", "Yes" if frame_config.vertical_gridline_days else "No"])
+        ws.append(["Show Row Numbers", "Yes" if getattr(frame_config, 'show_row_numbers', False) else "No"])
         
         # Auto-adjust column widths
         ws.column_dimensions['A'].width = 25
@@ -212,7 +213,7 @@ class ExcelRepository:
         ws = wb.create_sheet("Links")
         
         # Define headers explicitly (excluding Valid field as it's calculated)
-        headers = ["ID", "From Task ID", "From Task Name", "To Task ID", "To Task Name", "Line Color", "Line Style"]
+        headers = ["ID", "From Task ID", "From Task Name", "To Task ID", "To Task Name", "Line Color", "Line Style", "Link Routing"]
         ws.append(headers)
         self._format_header_row(ws, 1)
         
@@ -225,7 +226,8 @@ class ExcelRepository:
                 str(link.to_task_id),
                 link.to_task_name or "",
                 link.line_color,
-                link.line_style
+                link.line_style,
+                link.link_routing
             ])
         
         # Auto-adjust column widths
@@ -332,7 +334,7 @@ class ExcelRepository:
                         value = 0
                 elif key in ["Show Years", "Show Months", "Show Weeks", "Show Days",
                              "Horizontal Gridlines", "Vertical Gridline Years", "Vertical Gridline Months",
-                             "Vertical Gridline Weeks", "Vertical Gridline Days"]:
+                             "Vertical Gridline Weeks", "Vertical Gridline Days", "Show Row Numbers"]:
                     value = str(value).strip().lower() in ["yes", "true", "1", 1, True]
                 elif key in ["Chart Start Date", "Chart End Date"]:
                     # Convert from display format (dd/mm/yyyy) to internal format (yyyy-mm-dd)
@@ -372,6 +374,7 @@ class ExcelRepository:
                     "Vertical Gridline Months": "vertical_gridline_months",
                     "Vertical Gridline Weeks": "vertical_gridline_weeks",
                     "Vertical Gridline Days": "vertical_gridline_days",
+                    "Show Row Numbers": "show_row_numbers",
                     "Chart Start Date": "chart_start_date",
                     "Chart End Date": "chart_end_date"
                 }
@@ -522,6 +525,8 @@ class ExcelRepository:
                         link_data["line_color"] = str(value) if value is not None else "black"
                     elif header == "Line Style":
                         link_data["line_style"] = str(value) if value is not None else "solid"
+                    elif header == "Link Routing":
+                        link_data["link_routing"] = str(value) if value is not None else "auto"
             
             # Only create link if we have required fields
             if ("link_id" in link_data and link_data["link_id"] > 0 and

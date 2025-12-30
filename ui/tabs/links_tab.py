@@ -134,11 +134,21 @@ class LinksTab(BaseTab):
         self.detail_line_style.setToolTip("Style of the link line (solid, dotted, or dashed)")
         self.detail_line_style.currentTextChanged.connect(self._on_detail_form_changed)
         
+        # Link Routing
+        routing_label = QLabel("Link Routing:")
+        routing_label.setFixedWidth(LABEL_WIDTH)
+        self.detail_link_routing = QComboBox()
+        self.detail_link_routing.addItems(["auto", "HV", "VH"])
+        self.detail_link_routing.setToolTip("Routing pattern: Auto (automatic), HV (horizontal then vertical), or VH (vertical then horizontal)")
+        self.detail_link_routing.currentTextChanged.connect(self._on_detail_form_changed)
+        
         # Layout form fields vertically (like tasks tab)
         layout.addWidget(color_label, 0, 0)
         layout.addWidget(self.detail_line_color, 0, 1)
         layout.addWidget(style_label, 1, 0)
         layout.addWidget(self.detail_line_style, 1, 1)
+        layout.addWidget(routing_label, 2, 0)
+        layout.addWidget(self.detail_link_routing, 2, 1)
         
         layout.setColumnStretch(1, 1)
         
@@ -167,10 +177,12 @@ class LinksTab(BaseTab):
                 link = self.project_data.links[row]
                 self.detail_line_color.setCurrentText(link.line_color if link.line_color else "black")
                 self.detail_line_style.setCurrentText(link.line_style if link.line_style else "solid")
+                self.detail_link_routing.setCurrentText(link.link_routing if link.link_routing else "auto")
             else:
                 # Use defaults if link doesn't exist
                 self.detail_line_color.setCurrentText("black")
                 self.detail_line_style.setCurrentText("solid")
+                self.detail_link_routing.setCurrentText("auto")
         finally:
             self._updating_form = False
 
@@ -180,6 +192,7 @@ class LinksTab(BaseTab):
         try:
             self.detail_line_color.setCurrentText("black")
             self.detail_line_style.setCurrentText("solid")
+            self.detail_link_routing.setCurrentText("auto")
         finally:
             self._updating_form = False
 
@@ -324,6 +337,7 @@ class LinksTab(BaseTab):
             # Otherwise, get from existing Link object
             line_color = "black"
             line_style = "solid"
+            link_routing = "auto"
             
             if row_idx == self._selected_row:
                 # Use values from detail form
@@ -331,12 +345,15 @@ class LinksTab(BaseTab):
                     line_color = self.detail_line_color.currentText()
                 if self.detail_line_style:
                     line_style = self.detail_line_style.currentText()
+                if self.detail_link_routing:
+                    link_routing = self.detail_link_routing.currentText()
             else:
                 # Get from existing Link object if available
                 if row_idx < len(self.project_data.links):
                     existing_link = self.project_data.links[row_idx]
                     line_color = existing_link.line_color
                     line_style = existing_link.line_style
+                    link_routing = existing_link.link_routing
             
             # Create Link object
             link = Link(
@@ -344,7 +361,8 @@ class LinksTab(BaseTab):
                 from_task_id=from_task_id,
                 to_task_id=to_task_id,
                 line_color=line_color,
-                line_style=line_style
+                line_style=line_style,
+                link_routing=link_routing
             )
             
             return link
