@@ -37,9 +37,8 @@ class ChartConfig:
     # Frame border settings
     frame_border_width_heavy: float = 1.0  # Outer frame border width
     frame_border_width_light: float = 0.5  # Header, footer, scale, and row frame border width
-    frame_border_color_light: str = "grey"  # Border color for header, footer, scales, and row frame
-    frame_border_color_heavy: str = "lightgrey"  # Border color for outer frame
-
+    frame_border_color: str = "grey"  # Border color for all frames
+    
     # Font sizes
     task_font_size: int = 10  # Font size for task labels
     scale_font_size: int = 10  # Font size for scale labels

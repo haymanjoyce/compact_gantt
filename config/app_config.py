@@ -180,12 +180,8 @@ class GeneralConfig:
         return self.chart.frame_border_width_light
 
     @property
-    def frame_border_color_light(self) -> str:
-        return self.chart.frame_border_color_light
-
-    @property
-    def frame_border_color_heavy(self) -> str:
-        return self.chart.frame_border_color_heavy
+    def frame_border_color(self) -> str:
+        return self.chart.frame_border_color
 
 @dataclass
 class TableColumnConfig:

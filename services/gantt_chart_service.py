@@ -77,7 +77,7 @@ class GanttChartService(QObject):
         width = self._get_frame_config("outer_width", self.config.general.outer_width)
         height = self._get_frame_config("outer_height", self.config.general.outer_height)
         self.dwg.add(self.dwg.rect(insert=(0, 0), size=(width, height), fill="none", 
-                                   stroke=self.config.general.frame_border_color_heavy, 
+                                   stroke=self.config.general.frame_border_color, 
                                    stroke_width=self.config.general.frame_border_width_heavy))
         logging.debug("Outer frame border rendered")
 
@@ -87,7 +87,7 @@ class GanttChartService(QObject):
         height = self._get_frame_config("header_height", 20)
         self.dwg.add(self.dwg.rect(insert=(margins[3], margins[0]), size=(width, height),
                                    fill="lightgray", 
-                                   stroke=self.config.general.frame_border_color_light, 
+                                   stroke=self.config.general.frame_border_color, 
                                    stroke_width=self.config.general.frame_border_width_light))
         header_text = self._get_frame_config("header_text", "")
         if header_text:
@@ -104,7 +104,7 @@ class GanttChartService(QObject):
         y = self._get_frame_config("outer_height", self.config.general.outer_height) - margins[2] - height
         self.dwg.add(self.dwg.rect(insert=(margins[3], y), size=(width, height),
                                    fill="lightgray", 
-                                   stroke=self.config.general.frame_border_color_light, 
+                                   stroke=self.config.general.frame_border_color, 
                                    stroke_width=self.config.general.frame_border_width_light))
         footer_text = self._get_frame_config("footer_text", "")
         if footer_text:
@@ -898,7 +898,7 @@ class GanttChartService(QObject):
         for interval, scale_height in scale_heights:
             self.dwg.add(self.dwg.rect(insert=(x, current_y), size=(width, scale_height),
                                        fill="lightgrey", 
-                                       stroke=self.config.general.frame_border_color_light, 
+                                       stroke=self.config.general.frame_border_color, 
                                        stroke_width=self.config.general.frame_border_width_light))
             self.render_scale_interval(x, current_y, width, scale_height, start_date, end_date, interval, time_scale)
             current_y += scale_height
@@ -907,7 +907,7 @@ class GanttChartService(QObject):
         num_rows = self._get_frame_config("num_rows", 1)
         self.dwg.add(self.dwg.rect(insert=(x, row_y), size=(width, row_frame_height),
                                    fill="none", 
-                                   stroke=self.config.general.frame_border_color_light, 
+                                   stroke=self.config.general.frame_border_color, 
                                    stroke_width=self.config.general.frame_border_width_light))
 
         if self._get_frame_config("horizontal_gridlines", False):
