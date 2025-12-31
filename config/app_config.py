@@ -171,6 +171,22 @@ class GeneralConfig:
     def header_footer_font_size(self) -> int:
         return self.chart.header_footer_font_size
 
+    @property
+    def frame_border_width_heavy(self) -> float:
+        return self.chart.frame_border_width_heavy
+
+    @property
+    def frame_border_width_light(self) -> float:
+        return self.chart.frame_border_width_light
+
+    @property
+    def frame_border_color_light(self) -> str:
+        return self.chart.frame_border_color_light
+
+    @property
+    def frame_border_color_heavy(self) -> str:
+        return self.chart.frame_border_color_heavy
+
 @dataclass
 class TableColumnConfig:
     name: str

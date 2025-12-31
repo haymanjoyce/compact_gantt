@@ -33,6 +33,12 @@ class ChartConfig:
     label_horizontal_offset_factor: float = 0.0
     label_text_width_factor: float = 0.55
     text_vertical_alignment_factor: float = 0.7  # Vertical position for all text (0.0=top, 0.5=center, 1.0=bottom). Used for header, footer, scales, and task labels.
+    
+    # Frame border settings
+    frame_border_width_heavy: float = 1.0  # Outer frame border width
+    frame_border_width_light: float = 0.5  # Header, footer, scale, and row frame border width
+    frame_border_color_light: str = "grey"  # Border color for header, footer, scales, and row frame
+    frame_border_color_heavy: str = "lightgrey"  # Border color for outer frame
 
     # Font sizes
     task_font_size: int = 10  # Font size for task labels
@@ -53,7 +59,8 @@ class ChartConfig:
                           "scale_proportion_weeks", "scale_proportion_days",
                           "leader_line_vertical_default", "leader_line_horizontal_default",
                           "label_horizontal_offset_factor",
-                          "label_text_width_factor", "text_vertical_alignment_factor"]:
+                          "label_text_width_factor", "text_vertical_alignment_factor",
+                          "frame_border_width_heavy", "frame_border_width_light"]:
             value = getattr(self, field_name)
             if not isinstance(value, float) or value < 0:
                 raise ValueError(f"{field_name} must be a non-negative float")
