@@ -14,8 +14,7 @@ from models.project import ProjectData  # Import here to avoid circular import
 from ui.window_utils import move_window_according_to_preferences
 from .tabs.windows_tab import WindowsTab
 from .tabs.titles_tab import TitlesTab
-from .tabs.scales_tab import ScalesTab
-from .tabs.grid_tab import GridTab
+from .tabs.timeline_tab import TimelineTab
 from .tabs.swimlanes_tab import SwimlanesTab
 
 class MainWindow(QMainWindow):
@@ -102,8 +101,7 @@ class MainWindow(QMainWindow):
         self.windows_tab.data_updated.connect(self._on_windows_updated)
         self.layout_tab = LayoutTab(self.project_data, self.app_config)
         self.titles_tab = TitlesTab(self.project_data, self.app_config)
-        self.scales_tab = ScalesTab(self.project_data, self.app_config)
-        self.grid_tab = GridTab(self.project_data, self.app_config)
+        self.timeline_tab = TimelineTab(self.project_data, self.app_config)
         self.tasks_tab = TasksTab(self.project_data, self.app_config)
         self.tasks_tab.data_updated.connect(self._on_data_updated)
         self.links_tab = LinksTab(self.project_data, self.app_config)
@@ -117,8 +115,7 @@ class MainWindow(QMainWindow):
         self.tab_widget.addTab(self.windows_tab, "Windows")
         self.tab_widget.addTab(self.layout_tab, "Layout")
         self.tab_widget.addTab(self.titles_tab, "Titles")
-        self.tab_widget.addTab(self.scales_tab, "Scales")
-        self.tab_widget.addTab(self.grid_tab, "Grid")
+        self.tab_widget.addTab(self.timeline_tab, "Timeline")
         self.tab_widget.addTab(self.tasks_tab, "Tasks")
         self.tab_widget.addTab(self.links_tab, "Links")
         self.tab_widget.addTab(self.swimlanes_tab, "Swimlanes")
@@ -224,10 +221,8 @@ class MainWindow(QMainWindow):
                 self.layout_tab._sync_data()
             if hasattr(self.titles_tab, '_sync_data'):
                 self.titles_tab._sync_data()
-            if hasattr(self.scales_tab, '_sync_data'):
-                self.scales_tab._sync_data()
-            if hasattr(self.grid_tab, '_sync_data'):
-                self.grid_tab._sync_data()
+            if hasattr(self.timeline_tab, '_sync_data'):
+                self.timeline_tab._sync_data()
             if hasattr(self.tasks_tab, '_sync_data'):
                 self.tasks_tab._sync_data()
             if hasattr(self.links_tab, '_sync_data'):
