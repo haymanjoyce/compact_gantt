@@ -120,7 +120,7 @@ class PipesTab(BaseTab):
         color_label = QLabel("Color:")
         color_label.setFixedWidth(LABEL_WIDTH)
         self.detail_color = QComboBox()
-        self.detail_color.addItems(["red", "blue", "green", "orange", "purple", "black", "grey"])
+        self.detail_color.addItems(["blue", "red", "green", "yellow", "orange", "purple", "gray", "black", "cyan", "magenta", "brown"])
         self.detail_color.setToolTip("Color of the pipe line")
         self.detail_color.currentTextChanged.connect(self._on_detail_form_changed)
         
@@ -362,12 +362,14 @@ class PipesTab(BaseTab):
                 # Invalid date format - return None to skip this row
                 return None
             
-            # Get Color from existing pipe in project_data (updated by detail form)
-            # If pipe doesn't exist yet, use default
+            # Get Color from detail form if this row is selected, otherwise from existing pipe
             color = "red"
-            existing_pipe = next((p for p in self.project_data.pipes if p.pipe_id == pipe_id), None)
-            if existing_pipe and existing_pipe.color:
-                color = existing_pipe.color
+            if row_idx == self._selected_row and hasattr(self, 'detail_color') and self.detail_color:
+                color = self.detail_color.currentText()
+            else:
+                existing_pipe = next((p for p in self.project_data.pipes if p.pipe_id == pipe_id), None)
+                if existing_pipe and existing_pipe.color:
+                    color = existing_pipe.color
             
             # Extract Name
             name = ""

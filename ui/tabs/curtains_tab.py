@@ -120,7 +120,7 @@ class CurtainsTab(BaseTab):
         color_label = QLabel("Color:")
         color_label.setFixedWidth(LABEL_WIDTH)
         self.detail_color = QComboBox()
-        self.detail_color.addItems(["red", "blue", "green", "orange", "purple", "black", "grey"])
+        self.detail_color.addItems(["blue", "red", "green", "yellow", "orange", "purple", "gray", "black", "cyan", "magenta", "brown"])
         self.detail_color.setToolTip("Color of the curtain lines and hatching")
         self.detail_color.currentTextChanged.connect(self._on_detail_form_changed)
         
@@ -400,12 +400,14 @@ class CurtainsTab(BaseTab):
                 # Invalid date format - return None to skip this row
                 return None
             
-            # Get Color from existing curtain in project_data (updated by detail form)
-            # If curtain doesn't exist yet, use default
+            # Get Color from detail form if this row is selected, otherwise from existing curtain
             color = "red"
-            existing_curtain = next((c for c in self.project_data.curtains if c.curtain_id == curtain_id), None)
-            if existing_curtain and existing_curtain.color:
-                color = existing_curtain.color
+            if row_idx == self._selected_row and hasattr(self, 'detail_color') and self.detail_color:
+                color = self.detail_color.currentText()
+            else:
+                existing_curtain = next((c for c in self.project_data.curtains if c.curtain_id == curtain_id), None)
+                if existing_curtain and existing_curtain.color:
+                    color = existing_curtain.color
             
             # Extract Name
             name = ""

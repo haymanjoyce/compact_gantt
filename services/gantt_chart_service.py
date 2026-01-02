@@ -567,7 +567,18 @@ class GanttChartService(QObject):
             x_start_visible = max(x, min(x_start, x + width))
             x_end_visible = max(x, min(x_end, x + width))
             
-            # Draw left vertical line
+            # Draw filled rectangle with semi-transparent fill (less saturated)
+            if x_start_visible < x_end_visible:
+                curtain_color = curtain.color if curtain.color else "red"
+                self.dwg.add(self.dwg.rect(
+                    insert=(x_start_visible, row_y),
+                    size=(x_end_visible - x_start_visible, row_frame_height),
+                    fill=curtain_color,
+                    fill_opacity=0.3,  # Semi-transparent fill (less saturated)
+                    stroke="none"
+                ))
+            
+            # Draw left vertical line (border)
             if x <= x_start <= x + width:
                 self.dwg.add(self.dwg.line(
                     (x_start, row_y),
@@ -576,53 +587,13 @@ class GanttChartService(QObject):
                     stroke_width=1.0
                 ))
             
-            # Draw right vertical line
+            # Draw right vertical line (border)
             if x <= x_end <= x + width:
                 self.dwg.add(self.dwg.line(
                     (x_end, row_y),
                     (x_end, row_y + row_frame_height),
                     stroke=curtain.color if curtain.color else "red",
                     stroke_width=1.0
-                ))
-            
-            # Draw hatched pattern between the lines
-            if x_start_visible < x_end_visible:
-                # Create a unique pattern ID for this curtain color
-                # Sanitize color name for SVG ID (replace spaces and special chars)
-                color_name = (curtain.color if curtain.color else "red").replace(" ", "-").replace("#", "")
-                pattern_id = f"curtain-hatch-{color_name}"
-                
-                # Define hatched pattern if not already defined
-                # Check if pattern already exists by trying to get it
-                pattern_exists = False
-                try:
-                    for element in self.dwg.defs.elements:
-                        if hasattr(element, 'get_id') and element.get_id() == pattern_id:
-                            pattern_exists = True
-                            break
-                except:
-                    pass
-                
-                if not pattern_exists:
-                    pattern = self.dwg.pattern(
-                        id=pattern_id,
-                        patternUnits="userSpaceOnUse",
-                        width=4,
-                        height=4
-                    )
-                    pattern.add(self.dwg.path(
-                        d="M 0,4 l 4,-4",
-                        stroke=curtain.color if curtain.color else "red",
-                        stroke_width=0.5
-                    ))
-                    self.dwg.defs.add(pattern)
-                
-                # Draw rectangle filled with hatched pattern
-                self.dwg.add(self.dwg.rect(
-                    insert=(x_start_visible, row_y),
-                    size=(x_end_visible - x_start_visible, row_frame_height),
-                    fill=f"url(#{pattern_id})",
-                    stroke="none"
                 ))
             
             # Render name if provided (rotated 90 degrees along the start line)
