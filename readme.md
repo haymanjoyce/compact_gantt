@@ -32,7 +32,7 @@ A PyQt5-based tool for creating compact Gantt charts with SVG output.
 
 ```bash
 # Install dependencies
-pip install -r requirements-minimal.txt
+pip install -r requirements.txt
 
 # Run the application
 python main.py
