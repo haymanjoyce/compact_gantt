@@ -258,8 +258,9 @@ class AppConfig:
                 key="pipes",
                 columns=[
                     TableColumnConfig("Select", widget_type="checkbox"),
+                    TableColumnConfig("ID", validator=lambda x: int(x) > 0 if x else False),
                     TableColumnConfig("Date", validator=validate_display_date),
-                    TableColumnConfig("Colour")
+                    TableColumnConfig("Name")
                 ],
                 min_rows=0
             ),
@@ -267,9 +268,10 @@ class AppConfig:
                 key="curtains",
                 columns=[
                     TableColumnConfig("Select", widget_type="checkbox"),
-                    TableColumnConfig("From Date", validator=validate_display_date),
-                    TableColumnConfig("To Date", validator=validate_display_date),
-                    TableColumnConfig("Colour")
+                    TableColumnConfig("ID", validator=lambda x: int(x) > 0 if x else False),
+                    TableColumnConfig("Start Date", validator=validate_display_date),
+                    TableColumnConfig("End Date", validator=validate_display_date),
+                    TableColumnConfig("Name")
                 ],
                 min_rows=0
             ),

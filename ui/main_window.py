@@ -8,6 +8,8 @@ from .tabs.layout_tab import LayoutTab
 from .tabs.tasks_tab import TasksTab
 from .tabs.placeholder_tab import PlaceholderTab
 from .tabs.links_tab import LinksTab
+from .tabs.pipes_tab import PipesTab
+from .tabs.curtains_tab import CurtainsTab
 from repositories.project_repository import ProjectRepository
 from repositories.excel_repository import ExcelRepository
 from models.project import ProjectData  # Import here to avoid circular import
@@ -107,8 +109,8 @@ class MainWindow(QMainWindow):
         self.links_tab = LinksTab(self.project_data, self.app_config)
         self.links_tab.data_updated.connect(self._on_data_updated)
         self.swimlanes_tab = SwimlanesTab(self.project_data, self.app_config)
-        self.pipes_tab = PlaceholderTab(self.project_data, self.app_config, "Pipes")
-        self.curtains_tab = PlaceholderTab(self.project_data, self.app_config, "Curtains")
+        self.pipes_tab = PipesTab(self.project_data, self.app_config)
+        self.curtains_tab = CurtainsTab(self.project_data, self.app_config)
         self.text_boxes_tab = PlaceholderTab(self.project_data, self.app_config, "Text Boxes")
 
     def _add_all_tabs(self):
@@ -229,6 +231,10 @@ class MainWindow(QMainWindow):
                 self.links_tab._sync_data()
             if hasattr(self.swimlanes_tab, '_sync_data'):
                 self.swimlanes_tab._sync_data()
+            if hasattr(self.pipes_tab, '_sync_data'):
+                self.pipes_tab._sync_data()
+            if hasattr(self.curtains_tab, '_sync_data'):
+                self.curtains_tab._sync_data()
         except Exception as e:
             logging.error(f"Error syncing tab data: {e}", exc_info=True)
             # Continue anyway - emit with whatever data we have

@@ -1,5 +1,5 @@
 from typing import List, Dict, Any, Set
-from models import FrameConfig, Task, Link
+from models import FrameConfig, Task, Link, Pipe, Curtain
 from validators import DataValidator
 from datetime import datetime
 import logging
@@ -15,8 +15,8 @@ class ProjectData:
         self.tasks: List[Task] = []
         self.links: List[Link] = []
         self.swimlanes: List[List[str]] = []
-        self.pipes: List[List[str]] = []
-        self.curtains: List[List[str]] = []
+        self.pipes: List[Pipe] = []
+        self.curtains: List[Curtain] = []
         self.text_boxes: List[List[str]] = []
         self.validator = DataValidator()
 
@@ -53,14 +53,16 @@ class ProjectData:
         # FrameConfig: save all fields (all are necessary)
         # Convert Link objects to dictionaries for JSON (Valid field is excluded as it's calculated)
         links_data = [link.to_dict() for link in self.links]
+        pipes_data = [pipe.to_dict() for pipe in self.pipes]
+        curtains_data = [curtain.to_dict() for curtain in self.curtains]
         
         return {
             "frame_config": vars(self.frame_config),
             "tasks": tasks_data,
             "links": links_data,
             "swimlanes": self.swimlanes,
-            "pipes": self.pipes,
-            "curtains": self.curtains,
+            "pipes": pipes_data,
+            "curtains": curtains_data,
             "text_boxes": self.text_boxes
         }
 
@@ -81,9 +83,24 @@ class ProjectData:
         # Load links - convert dicts to Link objects
         links_data = data.get("links", [])
         project.links = [Link.from_dict(link_data) for link_data in links_data if isinstance(link_data, dict)]
+        
+        # Load pipes - convert dicts to Pipe objects (with backward compatibility for old list format)
+        pipes_data = data.get("pipes", [])
+        if pipes_data and isinstance(pipes_data[0], dict):
+            project.pipes = [Pipe.from_dict(pipe_data) for pipe_data in pipes_data if isinstance(pipe_data, dict)]
+        else:
+            # Backward compatibility: old list format
+            project.pipes = []
+        
+        # Load curtains - convert dicts to Curtain objects (with backward compatibility for old list format)
+        curtains_data = data.get("curtains", [])
+        if curtains_data and isinstance(curtains_data[0], dict):
+            project.curtains = [Curtain.from_dict(curtain_data) for curtain_data in curtains_data if isinstance(curtain_data, dict)]
+        else:
+            # Backward compatibility: old list format
+            project.curtains = []
+        
         project.swimlanes = data.get("swimlanes", [])
-        project.pipes = data.get("pipes", [])
-        project.curtains = data.get("curtains", [])
         project.text_boxes = data.get("text_boxes", [])
         
         return project

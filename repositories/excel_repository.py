@@ -7,6 +7,8 @@ from models.project import ProjectData
 from models.frame import FrameConfig
 from models.task import Task
 from models.link import Link
+from models.pipe import Pipe
+from models.curtain import Curtain
 from utils.conversion import internal_to_display_date, display_to_internal_date
 
 
@@ -86,10 +88,10 @@ class ExcelRepository:
             project.swimlanes = self._read_table_sheet(wb["Swimlanes"])
         
         if "Pipes" in wb.sheetnames:
-            project.pipes = self._read_table_sheet(wb["Pipes"])
+            project.pipes = self._read_pipes_sheet(wb["Pipes"])
         
         if "Curtains" in wb.sheetnames:
-            project.curtains = self._read_table_sheet(wb["Curtains"])
+            project.curtains = self._read_curtains_sheet(wb["Curtains"])
         
         if "Text Boxes" in wb.sheetnames:
             project.text_boxes = self._read_table_sheet(wb["Text Boxes"])
@@ -267,37 +269,131 @@ class ExcelRepository:
             ws.append(["Start", "End", "Label", "Color"])
             self._format_header_row(ws, 1)
     
-    def _create_pipes_sheet(self, wb: Workbook, pipes: List[List[str]]) -> None:
+    def _create_pipes_sheet(self, wb: Workbook, pipes: List[Pipe]) -> None:
         """Create Pipes worksheet."""
         ws = wb.create_sheet("Pipes")
-        if pipes:
-            if len(pipes) > 0:
-                ws.append(pipes[0] if len(pipes[0]) > 0 else ["Date", "Color"])
-                self._format_header_row(ws, 1)
-                for row in pipes[1:] if len(pipes) > 1 else []:
-                    ws.append(row)
-            else:
-                ws.append(["Date", "Color"])
-                self._format_header_row(ws, 1)
-        else:
-            ws.append(["Date", "Color"])
-            self._format_header_row(ws, 1)
+        ws.append(["ID", "Date", "Color", "Name"])
+        self._format_header_row(ws, 1)
+        
+        for pipe in pipes:
+            date_display = internal_to_display_date(pipe.date) if pipe.date else ""
+            ws.append([
+                pipe.pipe_id,
+                date_display,
+                pipe.color if pipe.color else "red",
+                pipe.name if pipe.name else ""
+            ])
     
-    def _create_curtains_sheet(self, wb: Workbook, curtains: List[List[str]]) -> None:
+    def _create_curtains_sheet(self, wb: Workbook, curtains: List[Curtain]) -> None:
         """Create Curtains worksheet."""
         ws = wb.create_sheet("Curtains")
-        if curtains:
-            if len(curtains) > 0:
-                ws.append(curtains[0] if len(curtains[0]) > 0 else ["Start Date", "End Date", "Color"])
-                self._format_header_row(ws, 1)
-                for row in curtains[1:] if len(curtains) > 1 else []:
-                    ws.append(row)
-            else:
-                ws.append(["Start Date", "End Date", "Color"])
-                self._format_header_row(ws, 1)
-        else:
-            ws.append(["Start Date", "End Date", "Color"])
-            self._format_header_row(ws, 1)
+        ws.append(["ID", "Start Date", "End Date", "Color", "Name"])
+        self._format_header_row(ws, 1)
+        
+        for curtain in curtains:
+            start_date_display = internal_to_display_date(curtain.start_date) if curtain.start_date else ""
+            end_date_display = internal_to_display_date(curtain.end_date) if curtain.end_date else ""
+            ws.append([
+                curtain.curtain_id,
+                start_date_display,
+                end_date_display,
+                curtain.color if curtain.color else "red",
+                curtain.name if curtain.name else ""
+            ])
+    
+    def _read_pipes_sheet(self, ws) -> List[Pipe]:
+        """Read Pipes worksheet and return list of Pipe objects."""
+        pipes = []
+        headers = {}
+        
+        # Read header row
+        header_row = ws[1]
+        for idx, cell in enumerate(header_row):
+            headers[cell.value] = idx
+        
+        # Read data rows
+        for row in ws.iter_rows(min_row=2, values_only=False):
+            if not any(cell.value for cell in row):
+                continue
+            
+            pipe_data = {}
+            for header, col_idx in headers.items():
+                cell = row[col_idx]
+                value = cell.value if cell else None
+                
+                if header == "ID":
+                    pipe_data["pipe_id"] = int(value) if value is not None else 0
+                elif header == "Date":
+                    if value:
+                        if isinstance(value, datetime):
+                            pipe_data["date"] = value.strftime("%Y-%m-%d")
+                        else:
+                            pipe_data["date"] = display_to_internal_date(str(value))
+                    else:
+                        pipe_data["date"] = ""
+                elif header == "Colour" or header == "Color":
+                    pipe_data["color"] = str(value) if value else "red"
+                elif header == "Name":
+                    pipe_data["name"] = str(value) if value else ""
+            
+            if pipe_data.get("pipe_id") and pipe_data.get("date"):
+                try:
+                    pipes.append(Pipe.from_dict(pipe_data))
+                except (ValueError, KeyError) as e:
+                    logging.warning(f"Skipping invalid pipe row: {e}")
+        
+        return pipes
+    
+    def _read_curtains_sheet(self, ws) -> List[Curtain]:
+        """Read Curtains worksheet and return list of Curtain objects."""
+        curtains = []
+        headers = {}
+        
+        # Read header row
+        header_row = ws[1]
+        for idx, cell in enumerate(header_row):
+            headers[cell.value] = idx
+        
+        # Read data rows
+        for row in ws.iter_rows(min_row=2, values_only=False):
+            if not any(cell.value for cell in row):
+                continue
+            
+            curtain_data = {}
+            for header, col_idx in headers.items():
+                cell = row[col_idx]
+                value = cell.value if cell else None
+                
+                if header == "ID":
+                    curtain_data["curtain_id"] = int(value) if value is not None else 0
+                elif header == "Start Date":
+                    if value:
+                        if isinstance(value, datetime):
+                            curtain_data["start_date"] = value.strftime("%Y-%m-%d")
+                        else:
+                            curtain_data["start_date"] = display_to_internal_date(str(value))
+                    else:
+                        curtain_data["start_date"] = ""
+                elif header == "End Date":
+                    if value:
+                        if isinstance(value, datetime):
+                            curtain_data["end_date"] = value.strftime("%Y-%m-%d")
+                        else:
+                            curtain_data["end_date"] = display_to_internal_date(str(value))
+                    else:
+                        curtain_data["end_date"] = ""
+                elif header == "Colour" or header == "Color":
+                    curtain_data["color"] = str(value) if value else "red"
+                elif header == "Name":
+                    curtain_data["name"] = str(value) if value else ""
+            
+            if curtain_data.get("curtain_id") and curtain_data.get("start_date") and curtain_data.get("end_date"):
+                try:
+                    curtains.append(Curtain.from_dict(curtain_data))
+                except (ValueError, KeyError) as e:
+                    logging.warning(f"Skipping invalid curtain row: {e}")
+        
+        return curtains
     
     def _create_text_boxes_sheet(self, wb: Workbook, text_boxes: List[List[str]]) -> None:
         """Create Text Boxes worksheet."""

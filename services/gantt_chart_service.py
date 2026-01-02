@@ -8,6 +8,8 @@ from config.app_config import AppConfig
 import logging
 from models.link import Link
 from utils.conversion import is_valid_internal_date
+from models.pipe import Pipe
+from models.curtain import Curtain
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -451,6 +453,191 @@ class GanttChartService(QObject):
             points = [(x, y), (x - size/2, y - size), (x + size/2, y - size)]
         
         self.dwg.add(self.dwg.polygon(points=points, fill=color, stroke="none"))
+
+    def render_pipes(self, x, row_y, width, row_frame_height, start_date, end_date):
+        """Render vertical pipe lines at specific dates.
+        
+        Args:
+            x: The absolute x position of the timeline (in pixels)
+            row_y: The absolute y position of the row frame (in pixels)
+            width: The width of the timeline (in pixels)
+            row_frame_height: The height of the row frame (in pixels)
+            start_date: The start date of the timeline (datetime)
+            end_date: The end date of the timeline (datetime)
+        """
+        pipes_data = self.data.get("pipes", [])
+        if not pipes_data:
+            return
+        
+        total_days = max((end_date - start_date).days, 1)
+        time_scale = width / total_days if total_days > 0 else width
+        
+        for pipe_data in pipes_data:
+            # Convert dict to Pipe object if needed
+            if isinstance(pipe_data, dict):
+                pipe = Pipe.from_dict(pipe_data)
+            else:
+                pipe = pipe_data
+            
+            # Validate date
+            if not is_valid_internal_date(pipe.date):
+                continue
+            
+            try:
+                pipe_date = datetime.strptime(pipe.date, "%Y-%m-%d")
+            except (ValueError, TypeError):
+                continue
+            
+            # Skip if pipe date is outside timeline range
+            if pipe_date < start_date or pipe_date > end_date:
+                continue
+            
+            # Calculate x position for the pipe
+            x_pos = x + (pipe_date - start_date).days * time_scale
+            
+            # Only render if within visible area
+            if x <= x_pos <= x + width:
+                # Draw vertical line spanning all rows
+                self.dwg.add(self.dwg.line(
+                    (x_pos, row_y),
+                    (x_pos, row_y + row_frame_height),
+                    stroke=pipe.color if pipe.color else "red",
+                    stroke_width=1.0
+                ))
+                
+                # Render name if provided (rotated 90 degrees along the line)
+                if pipe.name:
+                    # Position name at top of the line, rotated 90 degrees
+                    name_group = self.dwg.g(transform=f"translate({x_pos}, {row_y}) rotate(-90)")
+                    self.dwg.add(name_group)
+                    name_group.add(self.dwg.text(
+                        pipe.name,
+                        insert=(0, 0),
+                        text_anchor="start",
+                        dominant_baseline="middle",
+                        font_size=str(self.config.general.task_font_size),
+                        font_family="Arial",
+                        fill=pipe.color if pipe.color else "red"
+                    ))
+
+    def render_curtains(self, x, row_y, width, row_frame_height, start_date, end_date):
+        """Render curtains (two vertical lines with hatched pattern between them).
+        
+        Args:
+            x: The absolute x position of the timeline (in pixels)
+            row_y: The absolute y position of the row frame (in pixels)
+            width: The width of the timeline (in pixels)
+            row_frame_height: The height of the row frame (in pixels)
+            start_date: The start date of the timeline (datetime)
+            end_date: The end date of the timeline (datetime)
+        """
+        curtains_data = self.data.get("curtains", [])
+        if not curtains_data:
+            return
+        
+        total_days = max((end_date - start_date).days, 1)
+        time_scale = width / total_days if total_days > 0 else width
+        
+        for curtain_data in curtains_data:
+            # Convert dict to Curtain object if needed
+            if isinstance(curtain_data, dict):
+                curtain = Curtain.from_dict(curtain_data)
+            else:
+                curtain = curtain_data
+            
+            # Validate dates
+            if not is_valid_internal_date(curtain.start_date) or not is_valid_internal_date(curtain.end_date):
+                continue
+            
+            try:
+                curtain_start = datetime.strptime(curtain.start_date, "%Y-%m-%d")
+                curtain_end = datetime.strptime(curtain.end_date, "%Y-%m-%d")
+            except (ValueError, TypeError):
+                continue
+            
+            # Skip if curtain is completely outside timeline range
+            if curtain_end < start_date or curtain_start > end_date:
+                continue
+            
+            # Calculate x positions for the curtain lines
+            x_start = x + (curtain_start - start_date).days * time_scale
+            x_end = x + (curtain_end - start_date).days * time_scale
+            
+            # Clamp to visible area
+            x_start_visible = max(x, min(x_start, x + width))
+            x_end_visible = max(x, min(x_end, x + width))
+            
+            # Draw left vertical line
+            if x <= x_start <= x + width:
+                self.dwg.add(self.dwg.line(
+                    (x_start, row_y),
+                    (x_start, row_y + row_frame_height),
+                    stroke=curtain.color if curtain.color else "red",
+                    stroke_width=1.0
+                ))
+            
+            # Draw right vertical line
+            if x <= x_end <= x + width:
+                self.dwg.add(self.dwg.line(
+                    (x_end, row_y),
+                    (x_end, row_y + row_frame_height),
+                    stroke=curtain.color if curtain.color else "red",
+                    stroke_width=1.0
+                ))
+            
+            # Draw hatched pattern between the lines
+            if x_start_visible < x_end_visible:
+                # Create a unique pattern ID for this curtain color
+                # Sanitize color name for SVG ID (replace spaces and special chars)
+                color_name = (curtain.color if curtain.color else "red").replace(" ", "-").replace("#", "")
+                pattern_id = f"curtain-hatch-{color_name}"
+                
+                # Define hatched pattern if not already defined
+                # Check if pattern already exists by trying to get it
+                pattern_exists = False
+                try:
+                    for element in self.dwg.defs.elements:
+                        if hasattr(element, 'get_id') and element.get_id() == pattern_id:
+                            pattern_exists = True
+                            break
+                except:
+                    pass
+                
+                if not pattern_exists:
+                    pattern = self.dwg.pattern(
+                        id=pattern_id,
+                        patternUnits="userSpaceOnUse",
+                        width=4,
+                        height=4
+                    )
+                    pattern.add(self.dwg.path(
+                        d="M 0,4 l 4,-4",
+                        stroke=curtain.color if curtain.color else "red",
+                        stroke_width=0.5
+                    ))
+                    self.dwg.defs.add(pattern)
+                
+                # Draw rectangle filled with hatched pattern
+                self.dwg.add(self.dwg.rect(
+                    insert=(x_start_visible, row_y),
+                    size=(x_end_visible - x_start_visible, row_frame_height),
+                    fill=f"url(#{pattern_id})",
+                    stroke="none"
+                ))
+            
+            # Render name if provided (rotated 90 degrees along the start line)
+            if curtain.name and x <= x_start <= x + width:
+                name_group = self.dwg.g(transform=f"translate({x_start}, {row_y}) rotate(-90)")
+                self.dwg.add(name_group)
+                name_group.add(self.dwg.text(
+                    curtain.name,
+                    insert=(0, 0),
+                    text_anchor="start",
+                    dominant_baseline="middle",
+                    font_size=str(self.config.general.task_font_size),
+                    font_family="Arial",
+                    fill=curtain.color if curtain.color else "red"
+                ))
 
     def render_links(self, x, row_y, width, row_frame_height, start_date, end_date):
         """Render links between tasks according to Finish-to-Start (FS) dependency rules.
@@ -986,6 +1173,10 @@ class GanttChartService(QObject):
                 prev_x = x_pos
                 current_date = self.next_period(current_date, interval)
 
+        # Render pipes and curtains (after gridlines, before tasks)
+        self.render_pipes(x, row_y, width, row_frame_height, start_date, end_date)
+        self.render_curtains(x, row_y, width, row_frame_height, start_date, end_date)
+        
         self.render_tasks(x, row_y, width, row_frame_height, start_date, end_date, num_rows)
         
         # Return row frame position and height for use by other rendering functions
