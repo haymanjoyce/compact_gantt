@@ -21,8 +21,8 @@ class ExcelRepository:
         # Create worksheets for each tab
         self._create_layout_sheet(wb, project_data.frame_config)
         self._create_titles_sheet(wb, project_data.frame_config)
-        self._create_scales_sheet(wb, project_data.frame_config)
-        self._create_grid_sheet(wb, project_data.frame_config)
+        self._create_timeline_sheet(wb, project_data.frame_config)
+        # Grid sheet deprecated - horizontal gridlines now in Layout sheet as "Show Row Gridlines"
         self._create_tasks_sheet(wb, project_data.tasks)
         self._create_links_sheet(wb, project_data.links)
         self._create_swimlanes_sheet(wb, project_data.swimlanes)
@@ -52,8 +52,13 @@ class ExcelRepository:
             titles_data = self._read_key_value_sheet(wb["Titles"])
             frame_config_data.update(titles_data)
         
-        # Load Scales sheet
-        if "Scales" in wb.sheetnames:
+        # Load Timeline sheet (new structure)
+        if "Timeline" in wb.sheetnames:
+            timeline_data = self._read_key_value_sheet(wb["Timeline"])
+            frame_config_data.update(timeline_data)
+        
+        # Backward compatibility: Load old Scales sheet if Timeline doesn't exist
+        if "Timeline" not in wb.sheetnames and "Scales" in wb.sheetnames:
             scales_data = self._read_key_value_sheet(wb["Scales"])
             frame_config_data.update(scales_data)
         
@@ -107,8 +112,8 @@ class ExcelRepository:
         ws.append(["Margin Right", frame_config.margins[1]])
         ws.append(["Margin Bottom", frame_config.margins[2]])
         ws.append(["Margin Left", frame_config.margins[3]])
-        ws.append(["Chart Start Date", internal_to_display_date(frame_config.chart_start_date)])
-        ws.append(["Chart End Date", internal_to_display_date(frame_config.chart_end_date)])
+        ws.append(["Row Numbers", "Yes" if getattr(frame_config, 'show_row_numbers', False) else "No"])
+        ws.append(["Show Row Gridlines", "Yes" if frame_config.horizontal_gridlines else "No"])
         
         # Auto-adjust column widths
         ws.column_dimensions['A'].width = 20
@@ -132,13 +137,17 @@ class ExcelRepository:
         ws.column_dimensions['A'].width = 20
         ws.column_dimensions['B'].width = 30
     
-    def _create_scales_sheet(self, wb: Workbook, frame_config: FrameConfig) -> None:
-        """Create Scales worksheet with scale visibility settings."""
-        ws = wb.create_sheet("Scales")
+    def _create_timeline_sheet(self, wb: Workbook, frame_config: FrameConfig) -> None:
+        """Create Timeline worksheet with timeframe, scales, and vertical gridlines."""
+        ws = wb.create_sheet("Timeline")
         
         # Header
         ws.append(["Field", "Value"])
         self._format_header_row(ws, 1)
+        
+        # Timeframe fields
+        ws.append(["Chart Start Date", internal_to_display_date(frame_config.chart_start_date)])
+        ws.append(["Chart End Date", internal_to_display_date(frame_config.chart_end_date)])
         
         # Scale fields
         ws.append(["Show Years", "Yes" if frame_config.show_years else "No"])
@@ -146,29 +155,27 @@ class ExcelRepository:
         ws.append(["Show Weeks", "Yes" if frame_config.show_weeks else "No"])
         ws.append(["Show Days", "Yes" if frame_config.show_days else "No"])
         
-        # Auto-adjust column widths
-        ws.column_dimensions['A'].width = 20
-        ws.column_dimensions['B'].width = 10
-    
-    def _create_grid_sheet(self, wb: Workbook, frame_config: FrameConfig) -> None:
-        """Create Grid worksheet with gridline settings."""
-        ws = wb.create_sheet("Grid")
-        
-        # Header
-        ws.append(["Field", "Value"])
-        self._format_header_row(ws, 1)
-        
-        # Grid fields
-        ws.append(["Horizontal Gridlines", "Yes" if frame_config.horizontal_gridlines else "No"])
+        # Vertical Gridline fields
         ws.append(["Vertical Gridline Years", "Yes" if frame_config.vertical_gridline_years else "No"])
         ws.append(["Vertical Gridline Months", "Yes" if frame_config.vertical_gridline_months else "No"])
         ws.append(["Vertical Gridline Weeks", "Yes" if frame_config.vertical_gridline_weeks else "No"])
         ws.append(["Vertical Gridline Days", "Yes" if frame_config.vertical_gridline_days else "No"])
-        ws.append(["Show Row Numbers", "Yes" if getattr(frame_config, 'show_row_numbers', False) else "No"])
         
         # Auto-adjust column widths
         ws.column_dimensions['A'].width = 25
-        ws.column_dimensions['B'].width = 10
+        ws.column_dimensions['B'].width = 15
+    
+    def _create_grid_sheet(self, wb: Workbook, frame_config: FrameConfig) -> None:
+        """DEPRECATED: Grid sheet is no longer created.
+        
+        Horizontal gridlines are now saved in Layout sheet as "Show Row Gridlines".
+        Vertical gridlines and scales are in Timeline sheet.
+        Show Row Numbers is in Layout sheet.
+        
+        This method is kept for reference but is not called.
+        """
+        # This method is deprecated and should not be called
+        pass
     
     def _create_tasks_sheet(self, wb: Workbook, tasks: List[Task]) -> None:
         """Create Tasks worksheet with task data as a table.
@@ -319,7 +326,7 @@ class ExcelRepository:
             cell.alignment = Alignment(horizontal="center", vertical="center")
     
     def _read_key_value_sheet(self, ws) -> Dict[str, Any]:
-        """Read a key-value pair worksheet (Layout, Titles, Scales, Grid)."""
+        """Read a key-value pair worksheet (Layout, Titles, Timeline, Grid)."""
         data = {}
         for row in ws.iter_rows(min_row=2, values_only=True):  # Skip header row
             if row[0] and row[1] is not None:
@@ -334,8 +341,10 @@ class ExcelRepository:
                     except (ValueError, TypeError):
                         value = 0
                 elif key in ["Show Years", "Show Months", "Show Weeks", "Show Days",
-                             "Horizontal Gridlines", "Vertical Gridline Years", "Vertical Gridline Months",
-                             "Vertical Gridline Weeks", "Vertical Gridline Days", "Show Row Numbers"]:
+                             "Horizontal Gridlines", "Show Row Gridlines",
+                             "Vertical Gridline Years", "Vertical Gridline Months",
+                             "Vertical Gridline Weeks", "Vertical Gridline Days", 
+                             "Row Numbers", "Show Row Numbers"]:
                     value = str(value).strip().lower() in ["yes", "true", "1", 1, True]
                 elif key in ["Chart Start Date", "Chart End Date"]:
                     # Convert from display format (dd/mm/yyyy) to internal format (yyyy-mm-dd)
@@ -371,11 +380,13 @@ class ExcelRepository:
                     "Show Weeks": "show_weeks",
                     "Show Days": "show_days",
                     "Horizontal Gridlines": "horizontal_gridlines",
+                    "Show Row Gridlines": "horizontal_gridlines",  # Alias for backward compatibility
                     "Vertical Gridline Years": "vertical_gridline_years",
                     "Vertical Gridline Months": "vertical_gridline_months",
                     "Vertical Gridline Weeks": "vertical_gridline_weeks",
                     "Vertical Gridline Days": "vertical_gridline_days",
-                    "Show Row Numbers": "show_row_numbers",
+                    "Row Numbers": "show_row_numbers",
+                    "Show Row Numbers": "show_row_numbers",  # Alias for backward compatibility
                     "Chart Start Date": "chart_start_date",
                     "Chart End Date": "chart_end_date"
                 }
