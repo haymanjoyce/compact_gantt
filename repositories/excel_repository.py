@@ -3,12 +3,14 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
 from typing import Any, Type, Dict, List
 from datetime import datetime
+import logging
 from models.project import ProjectData
 from models.frame import FrameConfig
 from models.task import Task
 from models.link import Link
 from models.pipe import Pipe
 from models.curtain import Curtain
+from models.swimlane import Swimlane
 from utils.conversion import internal_to_display_date, display_to_internal_date
 
 
@@ -253,21 +255,19 @@ class ExcelRepository:
             adjusted_width = min(max_length + 2, 50)
             ws.column_dimensions[col_letter].width = adjusted_width
     
-    def _create_swimlanes_sheet(self, wb: Workbook, swimlanes: List[List[str]]) -> None:
+    def _create_swimlanes_sheet(self, wb: Workbook, swimlanes: List[Swimlane]) -> None:
         """Create Swimlanes worksheet."""
         ws = wb.create_sheet("Swimlanes")
-        if swimlanes:
-            if len(swimlanes) > 0:
-                ws.append(swimlanes[0] if len(swimlanes[0]) > 0 else ["Start", "End", "Label", "Color"])
-                self._format_header_row(ws, 1)
-                for row in swimlanes[1:] if len(swimlanes) > 1 else []:
-                    ws.append(row)
-            else:
-                ws.append(["Start", "End", "Label", "Color"])
-                self._format_header_row(ws, 1)
-        else:
-            ws.append(["Start", "End", "Label", "Color"])
-            self._format_header_row(ws, 1)
+        ws.append(["ID", "First Row", "Last Row", "Name"])
+        self._format_header_row(ws, 1)
+        
+        for swimlane in swimlanes:
+            ws.append([
+                swimlane.swimlane_id,
+                swimlane.first_row,
+                swimlane.last_row,
+                swimlane.name if swimlane.name else ""
+            ])
     
     def _create_pipes_sheet(self, wb: Workbook, pipes: List[Pipe]) -> None:
         """Create Pipes worksheet."""
@@ -394,6 +394,48 @@ class ExcelRepository:
                     logging.warning(f"Skipping invalid curtain row: {e}")
         
         return curtains
+    
+    def _read_swimlanes_sheet(self, ws) -> List[Swimlane]:
+        """Read Swimlanes worksheet and return list of Swimlane objects."""
+        swimlanes = []
+        headers = {}
+        
+        # Read header row
+        header_row = ws[1]
+        for idx, cell in enumerate(header_row):
+            if cell.value:
+                headers[cell.value] = idx
+        
+        # Read data rows
+        for row in ws.iter_rows(min_row=2, values_only=False):
+            if not any(cell.value for cell in row):
+                continue
+            
+            swimlane_data = {}
+            for idx, cell in enumerate(row):
+                # Get header by column index
+                header = None
+                header_row_values = [c.value for c in ws[1]]
+                if idx < len(header_row_values):
+                    header = header_row_values[idx]
+                
+                value = cell.value
+                if header == "ID":
+                    swimlane_data["swimlane_id"] = int(value) if value else 0
+                elif header == "First Row":
+                    swimlane_data["first_row"] = int(value) if value else 0
+                elif header == "Last Row":
+                    swimlane_data["last_row"] = int(value) if value else 0
+                elif header == "Name":
+                    swimlane_data["name"] = str(value) if value else ""
+            
+            if swimlane_data.get("swimlane_id") and swimlane_data.get("first_row") and swimlane_data.get("last_row"):
+                try:
+                    swimlanes.append(Swimlane.from_dict(swimlane_data))
+                except (ValueError, KeyError) as e:
+                    logging.warning(f"Skipping invalid swimlane row: {e}")
+        
+        return swimlanes
     
     def _create_text_boxes_sheet(self, wb: Workbook, text_boxes: List[List[str]]) -> None:
         """Create Text Boxes worksheet."""

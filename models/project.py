@@ -1,5 +1,5 @@
 from typing import List, Dict, Any, Set
-from models import FrameConfig, Task, Link, Pipe, Curtain
+from models import FrameConfig, Task, Link, Pipe, Curtain, Swimlane
 from validators import DataValidator
 from datetime import datetime
 import logging
@@ -14,7 +14,7 @@ class ProjectData:
         self.frame_config = FrameConfig(num_rows=app_config.general.tasks_rows)
         self.tasks: List[Task] = []
         self.links: List[Link] = []
-        self.swimlanes: List[List[str]] = []
+        self.swimlanes: List[Swimlane] = []
         self.pipes: List[Pipe] = []
         self.curtains: List[Curtain] = []
         self.text_boxes: List[List[str]] = []
@@ -55,12 +55,13 @@ class ProjectData:
         links_data = [link.to_dict() for link in self.links]
         pipes_data = [pipe.to_dict() for pipe in self.pipes]
         curtains_data = [curtain.to_dict() for curtain in self.curtains]
+        swimlanes_data = [swimlane.to_dict() for swimlane in self.swimlanes]
         
         return {
             "frame_config": vars(self.frame_config),
             "tasks": tasks_data,
             "links": links_data,
-            "swimlanes": self.swimlanes,
+            "swimlanes": swimlanes_data,
             "pipes": pipes_data,
             "curtains": curtains_data,
             "text_boxes": self.text_boxes
@@ -100,7 +101,14 @@ class ProjectData:
             # Backward compatibility: old list format
             project.curtains = []
         
-        project.swimlanes = data.get("swimlanes", [])
+        # Load swimlanes - convert dicts to Swimlane objects (with backward compatibility for old list format)
+        swimlanes_data = data.get("swimlanes", [])
+        if swimlanes_data and isinstance(swimlanes_data[0], dict):
+            project.swimlanes = [Swimlane.from_dict(swimlane_data) for swimlane_data in swimlanes_data if isinstance(swimlane_data, dict)]
+        else:
+            # Backward compatibility: old list format
+            project.swimlanes = []
+        
         project.text_boxes = data.get("text_boxes", [])
         
         return project

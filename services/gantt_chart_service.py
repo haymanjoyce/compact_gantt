@@ -10,6 +10,7 @@ from models.link import Link
 from utils.conversion import is_valid_internal_date
 from models.pipe import Pipe
 from models.curtain import Curtain
+from models.swimlane import Swimlane
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -519,6 +520,84 @@ class GanttChartService(QObject):
                         font_family="Arial",
                         fill=pipe.color if pipe.color else "red"
                     ))
+
+    def render_swimlanes(self, x, row_y, width, row_frame_height, num_rows):
+        """Render swimlanes (horizontal dividers and labels).
+        
+        Args:
+            x: The absolute x position of the timeline (in pixels)
+            row_y: The absolute y position of the row frame (in pixels)
+            width: The width of the timeline (in pixels)
+            row_frame_height: The height of the row frame (in pixels)
+            num_rows: The number of rows in the chart
+        """
+        swimlanes_data = self.data.get("swimlanes", [])
+        if not swimlanes_data:
+            return
+        
+        # Convert dicts to Swimlane objects if needed
+        swimlanes = []
+        for swimlane_data in swimlanes_data:
+            if isinstance(swimlane_data, dict):
+                swimlanes.append(Swimlane.from_dict(swimlane_data))
+            else:
+                swimlanes.append(swimlane_data)
+        
+        if not swimlanes:
+            return
+        
+        # Calculate row height
+        row_height = row_frame_height / num_rows if num_rows > 0 else row_frame_height
+        
+        # Sort swimlanes by last_row to identify the last one (highest last_row)
+        sorted_swimlanes = sorted(swimlanes, key=lambda s: s.last_row, reverse=True)
+        last_swimlane_last_row = sorted_swimlanes[0].last_row if sorted_swimlanes else -1
+        
+        # Render dividers and labels for each swimlane
+        for swimlane in swimlanes:
+            # Convert 1-based row numbers to 0-based for calculations
+            first_row_0based = swimlane.first_row - 1
+            last_row_0based = swimlane.last_row - 1
+            
+            # Validate row numbers
+            if first_row_0based < 0 or last_row_0based >= num_rows:
+                continue
+            
+            # Render divider at the bottom of the swimlane (except for the last swimlane)
+            # The divider is at the boundary between last_row and last_row + 1
+            if swimlane.last_row < last_swimlane_last_row:
+                # Calculate Y position for divider (at the bottom boundary of the swimlane)
+                # This is the same Y position as a row divider would use
+                divider_y = row_y + (swimlane.last_row) * row_height
+                self.dwg.add(self.dwg.line(
+                    (x, divider_y),
+                    (x + width, divider_y),
+                    stroke="grey",
+                    stroke_width=0.5
+                ))
+            
+            # Render label in bottom-right corner of the swimlane area
+            if swimlane.name:
+                # Calculate the swimlane area bounds
+                swimlane_top = row_y + first_row_0based * row_height
+                swimlane_bottom = row_y + (last_row_0based + 1) * row_height
+                swimlane_height = swimlane_bottom - swimlane_top
+                
+                # Position label 5px from right, 5px from bottom
+                label_x = x + width - 5
+                label_y = swimlane_bottom - 5
+                
+                # Create text element
+                text_element = self.dwg.text(
+                    swimlane.name,
+                    insert=(label_x, label_y),
+                    fill="grey",
+                    font_size="14px",
+                    font_family="Arial, sans-serif",
+                    text_anchor="end",
+                    dominant_baseline="auto"
+                )
+                self.dwg.add(text_element)
 
     def render_curtains(self, x, row_y, width, row_frame_height, start_date, end_date):
         """Render curtains (two vertical lines with hatched pattern between them).
@@ -1144,7 +1223,10 @@ class GanttChartService(QObject):
                 prev_x = x_pos
                 current_date = self.next_period(current_date, interval)
 
-        # Render pipes and curtains (after gridlines, before tasks)
+        # Render swimlanes (after gridlines, before pipes/curtains/tasks)
+        self.render_swimlanes(x, row_y, width, row_frame_height, num_rows)
+        
+        # Render pipes and curtains (after swimlanes, before tasks)
         self.render_pipes(x, row_y, width, row_frame_height, start_date, end_date)
         self.render_curtains(x, row_y, width, row_frame_height, start_date, end_date)
         
