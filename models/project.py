@@ -1,5 +1,5 @@
 from typing import List, Dict, Any, Set
-from models import FrameConfig, Task, Link, Pipe, Curtain, Swimlane
+from models import FrameConfig, Task, Link, Pipe, Curtain, Swimlane, TextBox
 from validators import DataValidator
 from datetime import datetime
 import logging
@@ -17,7 +17,7 @@ class ProjectData:
         self.swimlanes: List[Swimlane] = []
         self.pipes: List[Pipe] = []
         self.curtains: List[Curtain] = []
-        self.text_boxes: List[List[str]] = []
+        self.text_boxes: List[TextBox] = []
         self.validator = DataValidator()
 
     def to_json(self) -> Dict[str, Any]:
@@ -109,7 +109,15 @@ class ProjectData:
             # Backward compatibility: old list format
             project.swimlanes = []
         
-        project.text_boxes = data.get("text_boxes", [])
+        # Load text boxes - convert dicts to TextBox objects (with backward compatibility for old list format)
+        text_boxes_data = data.get("text_boxes", [])
+        if text_boxes_data and isinstance(text_boxes_data[0], dict):
+            project.text_boxes = [TextBox.from_dict(textbox_data) for textbox_data in text_boxes_data if isinstance(textbox_data, dict)]
+        elif text_boxes_data and isinstance(text_boxes_data[0], list):
+            # Backward compatibility: old list format
+            project.text_boxes = [TextBox.from_dict(textbox_data) for textbox_data in text_boxes_data if isinstance(textbox_data, list)]
+        else:
+            project.text_boxes = []
         
         return project
     

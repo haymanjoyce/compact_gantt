@@ -11,6 +11,7 @@ from models.link import Link
 from models.pipe import Pipe
 from models.curtain import Curtain
 from models.swimlane import Swimlane
+from models.text_box import TextBox
 from utils.conversion import internal_to_display_date, display_to_internal_date
 
 
@@ -96,7 +97,7 @@ class ExcelRepository:
             project.curtains = self._read_curtains_sheet(wb["Curtains"])
         
         if "Text Boxes" in wb.sheetnames:
-            project.text_boxes = self._read_table_sheet(wb["Text Boxes"])
+            project.text_boxes = self._read_text_boxes_sheet(wb["Text Boxes"])
         
         return project
     
@@ -440,21 +441,21 @@ class ExcelRepository:
         
         return swimlanes
     
-    def _create_text_boxes_sheet(self, wb: Workbook, text_boxes: List[List[str]]) -> None:
+    def _create_text_boxes_sheet(self, wb: Workbook, text_boxes: List[TextBox]) -> None:
         """Create Text Boxes worksheet."""
         ws = wb.create_sheet("Text Boxes")
-        if text_boxes:
-            if len(text_boxes) > 0:
-                ws.append(text_boxes[0] if len(text_boxes[0]) > 0 else ["Text", "X", "Y", "Color"])
-                self._format_header_row(ws, 1)
-                for row in text_boxes[1:] if len(text_boxes) > 1 else []:
-                    ws.append(row)
-            else:
-                ws.append(["Text", "X", "Y", "Color"])
-                self._format_header_row(ws, 1)
-        else:
-            ws.append(["Text", "X", "Y", "Color"])
-            self._format_header_row(ws, 1)
+        ws.append(["ID", "X", "Y", "Width", "Height", "Text"])
+        self._format_header_row(ws, 1)
+        
+        for textbox in text_boxes:
+            ws.append([
+                textbox.textbox_id,
+                textbox.x,
+                textbox.y,
+                textbox.width,
+                textbox.height,
+                textbox.text
+            ])
     
     def _format_header_row(self, ws, row_num: int) -> None:
         """Format header row with bold font and background color."""
@@ -695,8 +696,55 @@ class ExcelRepository:
         
         return links
     
+    def _read_text_boxes_sheet(self, ws) -> List[TextBox]:
+        """Read Text Boxes worksheet and return list of TextBox objects."""
+        text_boxes = []
+        headers = None
+        
+        for row_idx, row in enumerate(ws.iter_rows(values_only=True), 1):
+            if row_idx == 1:
+                # Header row
+                headers = [str(cell).strip() if cell else "" for cell in row]
+                continue
+            
+            if not any(row):  # Skip empty rows
+                continue
+            
+            # Create textbox dict from row data using header mapping
+            textbox_data = {}
+            for col_idx, value in enumerate(row):
+                if col_idx < len(headers) and headers[col_idx]:
+                    header = headers[col_idx]
+                    
+                    # Map Excel headers to textbox fields
+                    if header == "ID":
+                        textbox_data["textbox_id"] = int(value) if value is not None else 0
+                    elif header == "X":
+                        textbox_data["x"] = float(value) if value is not None else 0.0
+                    elif header == "Y":
+                        textbox_data["y"] = float(value) if value is not None else 0.0
+                    elif header == "Width":
+                        textbox_data["width"] = float(value) if value is not None else 100.0
+                    elif header == "Height":
+                        textbox_data["height"] = float(value) if value is not None else 50.0
+                    elif header == "Text":
+                        textbox_data["text"] = str(value) if value is not None else ""
+            
+            # Only create textbox if we have required fields
+            if ("textbox_id" in textbox_data and textbox_data["textbox_id"] > 0 and
+                "x" in textbox_data and "y" in textbox_data and
+                "width" in textbox_data and "height" in textbox_data):
+                try:
+                    textbox = TextBox.from_dict(textbox_data)
+                    text_boxes.append(textbox)
+                except (KeyError, ValueError) as e:
+                    # Skip invalid textboxes
+                    continue
+        
+        return text_boxes
+    
     def _read_table_sheet(self, ws) -> List[List[str]]:
-        """Read a table worksheet (Links, Swimlanes, Pipes, Curtains, Text Boxes)."""
+        """Read a table worksheet (legacy format for backward compatibility)."""
         data = []
         for row in ws.iter_rows(values_only=True):
             if any(row):  # Only add non-empty rows

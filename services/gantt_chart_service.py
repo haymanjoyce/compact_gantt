@@ -11,6 +11,7 @@ from utils.conversion import is_valid_internal_date
 from models.pipe import Pipe
 from models.curtain import Curtain
 from models.swimlane import Swimlane
+from models.text_box import TextBox
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -1300,6 +1301,55 @@ class GanttChartService(QObject):
             prev_x = x_pos
             current_date = next_date
 
+    def render_text_boxes(self):
+        """Render text boxes (rectangles with text) above all other elements.
+        
+        Text boxes are positioned absolutely on the chart and render last so they appear on top.
+        """
+        text_boxes = self.data.get("text_boxes", [])
+        if not text_boxes:
+            return
+        
+        logging.debug(f"Rendering {len(text_boxes)} text boxes")
+        
+        for textbox_data in text_boxes:
+            # Convert dict to TextBox object if needed
+            if isinstance(textbox_data, dict):
+                textbox = TextBox.from_dict(textbox_data)
+            else:
+                textbox = textbox_data
+            
+            if not textbox or not textbox.text:
+                continue
+            
+            # Render rectangle with border and background
+            self.dwg.add(self.dwg.rect(
+                insert=(textbox.x, textbox.y),
+                size=(textbox.width, textbox.height),
+                fill="white",
+                stroke="grey",
+                stroke_width=0.5
+            ))
+            
+            # Render text with wrapping
+            # Calculate text position (centered)
+            text_x = textbox.x + textbox.width / 2
+            text_y = textbox.y + textbox.height / 2
+            
+            # Create text element with wrapping
+            # SVG text doesn't support automatic wrapping, so we'll render the text
+            # and let it overflow (or we could implement manual line breaking)
+            # For now, render as single line centered
+            self.dwg.add(self.dwg.text(
+                textbox.text,
+                insert=(text_x, text_y),
+                font_size="10px",
+                font_family="Arial",
+                fill="black",
+                text_anchor="middle",
+                dominant_baseline="middle"
+            ))
+
     def render(self):
         logging.debug("Starting render")
         os.makedirs(self.output_folder, exist_ok=True)
@@ -1308,6 +1358,7 @@ class GanttChartService(QObject):
         self.render_footer()
         self.render_inner_frame()
         self.render_single_timeline()
+        self.render_text_boxes()  # Render text boxes after all other elements
         self.render_outer_frame_border()  # Border rendered last
         self.dwg.save()
         logging.debug("Render completed")

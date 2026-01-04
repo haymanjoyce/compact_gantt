@@ -18,6 +18,7 @@ from .tabs.windows_tab import WindowsTab
 from .tabs.titles_tab import TitlesTab
 from .tabs.timeline_tab import TimelineTab
 from .tabs.swimlanes_tab import SwimlanesTab
+from .tabs.text_boxes_tab import TextBoxesTab
 
 class MainWindow(QMainWindow):
     data_updated = pyqtSignal(dict)
@@ -111,7 +112,7 @@ class MainWindow(QMainWindow):
         self.swimlanes_tab = SwimlanesTab(self.project_data, self.app_config)
         self.pipes_tab = PipesTab(self.project_data, self.app_config)
         self.curtains_tab = CurtainsTab(self.project_data, self.app_config)
-        self.text_boxes_tab = PlaceholderTab(self.project_data, self.app_config, "Text Boxes")
+        self.text_boxes_tab = TextBoxesTab(self.project_data, self.app_config)
 
     def _add_all_tabs(self):
         self.tab_widget.addTab(self.windows_tab, "Windows")
@@ -235,6 +236,8 @@ class MainWindow(QMainWindow):
                 self.pipes_tab._sync_data()
             if hasattr(self.curtains_tab, '_sync_data'):
                 self.curtains_tab._sync_data()
+            if hasattr(self.text_boxes_tab, '_sync_data'):
+                self.text_boxes_tab._sync_data()
         except Exception as e:
             logging.error(f"Error syncing tab data: {e}", exc_info=True)
             # Continue anyway - emit with whatever data we have

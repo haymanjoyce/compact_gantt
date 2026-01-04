@@ -278,10 +278,11 @@ class AppConfig:
                 key="text_boxes",
                 columns=[
                     TableColumnConfig("Select", widget_type="checkbox"),
-                    TableColumnConfig("Text"),
-                    TableColumnConfig("X Coordinate", validator=lambda x: float(x) >= 0 if x else False),
-                    TableColumnConfig("Y Coordinate", validator=lambda x: float(x) >= 0 if x else False),
-                    TableColumnConfig("Colour")
+                    TableColumnConfig("ID", validator=lambda x: int(x) > 0 if x else False),
+                    TableColumnConfig("X", validator=lambda x: float(x) >= 0 if x else False),
+                    TableColumnConfig("Y", validator=lambda x: float(x) >= 0 if x else False),
+                    TableColumnConfig("Width", validator=lambda x: float(x) > 0 if x else False),
+                    TableColumnConfig("Height", validator=lambda x: float(x) > 0 if x else False)
                 ],
                 min_rows=0
             )

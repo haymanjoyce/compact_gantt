@@ -248,6 +248,15 @@ def add_row(table, table_key, table_configs, parent, id_field_name, row_index=No
                 item = NumericTableWidgetItem("1")  # Default row count
                 item.setData(Qt.UserRole, 1)
                 table.setItem(row_index, col_idx, item)
+            # Numeric columns for text boxes (X, Y, Width, Height)
+            elif header_text in ["X", "Y"]:
+                item = NumericTableWidgetItem("0")  # Default to 0 for coordinates
+                item.setData(Qt.UserRole, 0)
+                table.setItem(row_index, col_idx, item)
+            elif header_text in ["Width", "Height"]:
+                item = NumericTableWidgetItem("100")  # Default width/height
+                item.setData(Qt.UserRole, 100)
+                table.setItem(row_index, col_idx, item)
             # Numeric column for links (From Task ID, To Task ID) - both should be editable
             elif is_links_table and header_text in ["From Task ID", "To Task ID"]:
                 item = NumericTableWidgetItem("")
