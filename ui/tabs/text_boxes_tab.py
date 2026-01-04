@@ -116,16 +116,33 @@ class TextBoxesTab(BaseTab):
         
         LABEL_WIDTH = 120
         
-        # Text (large text area)
+        # Text (large text area) - read-only by default
         text_label = QLabel("Text:")
         text_label.setFixedWidth(LABEL_WIDTH)
         self.detail_text = QPlainTextEdit()
         self.detail_text.setToolTip("Text content for the text box (supports text wrapping)")
         self.detail_text.setMinimumHeight(100)
-        self.detail_text.textChanged.connect(self._on_detail_form_changed)
+        self.detail_text.setReadOnly(True)  # Start as read-only
+        
+        # Edit and Save buttons
+        button_layout = QHBoxLayout()
+        button_layout.setSpacing(5)
+        self.edit_button = QPushButton("Edit")
+        self.edit_button.setToolTip("Enable editing of text content")
+        self.edit_button.clicked.connect(self._on_edit_clicked)
+        
+        self.save_button = QPushButton("Save")
+        self.save_button.setToolTip("Save text content changes")
+        self.save_button.clicked.connect(self._on_save_clicked)
+        self.save_button.setEnabled(False)  # Disabled until Edit is clicked
+        
+        button_layout.addWidget(self.edit_button)
+        button_layout.addWidget(self.save_button)
+        button_layout.addStretch()
         
         layout.addWidget(text_label, 0, 0)
         layout.addWidget(self.detail_text, 0, 1)
+        layout.addLayout(button_layout, 1, 1)  # Buttons below text area
         layout.setColumnStretch(1, 1)
         layout.setRowStretch(0, 1)  # Allow text area to expand vertically
         
@@ -149,6 +166,9 @@ class TextBoxesTab(BaseTab):
         self._updating_form = True
         
         try:
+            # Block signals to prevent recursive updates
+            self.detail_text.blockSignals(True)
+            
             # Get TextBox object directly from project_data
             if row < len(self.project_data.text_boxes):
                 textbox = self.project_data.text_boxes[row]
@@ -156,24 +176,45 @@ class TextBoxesTab(BaseTab):
             else:
                 # Use defaults if textbox doesn't exist
                 self.detail_text.setPlainText("")
+            
+            # Reset to read-only mode and button states
+            self.detail_text.setReadOnly(True)
+            self.edit_button.setEnabled(True)
+            self.save_button.setEnabled(False)
         finally:
+            self.detail_text.blockSignals(False)
             self._updating_form = False
 
     def _clear_detail_form(self):
         """Clear the detail form when no text box is selected."""
         self._updating_form = True
         try:
+            # Block signals to prevent recursive updates
+            self.detail_text.blockSignals(True)
             self.detail_text.setPlainText("")
+            self.detail_text.setReadOnly(True)
+            self.edit_button.setEnabled(False)  # Disable when no selection
+            self.save_button.setEnabled(False)
         finally:
+            self.detail_text.blockSignals(False)
             self._updating_form = False
 
-    def _on_detail_form_changed(self):
-        """Handle changes in detail form - update selected text box."""
-        if self._updating_form or self._selected_row is None:
-            return
-        
-        # Trigger sync to update the data
+    def _on_edit_clicked(self):
+        """Enable editing of text content."""
+        self.detail_text.setReadOnly(False)
+        self.edit_button.setEnabled(False)
+        self.save_button.setEnabled(True)
+        self.detail_text.setFocus()  # Give focus to text editor
+    
+    def _on_save_clicked(self):
+        """Save text content and disable editing."""
+        # Sync the data
         self._sync_data_if_not_initializing()
+        
+        # Return to read-only mode
+        self.detail_text.setReadOnly(True)
+        self.edit_button.setEnabled(True)
+        self.save_button.setEnabled(False)
 
     def _connect_signals(self):
         self.text_boxes_table.itemChanged.connect(self._on_item_changed)
@@ -436,8 +477,9 @@ class TextBoxesTab(BaseTab):
             # Update project data with TextBox objects directly
             self.project_data.text_boxes = text_boxes
             
-            # Update detail form if a row is selected
-            if self._selected_row is not None and self._selected_row < len(text_boxes):
+            # Only update detail form if change came from table (not from detail form itself)
+            # We can detect this by checking if _updating_form is False (meaning user edited table, not form)
+            if self._selected_row is not None and self._selected_row < len(text_boxes) and not self._updating_form:
                 self._populate_detail_form(self._selected_row)
         except Exception as e:
             # Catch any unexpected exceptions during sync
