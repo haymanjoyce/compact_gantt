@@ -108,7 +108,7 @@ class TextBoxesTab(BaseTab):
 
     def _create_detail_form(self) -> QGroupBox:
         """Create the detail form for editing text box content."""
-        group = QGroupBox("Text Box Content")
+        self.detail_group = QGroupBox("Text Box Content")  # Store reference for title updates
         layout = QGridLayout()
         layout.setHorizontalSpacing(10)
         layout.setVerticalSpacing(5)
@@ -141,8 +141,8 @@ class TextBoxesTab(BaseTab):
         layout.setColumnStretch(0, 1)  # Make column 0 stretch
         layout.setRowStretch(0, 1)  # Allow text area to expand vertically
         
-        group.setLayout(layout)
-        return group
+        self.detail_group.setLayout(layout)
+        return self.detail_group
 
     def _on_table_selection_changed(self):
         """Handle table selection changes - populate detail form."""
@@ -168,9 +168,12 @@ class TextBoxesTab(BaseTab):
             if row < len(self.project_data.text_boxes):
                 textbox = self.project_data.text_boxes[row]
                 self.detail_text.setPlainText(textbox.text if textbox.text else "")
+                # Update group box title to show which text box is selected
+                self.detail_group.setTitle(f"Text Box {textbox.textbox_id}")
             else:
                 # Use defaults if textbox doesn't exist
                 self.detail_text.setPlainText("")
+                self.detail_group.setTitle("Text Box Content")
             
             # Reset to read-only mode and button states
             self.detail_text.setReadOnly(True)
@@ -188,6 +191,7 @@ class TextBoxesTab(BaseTab):
             self.detail_text.blockSignals(True)
             self.detail_text.setPlainText("")
             self.detail_text.setReadOnly(True)
+            self.detail_group.setTitle("Text Box Content")  # Reset title when no selection
             self.edit_button.setEnabled(False)  # Disable when no selection
             self.save_button.setEnabled(False)
         finally:
