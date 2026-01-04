@@ -1409,10 +1409,15 @@ class GanttChartService(QObject):
             ))
             
             # Wrap text into lines that fit within the text box width
-            # Leave some padding (e.g., 4px on each side)
-            padding = 4
-            available_width = max(1, textbox.width - (2 * padding))
+            # Leave some padding (e.g., 2px on each side)
+            # Note: Qt font metrics may measure text wider than SVG renders,
+            # so we add a small correction factor to account for this mismatch
+            padding = 2
+            font_metrics_correction = 1.2  # Adjust if SVG renders more compactly than Qt measures
+            available_width = max(1, (textbox.width - (2 * padding)) * font_metrics_correction)
+            logging.debug(f"Text box width: {textbox.width}, padding: {padding}, available_width: {available_width} (with {font_metrics_correction}x correction)")
             text_lines = self._wrap_text_to_lines(textbox.text, available_width, font_size=10)
+            logging.debug(f"Wrapped text into {len(text_lines)} lines: {text_lines}")
             
             if not text_lines:
                 continue
