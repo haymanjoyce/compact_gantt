@@ -323,7 +323,12 @@ class GanttChartService(QObject):
             if task_finish < start_date or task_start > end_date:
                 continue
             
-            row_num = min(max(task.get("row_number", 1) - 1, 0), num_rows - 1)
+            # Skip tasks with row numbers beyond available rows (don't clamp to last row)
+            task_row = task.get("row_number", 1)
+            if task_row > num_rows:
+                continue
+            
+            row_num = task_row - 1  # Convert to 0-based index
             x_start = x + max((task_start - start_date).days, 0) * time_scale
             x_end = x + min((task_finish - start_date).days + 1, total_days) * time_scale
             width_task = time_scale if task_start == task_finish else max(x_end - x_start, time_scale)
@@ -404,7 +409,12 @@ class GanttChartService(QObject):
             if task_finish < start_date or task_start > end_date:
                 return None
             
-            row_num = min(max(task.get("row_number", 1) - 1, 0), num_rows - 1)
+            # Skip tasks with row numbers beyond available rows (don't clamp to last row)
+            task_row = task.get("row_number", 1)
+            if task_row > num_rows:
+                return None
+            
+            row_num = task_row - 1  # Convert to 0-based index
             x_start = x + max((task_start - start_date).days, 0) * time_scale
             x_end = x + min((task_finish - start_date).days + 1, total_days) * time_scale
             width_task = time_scale if task_start == task_finish else max(x_end - x_start, time_scale)
