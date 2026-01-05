@@ -65,8 +65,8 @@ class CurtainsTab(BaseTab):
         self.curtains_table.setShowGrid(True)
         self.curtains_table.verticalHeader().setVisible(False)
         
-        # Add bottom border to header row
-        self.curtains_table.setStyleSheet(self.app_config.general.table_header_stylesheet)
+        # Add bottom border to header row and gridline styling
+        self.curtains_table.setStyleSheet(self.app_config.general.table_stylesheet)
         
         # Column sizing
         header = self.curtains_table.horizontalHeader()

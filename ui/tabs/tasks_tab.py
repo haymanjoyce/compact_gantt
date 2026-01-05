@@ -80,8 +80,8 @@ class TasksTab(BaseTab):
         self.tasks_table.setShowGrid(True)
         self.tasks_table.verticalHeader().setVisible(False)
         
-        # Add bottom border to header row
-        self.tasks_table.setStyleSheet(self.app_config.general.table_header_stylesheet)
+        # Add bottom border to header row and gridline styling
+        self.tasks_table.setStyleSheet(self.app_config.general.table_stylesheet)
         
         # Column sizing
         header = self.tasks_table.horizontalHeader()

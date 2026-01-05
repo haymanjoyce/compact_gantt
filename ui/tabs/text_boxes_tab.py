@@ -64,8 +64,8 @@ class TextBoxesTab(BaseTab):
         self.text_boxes_table.setShowGrid(True)
         self.text_boxes_table.verticalHeader().setVisible(False)
         
-        # Add bottom border to header row
-        self.text_boxes_table.setStyleSheet(self.app_config.general.table_header_stylesheet)
+        # Add bottom border to header row and gridline styling
+        self.text_boxes_table.setStyleSheet(self.app_config.general.table_stylesheet)
         
         # Column sizing
         header = self.text_boxes_table.horizontalHeader()

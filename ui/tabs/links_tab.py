@@ -65,8 +65,8 @@ class LinksTab(BaseTab):
         self.links_table.setShowGrid(True)
         self.links_table.verticalHeader().setVisible(False)
         
-        # Add bottom border to header row
-        self.links_table.setStyleSheet(self.app_config.general.table_header_stylesheet)
+        # Add bottom border to header row and gridline styling
+        self.links_table.setStyleSheet(self.app_config.general.table_stylesheet)
         
         # Column sizing
         header = self.links_table.horizontalHeader()

@@ -65,8 +65,8 @@ class PipesTab(BaseTab):
         self.pipes_table.setShowGrid(True)
         self.pipes_table.verticalHeader().setVisible(False)
         
-        # Add bottom border to header row
-        self.pipes_table.setStyleSheet(self.app_config.general.table_header_stylesheet)
+        # Add bottom border to header row and gridline styling
+        self.pipes_table.setStyleSheet(self.app_config.general.table_stylesheet)
         
         # Column sizing
         header = self.pipes_table.horizontalHeader()

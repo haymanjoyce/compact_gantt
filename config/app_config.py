@@ -193,6 +193,10 @@ class GeneralConfig:
     @property
     def table_header_stylesheet(self) -> str:
         return self.ui.table_header_stylesheet
+    
+    @property
+    def table_stylesheet(self) -> str:
+        return self.ui.table_stylesheet
 
 @dataclass
 class TableColumnConfig:
