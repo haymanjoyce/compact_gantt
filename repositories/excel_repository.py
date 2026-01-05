@@ -561,10 +561,17 @@ class ExcelRepository:
         return data
     
     def _read_tasks_sheet(self, ws) -> List[Task]:
-        """Read Tasks worksheet and return list of Task objects."""
+        """Read Tasks worksheet and return list of Task objects.
+        
+        Auto-assigns sequential IDs and row numbers to tasks that don't have them.
+        This allows users to paste simple task lists (Name, Start Date, Finish Date)
+        without needing to manually specify IDs and row numbers.
+        """
         tasks = []
         headers = None
+        task_data_list = []  # Collect all task data first
         
+        # First pass: collect all task data from Excel
         for row_idx, row in enumerate(ws.iter_rows(values_only=True), 1):
             if row_idx == 1:
                 # Header row
@@ -584,7 +591,13 @@ class ExcelRepository:
                     if header == "ID":
                         task_data["task_id"] = int(value) if value is not None else 0
                     elif header == "Row":
-                        task_data["row_number"] = int(value) if value is not None else 1
+                        # Only set row_number if value is provided, otherwise leave unset for auto-assignment
+                        if value is not None:
+                            try:
+                                task_data["row_number"] = int(value)
+                            except (ValueError, TypeError):
+                                # Invalid value, leave unset for auto-assignment
+                                pass
                     elif header == "Name":
                         task_data["task_name"] = str(value) if value is not None else ""
                     elif header == "Start Date":
@@ -632,13 +645,46 @@ class ExcelRepository:
                     elif header == "Label Text Colour":
                         task_data["label_text_colour"] = str(value) if value is not None else "black"
             
-            # Only create task if we have required fields
-            if "task_id" in task_data and task_data["task_id"] > 0:
+            # Check if row has valid data (at least Name or dates)
+            has_name = task_data.get("task_name", "").strip()
+            has_start_date = task_data.get("start_date", "").strip()
+            has_finish_date = task_data.get("finish_date", "").strip()
+            
+            if has_name or has_start_date or has_finish_date:
+                # Row has valid data, add to list for processing
+                task_data_list.append(task_data)
+        
+        # Second pass: auto-assign IDs and row numbers, then create tasks
+        # Find max existing ID to start auto-assignment from
+        max_id = 0
+        for task_data in task_data_list:
+            task_id = task_data.get("task_id", 0)
+            if task_id > max_id:
+                max_id = task_id
+        
+        # Auto-assign IDs and row numbers
+        next_id = max_id + 1
+        next_row = 1
+        
+        for task_data in task_data_list:
+            # Auto-assign ID if missing or invalid
+            if "task_id" not in task_data or task_data.get("task_id", 0) <= 0:
+                task_data["task_id"] = next_id
+                next_id += 1
+            
+            # Auto-assign row number if missing or invalid
+            if "row_number" not in task_data or task_data.get("row_number", 0) <= 0:
+                task_data["row_number"] = next_row
+                next_row += 1
+            
+            # Create task if we have a valid ID
+            if task_data.get("task_id", 0) > 0:
                 try:
                     task = Task.from_dict(task_data)
                     tasks.append(task)
                 except (KeyError, ValueError) as e:
                     # Skip invalid tasks
+                    logging.warning(f"Skipping invalid task row: {e}")
                     continue
         
         return tasks
