@@ -110,22 +110,26 @@ class TitlesTab(BaseTab):
         self.footer_text.setText(footer_text)
 
     def _sync_data_impl(self):
-        # Validate numeric inputs
+        # Validate numeric inputs - skip validation if field is empty (intermediate editing state)
         numeric_fields = {
             "header_height": self.header_height.text(),
             "footer_height": self.footer_height.text(),
         }
 
         for field_name, value in numeric_fields.items():
+            # Skip validation for empty strings (intermediate editing state)
+            if not value.strip():
+                continue
             display_name = field_name.replace('_', ' ').title()
             errors = DataValidator.validate_non_negative_integer_string(value, display_name)
             if errors:
                 raise ValueError(errors[0])  # Raise first error
 
-        # Update frame config
-        self.project_data.frame_config.header_height = int(self.header_height.text())
+        # Update frame config - use current values from frame_config as defaults for empty fields
+        frame_config = self.project_data.frame_config
+        self.project_data.frame_config.header_height = int(self.header_height.text()) if self.header_height.text().strip() else frame_config.header_height
         self.project_data.frame_config.header_text = self.header_text.text()
-        self.project_data.frame_config.footer_height = int(self.footer_height.text())
+        self.project_data.frame_config.footer_height = int(self.footer_height.text()) if self.footer_height.text().strip() else frame_config.footer_height
         self.project_data.frame_config.footer_text = self.footer_text.text()
 
         # Emit data updated signal

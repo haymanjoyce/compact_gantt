@@ -2,7 +2,7 @@ from PyQt5.QtWidgets import (QWidget, QTableWidget, QVBoxLayout, QPushButton,
                            QHBoxLayout, QComboBox, QHeaderView, QTableWidgetItem, 
                            QMessageBox, QGroupBox, QSizePolicy, QLabel, QGridLayout, QLineEdit)
 from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QBrush, QColor
+from PyQt5.QtGui import QBrush, QColor, QIntValidator
 from typing import List, Dict, Any, Optional, Set
 from datetime import datetime
 import logging
@@ -11,6 +11,7 @@ from models import Task
 
 from ui.table_utils import NumericTableWidgetItem, DateTableWidgetItem, add_row, remove_row, CheckBoxWidget, highlight_table_errors, extract_table_data
 from .base_tab import BaseTab
+from validators.validators import DataValidator
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -149,6 +150,9 @@ class TasksTab(BaseTab):
         offset_label.setFixedWidth(LABEL_WIDTH)
         self.detail_offset = QLineEdit("0")
         self.detail_offset.setToolTip("Additional horizontal offset for outside labels in pixels. Leader line appears when offset > 0.")
+        # Add validator to only allow non-negative integers
+        validator = QIntValidator(0, 999999, self)
+        self.detail_offset.setValidator(validator)
         self.detail_offset.textChanged.connect(self._on_detail_form_changed)
         
         # Fill Color
@@ -322,12 +326,15 @@ class TasksTab(BaseTab):
                 if self.detail_placement:
                     label_placement = self.detail_placement.currentText()
                 if self.detail_offset:
-                    try:
-                        label_horizontal_offset = float(self.detail_offset.text()) if self.detail_offset.text().strip() else 0.0
-                        # Ensure non-negative
-                        label_horizontal_offset = max(0.0, label_horizontal_offset)
-                    except (ValueError, AttributeError):
+                    # Validate using centralized validator
+                    offset_text = self.detail_offset.text()
+                    errors = DataValidator.validate_non_negative_integer_string(offset_text, "Label Offset")
+                    if errors:
+                        # Invalid input - use default value
                         label_horizontal_offset = 0.0
+                    else:
+                        # Valid input - convert to int then float (model uses float but offset should be integer pixels)
+                        label_horizontal_offset = float(int(offset_text)) if offset_text.strip() else 0.0
                 if self.detail_fill_color:
                     fill_color = self.detail_fill_color.currentText()
             else:

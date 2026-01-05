@@ -156,7 +156,7 @@ class LayoutTab(BaseTab):
         self.margin_right.setText(str(margins[3]))
 
     def _sync_data_impl(self):
-        # Validate numeric inputs
+        # Validate numeric inputs - skip validation if field is empty (intermediate editing state)
         numeric_fields = {
             "outer_width": self.outer_width.text(),
             "outer_height": self.outer_height.text(),
@@ -168,20 +168,24 @@ class LayoutTab(BaseTab):
         }
 
         for field_name, value in numeric_fields.items():
+            # Skip validation for empty strings (intermediate editing state)
+            if not value.strip():
+                continue
             display_name = field_name.replace('_', ' ').title()
             errors = DataValidator.validate_non_negative_integer_string(value, display_name)
             if errors:
                 raise ValueError(errors[0])  # Raise first error
 
-        # Update frame config
-        self.project_data.frame_config.outer_width = int(self.outer_width.text())
-        self.project_data.frame_config.outer_height = int(self.outer_height.text())
+        # Update frame config - use current values from frame_config as defaults for empty fields
+        frame_config = self.project_data.frame_config
+        self.project_data.frame_config.outer_width = int(self.outer_width.text()) if self.outer_width.text().strip() else frame_config.outer_width
+        self.project_data.frame_config.outer_height = int(self.outer_height.text()) if self.outer_height.text().strip() else frame_config.outer_height
         self.project_data.frame_config.margins = (
-            int(self.margin_top.text()),
-            int(self.margin_bottom.text()),
-            int(self.margin_left.text()),
-            int(self.margin_right.text())
+            int(self.margin_top.text()) if self.margin_top.text().strip() else frame_config.margins[0],
+            int(self.margin_bottom.text()) if self.margin_bottom.text().strip() else frame_config.margins[1],
+            int(self.margin_left.text()) if self.margin_left.text().strip() else frame_config.margins[2],
+            int(self.margin_right.text()) if self.margin_right.text().strip() else frame_config.margins[3]
         )
-        self.project_data.frame_config.num_rows = int(self.num_rows.text())
+        self.project_data.frame_config.num_rows = int(self.num_rows.text()) if self.num_rows.text().strip() else frame_config.num_rows
         self.project_data.frame_config.show_row_numbers = self.show_row_numbers.currentText() == "Yes"
         self.project_data.frame_config.horizontal_gridlines = self.show_row_gridlines.currentText() == "Yes"
