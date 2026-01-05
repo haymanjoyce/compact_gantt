@@ -107,31 +107,50 @@ class TypographyTab(BaseTab):
         return group
 
     def _create_vertical_alignment_group(self, label_width: int) -> QGroupBox:
-        group = QGroupBox("Vertical Alignment")
+        group = QGroupBox("Vertical Adjustment")
         layout = QGridLayout()
         layout.setHorizontalSpacing(10)
         layout.setVerticalSpacing(5)
 
-        # Row-Based Elements
-        row_based_alignment_label = QLabel("Row-Based Elements:")
-        row_based_alignment_label.setFixedWidth(label_width)
-        self.row_based_vertical_alignment = QLineEdit("0.7")
-        self.row_based_vertical_alignment.setToolTip("Vertical position for row-based text (0.0=top, 0.5=center, 1.0=bottom). Applies to scales, tasks, and row numbers.")
         double_validator = QDoubleValidator(0.0, 1.0, 2, self)
         double_validator.setNotation(QDoubleValidator.StandardNotation)
-        self.row_based_vertical_alignment.setValidator(double_validator)
 
-        # Header/Footer
-        header_footer_alignment_label = QLabel("Header/Footer:")
+        # Scale Labels
+        scale_alignment_label = QLabel("Scale Labels:")
+        scale_alignment_label.setFixedWidth(label_width)
+        self.scale_vertical_alignment = QLineEdit("0.7")
+        self.scale_vertical_alignment.setToolTip("Vertical position for scale labels (0.0=top, 0.5=center, 1.0=bottom)")
+        self.scale_vertical_alignment.setValidator(double_validator)
+
+        # Task Labels
+        task_alignment_label = QLabel("Task Labels:")
+        task_alignment_label.setFixedWidth(label_width)
+        self.task_vertical_alignment = QLineEdit("0.7")
+        self.task_vertical_alignment.setToolTip("Vertical position for task labels (0.0=top, 0.5=center, 1.0=bottom)")
+        self.task_vertical_alignment.setValidator(double_validator)
+
+        # Row Numbers
+        row_number_alignment_label = QLabel("Row Numbers:")
+        row_number_alignment_label.setFixedWidth(label_width)
+        self.row_number_vertical_alignment = QLineEdit("0.7")
+        self.row_number_vertical_alignment.setToolTip("Vertical position for row numbers (0.0=top, 0.5=center, 1.0=bottom)")
+        self.row_number_vertical_alignment.setValidator(double_validator)
+
+        # Header & Footer
+        header_footer_alignment_label = QLabel("Header & Footer:")
         header_footer_alignment_label.setFixedWidth(label_width)
         self.header_footer_vertical_alignment = QLineEdit("0.7")
         self.header_footer_vertical_alignment.setToolTip("Vertical position for header and footer text (0.0=top, 0.5=center, 1.0=bottom)")
         self.header_footer_vertical_alignment.setValidator(double_validator)
 
-        layout.addWidget(row_based_alignment_label, 0, 0)
-        layout.addWidget(self.row_based_vertical_alignment, 0, 1)
-        layout.addWidget(header_footer_alignment_label, 1, 0)
-        layout.addWidget(self.header_footer_vertical_alignment, 1, 1)
+        layout.addWidget(scale_alignment_label, 0, 0)
+        layout.addWidget(self.scale_vertical_alignment, 0, 1)
+        layout.addWidget(task_alignment_label, 1, 0)
+        layout.addWidget(self.task_vertical_alignment, 1, 1)
+        layout.addWidget(row_number_alignment_label, 2, 0)
+        layout.addWidget(self.row_number_vertical_alignment, 2, 1)
+        layout.addWidget(header_footer_alignment_label, 3, 0)
+        layout.addWidget(self.header_footer_vertical_alignment, 3, 1)
         layout.setColumnStretch(1, 1)
         group.setLayout(layout)
         return group
@@ -147,8 +166,10 @@ class TypographyTab(BaseTab):
         self.row_number_font_size.textChanged.connect(self._sync_data_if_not_initializing)
         self.text_box_font_size.textChanged.connect(self._sync_data_if_not_initializing)
         
-        # Vertical Alignment
-        self.row_based_vertical_alignment.textChanged.connect(self._sync_data_if_not_initializing)
+        # Vertical Adjustment
+        self.scale_vertical_alignment.textChanged.connect(self._sync_data_if_not_initializing)
+        self.task_vertical_alignment.textChanged.connect(self._sync_data_if_not_initializing)
+        self.row_number_vertical_alignment.textChanged.connect(self._sync_data_if_not_initializing)
         self.header_footer_vertical_alignment.textChanged.connect(self._sync_data_if_not_initializing)
 
     def _load_initial_data_impl(self):
@@ -169,8 +190,10 @@ class TypographyTab(BaseTab):
         self.row_number_font_size.setText(str(chart_config.row_number_font_size))
         self.text_box_font_size.setText(str(chart_config.text_box_font_size))
 
-        # Load Vertical Alignment
-        self.row_based_vertical_alignment.setText(str(chart_config.row_based_vertical_alignment_factor))
+        # Load Vertical Adjustment
+        self.scale_vertical_alignment.setText(str(chart_config.scale_vertical_alignment_factor))
+        self.task_vertical_alignment.setText(str(chart_config.task_vertical_alignment_factor))
+        self.row_number_vertical_alignment.setText(str(chart_config.row_number_vertical_alignment_factor))
         self.header_footer_vertical_alignment.setText(str(chart_config.header_footer_vertical_alignment_factor))
 
     def _sync_data_impl(self):
@@ -194,9 +217,11 @@ class TypographyTab(BaseTab):
             if errors:
                 raise ValueError(errors[0])  # Raise first error
 
-        # Validate vertical alignment factors
+        # Validate vertical adjustment factors
         alignment_fields = {
-            "row_based_vertical_alignment": self.row_based_vertical_alignment.text(),
+            "scale_vertical_alignment": self.scale_vertical_alignment.text(),
+            "task_vertical_alignment": self.task_vertical_alignment.text(),
+            "row_number_vertical_alignment": self.row_number_vertical_alignment.text(),
             "header_footer_vertical_alignment": self.header_footer_vertical_alignment.text(),
         }
 
@@ -224,6 +249,8 @@ class TypographyTab(BaseTab):
         chart_config.row_number_font_size = int(self.row_number_font_size.text()) if self.row_number_font_size.text().strip() else chart_config.row_number_font_size
         chart_config.text_box_font_size = int(self.text_box_font_size.text()) if self.text_box_font_size.text().strip() else chart_config.text_box_font_size
 
-        chart_config.row_based_vertical_alignment_factor = float(self.row_based_vertical_alignment.text()) if self.row_based_vertical_alignment.text().strip() else chart_config.row_based_vertical_alignment_factor
+        chart_config.scale_vertical_alignment_factor = float(self.scale_vertical_alignment.text()) if self.scale_vertical_alignment.text().strip() else chart_config.scale_vertical_alignment_factor
+        chart_config.task_vertical_alignment_factor = float(self.task_vertical_alignment.text()) if self.task_vertical_alignment.text().strip() else chart_config.task_vertical_alignment_factor
+        chart_config.row_number_vertical_alignment_factor = float(self.row_number_vertical_alignment.text()) if self.row_number_vertical_alignment.text().strip() else chart_config.row_number_vertical_alignment_factor
         chart_config.header_footer_vertical_alignment_factor = float(self.header_footer_vertical_alignment.text()) if self.header_footer_vertical_alignment.text().strip() else chart_config.header_footer_vertical_alignment_factor
 

@@ -32,7 +32,9 @@ class ChartConfig:
     leader_line_horizontal_default: float = 3.0  # Default close offset for outside labels (base distance before user offset)
     label_horizontal_offset_factor: float = 0.0
     label_text_width_factor: float = 0.55
-    row_based_vertical_alignment_factor: float = 0.7  # Vertical position for row-based text (0.0=top, 0.5=center, 1.0=bottom). Used for scales, tasks, and row numbers.
+    scale_vertical_alignment_factor: float = 0.7  # Vertical position for scale labels (0.0=top, 0.5=center, 1.0=bottom)
+    task_vertical_alignment_factor: float = 0.7  # Vertical position for task labels (0.0=top, 0.5=center, 1.0=bottom)
+    row_number_vertical_alignment_factor: float = 0.7  # Vertical position for row numbers (0.0=top, 0.5=center, 1.0=bottom)
     header_footer_vertical_alignment_factor: float = 0.7  # Vertical position for header and footer text (0.0=top, 0.5=center, 1.0=bottom)
     
     # Frame border settings
@@ -65,7 +67,8 @@ class ChartConfig:
                           "scale_proportion_weeks", "scale_proportion_days",
                           "leader_line_vertical_default", "leader_line_horizontal_default",
                           "label_horizontal_offset_factor",
-                          "label_text_width_factor", "row_based_vertical_alignment_factor",
+                          "label_text_width_factor", "scale_vertical_alignment_factor",
+                          "task_vertical_alignment_factor", "row_number_vertical_alignment_factor",
                           "header_footer_vertical_alignment_factor",
                           "frame_border_width_heavy", "frame_border_width_light"]:
             value = getattr(self, field_name)

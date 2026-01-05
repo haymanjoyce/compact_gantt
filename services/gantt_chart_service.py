@@ -360,7 +360,7 @@ class GanttChartService(QObject):
                 
                 if not label_hide and label_placement == "Outside":
                     # Use proportional positioning: center_y is at row_height * 0.5, apply factor to row_height
-                    label_y_base = y_task + row_height * self.config.general.row_based_vertical_alignment_factor
+                    label_y_base = y_task + row_height * self.config.general.task_vertical_alignment_factor
                     milestone_right = center_x + half_size
                     self._render_outside_label(task_name, milestone_right, center_y, label_y_base, label_horizontal_offset)
             else:
@@ -375,8 +375,8 @@ class GanttChartService(QObject):
                     
                     if not label_hide:
                         # Use proportional positioning within task bar
-                        label_y_base = rect_y + task_height * self.config.general.row_based_vertical_alignment_factor
-                        logging.debug(f"  Calculated label_y_base={label_y_base} for task '{task_name}' (rect_y={rect_y}, task_height={task_height}, alignment_factor={self.config.general.row_based_vertical_alignment_factor})")
+                        label_y_base = rect_y + task_height * self.config.general.task_vertical_alignment_factor
+                        logging.debug(f"  Calculated label_y_base={label_y_base} for task '{task_name}' (rect_y={rect_y}, task_height={task_height}, alignment_factor={self.config.general.task_vertical_alignment_factor})")
                         
                         if label_placement == "Inside":
                             # Simple inside label rendering - no multi-time-frame logic needed
@@ -1223,7 +1223,7 @@ class GanttChartService(QObject):
             for i in range(num_rows):
                 # Calculate Y position using the same alignment factor as scales
                 row_top = row_y + i * row_height
-                row_center_y = row_top + row_height * self.config.general.row_based_vertical_alignment_factor
+                row_center_y = row_top + row_height * self.config.general.row_number_vertical_alignment_factor
                 # Position text 5px from left edge
                 text_x = x + 5
                 # Create text element with grey color
@@ -1315,7 +1315,7 @@ class GanttChartService(QObject):
                                            stroke="grey", stroke_width=0.5))
             if prev_x < x + width and x_pos > x:
                 label_x = (max(x, prev_x) + min(x + width, x_pos)) / 2
-                label_y = y + height * self.config.general.row_based_vertical_alignment_factor
+                label_y = y + height * self.config.general.scale_vertical_alignment_factor
                 label = ""
                 if interval == "years":
                     if interval_width >= self.config.general.full_label_width:

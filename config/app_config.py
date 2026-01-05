@@ -159,8 +159,16 @@ class GeneralConfig:
         return self.chart.label_text_width_factor
 
     @property
-    def row_based_vertical_alignment_factor(self) -> float:
-        return self.chart.row_based_vertical_alignment_factor
+    def scale_vertical_alignment_factor(self) -> float:
+        return self.chart.scale_vertical_alignment_factor
+
+    @property
+    def task_vertical_alignment_factor(self) -> float:
+        return self.chart.task_vertical_alignment_factor
+
+    @property
+    def row_number_vertical_alignment_factor(self) -> float:
+        return self.chart.row_number_vertical_alignment_factor
 
     @property
     def header_footer_vertical_alignment_factor(self) -> float:
