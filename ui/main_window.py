@@ -144,6 +144,13 @@ class MainWindow(QMainWindow):
         file_path, _ = QFileDialog.getSaveFileName(self, "Save Project", directory, "JSON Files (*.json)")
         if file_path:
             try:
+                # Ensure file has .json extension
+                if not file_path.endswith('.json'):
+                    file_path += '.json'
+                
+                # Sync all tabs before saving (this also syncs chart_config to project_data)
+                self._sync_all_tabs()
+                
                 self.repository.save(file_path, self.project_data)
                 # Update last directory from the saved file path
                 self.app_config.general.window.last_json_directory = os.path.dirname(file_path)
@@ -167,6 +174,9 @@ class MainWindow(QMainWindow):
                 self.app_config.general.window.last_json_directory = os.path.dirname(file_path)
                 self.app_config.save_settings()
 
+                # Sync chart_config from loaded project_data to app_config
+                self._sync_chart_config_from_project_data()
+                
                 # Re-create all tabs with the new project_data
                 self._create_all_tabs()
                 self.tab_widget.clear()
@@ -216,6 +226,9 @@ class MainWindow(QMainWindow):
                 self.app_config.general.window.last_excel_directory = os.path.dirname(file_path)
                 self.app_config.save_settings()
 
+                # Sync chart_config from loaded project_data to app_config
+                self._sync_chart_config_from_project_data()
+                
                 # Re-create all tabs with the new project_data
                 self._create_all_tabs()
                 self.tab_widget.clear()
@@ -252,9 +265,39 @@ class MainWindow(QMainWindow):
                 self.text_boxes_tab._sync_data()
             if hasattr(self.typography_tab, '_sync_data'):
                 self.typography_tab._sync_data()
+            # After syncing typography tab, sync chart_config to project_data
+            self._sync_chart_config_to_project_data()
         except Exception as e:
             logging.error(f"Error syncing tab data: {e}", exc_info=True)
             # Continue anyway - emit with whatever data we have
+    
+    def _sync_chart_config_to_project_data(self):
+        """Sync chart_config from app_config to project_data (for saving)."""
+        chart_config = self.app_config.general.chart
+        self.project_data.chart_config.font_family = chart_config.font_family
+        self.project_data.chart_config.task_font_size = chart_config.task_font_size
+        self.project_data.chart_config.scale_font_size = chart_config.scale_font_size
+        self.project_data.chart_config.header_footer_font_size = chart_config.header_footer_font_size
+        self.project_data.chart_config.row_number_font_size = chart_config.row_number_font_size
+        self.project_data.chart_config.text_box_font_size = chart_config.text_box_font_size
+        self.project_data.chart_config.scale_vertical_alignment_factor = chart_config.scale_vertical_alignment_factor
+        self.project_data.chart_config.task_vertical_alignment_factor = chart_config.task_vertical_alignment_factor
+        self.project_data.chart_config.row_number_vertical_alignment_factor = chart_config.row_number_vertical_alignment_factor
+        self.project_data.chart_config.header_footer_vertical_alignment_factor = chart_config.header_footer_vertical_alignment_factor
+    
+    def _sync_chart_config_from_project_data(self):
+        """Sync chart_config from project_data to app_config (after loading)."""
+        chart_config = self.app_config.general.chart
+        chart_config.font_family = self.project_data.chart_config.font_family
+        chart_config.task_font_size = self.project_data.chart_config.task_font_size
+        chart_config.scale_font_size = self.project_data.chart_config.scale_font_size
+        chart_config.header_footer_font_size = self.project_data.chart_config.header_footer_font_size
+        chart_config.row_number_font_size = self.project_data.chart_config.row_number_font_size
+        chart_config.text_box_font_size = self.project_data.chart_config.text_box_font_size
+        chart_config.scale_vertical_alignment_factor = self.project_data.chart_config.scale_vertical_alignment_factor
+        chart_config.task_vertical_alignment_factor = self.project_data.chart_config.task_vertical_alignment_factor
+        chart_config.row_number_vertical_alignment_factor = self.project_data.chart_config.row_number_vertical_alignment_factor
+        chart_config.header_footer_vertical_alignment_factor = self.project_data.chart_config.header_footer_vertical_alignment_factor
 
     def _emit_data_updated(self):
         """Only called when Update Image button is clicked"""

@@ -27,6 +27,7 @@ class ExcelRepository:
         self._create_layout_sheet(wb, project_data.frame_config)
         self._create_titles_sheet(wb, project_data.frame_config)
         self._create_timeline_sheet(wb, project_data.frame_config)
+        self._create_typography_sheet(wb, project_data.chart_config)
         # Grid sheet deprecated - horizontal gridlines now in Layout sheet as "Row Dividers"
         self._create_tasks_sheet(wb, project_data.tasks)
         self._create_links_sheet(wb, project_data.links)
@@ -99,6 +100,14 @@ class ExcelRepository:
         if "Text Boxes" in wb.sheetnames:
             project.text_boxes = self._read_text_boxes_sheet(wb["Text Boxes"])
         
+        # Load Typography sheet
+        if "Typography" in wb.sheetnames:
+            typography_data = self._read_typography_sheet(wb["Typography"])
+            # Update project's chart_config with loaded values
+            for key, value in typography_data.items():
+                if hasattr(project.chart_config, key):
+                    setattr(project.chart_config, key, value)
+        
         return project
     
     def _create_layout_sheet(self, wb: Workbook, frame_config: FrameConfig) -> None:
@@ -169,6 +178,35 @@ class ExcelRepository:
         # Auto-adjust column widths
         ws.column_dimensions['A'].width = 25
         ws.column_dimensions['B'].width = 15
+    
+    def _create_typography_sheet(self, wb: Workbook, chart_config) -> None:
+        """Create Typography worksheet with font and alignment settings."""
+        from config.chart_config import ChartConfig
+        ws = wb.create_sheet("Typography")
+        
+        # Header
+        ws.append(["Field", "Value"])
+        self._format_header_row(ws, 1)
+        
+        # Font Family
+        ws.append(["Font Family", chart_config.font_family])
+        
+        # Font Sizes
+        ws.append(["Task Font Size", chart_config.task_font_size])
+        ws.append(["Scale Font Size", chart_config.scale_font_size])
+        ws.append(["Header & Footer Font Size", chart_config.header_footer_font_size])
+        ws.append(["Row Number Font Size", chart_config.row_number_font_size])
+        ws.append(["Text Box Font Size", chart_config.text_box_font_size])
+        
+        # Vertical Alignment Factors
+        ws.append(["Scale Vertical Alignment Factor", chart_config.scale_vertical_alignment_factor])
+        ws.append(["Task Vertical Alignment Factor", chart_config.task_vertical_alignment_factor])
+        ws.append(["Row Number Vertical Alignment Factor", chart_config.row_number_vertical_alignment_factor])
+        ws.append(["Header & Footer Vertical Alignment Factor", chart_config.header_footer_vertical_alignment_factor])
+        
+        # Auto-adjust column widths
+        ws.column_dimensions['A'].width = 35
+        ws.column_dimensions['B'].width = 20
     
     def _create_grid_sheet(self, wb: Workbook, frame_config: FrameConfig) -> None:
         """DEPRECATED: Grid sheet is no longer created.
@@ -794,6 +832,46 @@ class ExcelRepository:
                     continue
         
         return text_boxes
+    
+    def _read_typography_sheet(self, ws) -> Dict[str, Any]:
+        """Read Typography worksheet and return dict of chart_config fields."""
+        data = {}
+        for row in ws.iter_rows(min_row=2, values_only=True):  # Skip header row
+            if row[0] and row[1] is not None:
+                key = str(row[0]).strip()
+                value = row[1]
+                
+                # Map Excel field names to chart_config field names
+                field_map = {
+                    "Font Family": "font_family",
+                    "Task Font Size": "task_font_size",
+                    "Scale Font Size": "scale_font_size",
+                    "Header & Footer Font Size": "header_footer_font_size",
+                    "Row Number Font Size": "row_number_font_size",
+                    "Text Box Font Size": "text_box_font_size",
+                    "Scale Vertical Alignment Factor": "scale_vertical_alignment_factor",
+                    "Task Vertical Alignment Factor": "task_vertical_alignment_factor",
+                    "Row Number Vertical Alignment Factor": "row_number_vertical_alignment_factor",
+                    "Header & Footer Vertical Alignment Factor": "header_footer_vertical_alignment_factor"
+                }
+                
+                field_name = field_map.get(key)
+                if field_name:
+                    # Convert value based on field type
+                    if field_name == "font_family":
+                        data[field_name] = str(value) if value is not None else "Arial"
+                    elif "font_size" in field_name:
+                        try:
+                            data[field_name] = int(value) if value is not None else 10
+                        except (ValueError, TypeError):
+                            data[field_name] = 10
+                    elif "alignment_factor" in field_name:
+                        try:
+                            data[field_name] = float(value) if value is not None else 0.7
+                        except (ValueError, TypeError):
+                            data[field_name] = 0.7
+        
+        return data
     
     def _read_table_sheet(self, ws) -> List[List[str]]:
         """Read a table worksheet (legacy format for backward compatibility)."""

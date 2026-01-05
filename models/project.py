@@ -4,6 +4,7 @@ from validators import DataValidator
 from datetime import datetime
 import logging
 from config.app_config import AppConfig
+from config.chart_config import ChartConfig
 from utils.conversion import safe_int, safe_float, display_to_internal_date, internal_to_display_date
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -12,6 +13,19 @@ class ProjectData:
     def __init__(self):
         app_config = AppConfig()
         self.frame_config = FrameConfig(num_rows=app_config.general.tasks_rows)
+        # Initialize chart_config from app_config (for typography and other chart settings)
+        self.chart_config = ChartConfig(
+            font_family=app_config.general.chart.font_family,
+            task_font_size=app_config.general.chart.task_font_size,
+            scale_font_size=app_config.general.chart.scale_font_size,
+            header_footer_font_size=app_config.general.chart.header_footer_font_size,
+            row_number_font_size=app_config.general.chart.row_number_font_size,
+            text_box_font_size=app_config.general.chart.text_box_font_size,
+            scale_vertical_alignment_factor=app_config.general.chart.scale_vertical_alignment_factor,
+            task_vertical_alignment_factor=app_config.general.chart.task_vertical_alignment_factor,
+            row_number_vertical_alignment_factor=app_config.general.chart.row_number_vertical_alignment_factor,
+            header_footer_vertical_alignment_factor=app_config.general.chart.header_footer_vertical_alignment_factor
+        )
         self.tasks: List[Task] = []
         self.links: List[Link] = []
         self.swimlanes: List[Swimlane] = []
@@ -58,8 +72,23 @@ class ProjectData:
         swimlanes_data = [swimlane.to_dict() for swimlane in self.swimlanes]
         text_boxes_data = [textbox.to_dict() for textbox in self.text_boxes]
         
+        # Serialize chart_config (only typography-related fields to keep JSON size manageable)
+        chart_config_data = {
+            "font_family": self.chart_config.font_family,
+            "task_font_size": self.chart_config.task_font_size,
+            "scale_font_size": self.chart_config.scale_font_size,
+            "header_footer_font_size": self.chart_config.header_footer_font_size,
+            "row_number_font_size": self.chart_config.row_number_font_size,
+            "text_box_font_size": self.chart_config.text_box_font_size,
+            "scale_vertical_alignment_factor": self.chart_config.scale_vertical_alignment_factor,
+            "task_vertical_alignment_factor": self.chart_config.task_vertical_alignment_factor,
+            "row_number_vertical_alignment_factor": self.chart_config.row_number_vertical_alignment_factor,
+            "header_footer_vertical_alignment_factor": self.chart_config.header_footer_vertical_alignment_factor
+        }
+        
         return {
             "frame_config": vars(self.frame_config),
+            "chart_config": chart_config_data,
             "tasks": tasks_data,
             "links": links_data,
             "swimlanes": swimlanes_data,
@@ -77,6 +106,17 @@ class ProjectData:
             frame_config_data["margins"] = tuple(frame_config_data["margins"])
         
         project.frame_config = FrameConfig(**frame_config_data)
+        
+        # Load chart_config (backward compatibility: use defaults if not present)
+        chart_config_data = data.get("chart_config", {})
+        if chart_config_data:
+            # Update project's chart_config with loaded values (only typography fields)
+            for key in ["font_family", "task_font_size", "scale_font_size", "header_footer_font_size",
+                       "row_number_font_size", "text_box_font_size", "scale_vertical_alignment_factor",
+                       "task_vertical_alignment_factor", "row_number_vertical_alignment_factor",
+                       "header_footer_vertical_alignment_factor"]:
+                if key in chart_config_data:
+                    setattr(project.chart_config, key, chart_config_data[key])
         
         # Load tasks
         for task_data in data.get("tasks", []):
