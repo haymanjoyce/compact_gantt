@@ -129,13 +129,13 @@ class TasksTab(BaseTab):
         
         LABEL_WIDTH = 120
         
-        # Label Display (Show/Hide)
-        label_label = QLabel("Label Display:")
+        # Label Content
+        label_label = QLabel("Label Content:")
         label_label.setFixedWidth(LABEL_WIDTH)
-        self.detail_label = QComboBox()
-        self.detail_label.addItems(["No", "Yes"])
-        self.detail_label.setToolTip("Show task label (No = Hide, Yes = Show)")
-        self.detail_label.currentTextChanged.connect(self._on_detail_form_changed)
+        self.detail_label_content = QComboBox()
+        self.detail_label_content.addItems(["None", "Name only", "Date only", "Name and Date"])
+        self.detail_label_content.setToolTip("What to display in the task label")
+        self.detail_label_content.currentTextChanged.connect(self._on_detail_form_changed)
         
         # Label Placement
         placement_label = QLabel("Label Placement:")
@@ -165,7 +165,7 @@ class TasksTab(BaseTab):
         
         # Layout form fields vertically (like titles tab)
         layout.addWidget(label_label, 0, 0)
-        layout.addWidget(self.detail_label, 0, 1)
+        layout.addWidget(self.detail_label_content, 0, 1)
         layout.addWidget(placement_label, 1, 0)
         layout.addWidget(self.detail_placement, 1, 1)
         layout.addWidget(offset_label, 2, 0)
@@ -198,13 +198,13 @@ class TasksTab(BaseTab):
             # Get Task object directly from project_data
             if row < len(self.project_data.tasks):
                 task = self.project_data.tasks[row]
-                self.detail_label.setCurrentText(task.label_hide if task.label_hide else "Yes")
+                self.detail_label_content.setCurrentText(task.label_content if task.label_content else "Name only")
                 self.detail_placement.setCurrentText(task.label_placement if task.label_placement else "Inside")
                 self.detail_offset.setText(str(int(task.label_horizontal_offset)) if task.label_horizontal_offset is not None else "0")
                 self.detail_fill_color.setCurrentText(task.fill_color if task.fill_color else "blue")
             else:
                 # Use defaults if task doesn't exist
-                self.detail_label.setCurrentText("Yes")
+                self.detail_label_content.setCurrentText("Name only")
                 self.detail_placement.setCurrentText("Inside")
                 self.detail_offset.setText("0")
                 self.detail_fill_color.setCurrentText("blue")
@@ -215,7 +215,7 @@ class TasksTab(BaseTab):
         """Clear the detail form when no task is selected."""
         self._updating_form = True
         try:
-            self.detail_label.setCurrentText("Yes")
+            self.detail_label_content.setCurrentText("Name only")
             self.detail_placement.setCurrentText("Inside")
             self.detail_offset.setText("0")
             self.detail_fill_color.setCurrentText("blue")
@@ -312,17 +312,17 @@ class TasksTab(BaseTab):
             elif finish_date_internal and not start_date_internal and not start_date_conversion_failed:
                 start_date_internal = finish_date_internal  # Auto-populate start date
             
-            # Extract Label, Placement, Offset, and Fill Color from detail form if this is the selected row
+            # Extract Label Content, Placement, Offset, and Fill Color from detail form if this is the selected row
             # Otherwise, get from existing Task object
-            label_hide = "Yes"
+            label_content = "Name only"
             label_placement = "Inside"
             label_horizontal_offset = 0.0
             fill_color = "blue"
             
             if row_idx == self._selected_row:
                 # Use values from detail form
-                if self.detail_label:
-                    label_hide = self.detail_label.currentText()
+                if self.detail_label_content:
+                    label_content = self.detail_label_content.currentText()
                 if self.detail_placement:
                     label_placement = self.detail_placement.currentText()
                 if self.detail_offset:
@@ -341,7 +341,7 @@ class TasksTab(BaseTab):
                 # Get from existing Task object if available (look up by task_id)
                 existing_task = next((t for t in self.project_data.tasks if t.task_id == task_id), None)
                 if existing_task:
-                    label_hide = existing_task.label_hide
+                    label_content = existing_task.label_content if hasattr(existing_task, 'label_content') and existing_task.label_content else "Name only"
                     label_placement = existing_task.label_placement
                     label_horizontal_offset = existing_task.label_horizontal_offset if hasattr(existing_task, 'label_horizontal_offset') else 0.0
                     fill_color = existing_task.fill_color if hasattr(existing_task, 'fill_color') else "blue"
@@ -353,7 +353,8 @@ class TasksTab(BaseTab):
                 start_date=start_date_internal,
                 finish_date=finish_date_internal,
                 row_number=row_number,
-                label_hide=label_hide,
+                label_hide="Yes" if label_content != "None" else "No",  # Keep for backward compatibility
+                label_content=label_content,
                 label_placement=label_placement,
                 label_alignment="Centre",
                 label_horizontal_offset=label_horizontal_offset,
@@ -890,7 +891,8 @@ class TasksTab(BaseTab):
                 row_number=original_task.row_number,
                 is_milestone=original_task.is_milestone,
                 label_placement=original_task.label_placement,
-                label_hide=original_task.label_hide,
+                label_hide=original_task.label_hide,  # Keep for backward compatibility
+                label_content=original_task.label_content if hasattr(original_task, 'label_content') else "Name only",
                 label_alignment=original_task.label_alignment,
                 label_horizontal_offset=original_task.label_horizontal_offset,
                 label_text_colour=original_task.label_text_colour,

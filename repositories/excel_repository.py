@@ -230,19 +230,21 @@ class ExcelRepository:
         ws = wb.create_sheet("Tasks")
         
         # Headers - only include fields that are visible/editable in UI
-        headers = ["ID", "Row", "Name", "Start Date", "Finish Date", "Label Display", "Label Placement", "Label Offset", "Fill Color"]
+        headers = ["ID", "Row", "Name", "Start Date", "Finish Date", "Label Content", "Label Placement", "Label Offset", "Fill Color"]
         ws.append(headers)
         self._format_header_row(ws, 1)
         
         # Task rows - only save visible/editable fields
         for task in tasks:
+            # Use label_content if available, otherwise fall back to label_hide for backward compatibility
+            label_content = task.label_content if hasattr(task, 'label_content') and task.label_content else ("None" if task.label_hide == "No" else "Name only")
             row = [
                 task.task_id,
                 task.row_number,
                 task.task_name,
                 internal_to_display_date(task.start_date),
                 internal_to_display_date(task.finish_date),
-                task.label_hide,
+                label_content,
                 task.label_placement,
                 int(task.label_horizontal_offset) if task.label_horizontal_offset else 0,
                 task.fill_color
@@ -668,8 +670,21 @@ class ExcelRepository:
                                 task_data["finish_date"] = ""
                         except (ValueError, AttributeError):
                             task_data["finish_date"] = ""
-                    elif header == "Label" or header == "Label Display":
-                        task_data["label_hide"] = str(value) if value is not None else "Yes"
+                    elif header == "Label" or header == "Label Display" or header == "Label Content":
+                        # Support both old "Label Display" (Yes/No) and new "Label Content" (None/Name only/Date only/Name and Date)
+                        value_str = str(value).strip() if value is not None else ""
+                        if value_str in ["None", "Name only", "Date only", "Name and Date"]:
+                            # New format
+                            task_data["label_content"] = value_str
+                            task_data["label_hide"] = "No" if value_str == "None" else "Yes"  # Keep for backward compatibility
+                        elif value_str.lower() in ["yes", "no"]:
+                            # Old format - migrate to new format
+                            task_data["label_hide"] = value_str
+                            task_data["label_content"] = "None" if value_str.lower() == "no" else "Name only"
+                        else:
+                            # Default
+                            task_data["label_content"] = "Name only"
+                            task_data["label_hide"] = "Yes"
                     elif header == "Placement" or header == "Label Placement":
                         task_data["label_placement"] = str(value) if value is not None else "Outside"
                     elif header == "Offset" or header == "Label Offset" or header == "Label Horizontal Offset":

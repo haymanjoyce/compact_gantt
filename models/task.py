@@ -11,7 +11,8 @@ class Task:
     row_number: int
     is_milestone: bool = False
     label_placement: str = "Outside"
-    label_hide: str = "Yes"
+    label_hide: str = "Yes"  # Deprecated: kept for backward compatibility, use label_content instead
+    label_content: str = "Name only"  # Options: "None", "Name only", "Date only", "Name and Date"
     label_alignment: str = "Centre"  # Default to Centre (always used for inside labels)
     label_horizontal_offset: float = 0.0
     label_text_colour: str = "black"
@@ -27,6 +28,18 @@ class Task:
         
         # Removed auto-population logic - dates are loaded as-is from JSON
         
+        # Backward compatibility: migrate label_hide to label_content
+        label_content = data.get("label_content")
+        if label_content is None:
+            # Migrate from old label_hide field
+            label_hide = data.get("label_hide", "Yes")
+            if label_hide == "No":
+                label_content = "None"
+            else:
+                label_content = "Name only"  # Default for old files
+        else:
+            label_content = label_content  # Use new field if present
+        
         return cls(
             task_id=data["task_id"],
             task_name=data["task_name"],
@@ -35,7 +48,8 @@ class Task:
             row_number=data["row_number"],
             is_milestone=data.get("is_milestone", False),
             label_placement=data.get("label_placement", "Outside"),
-            label_hide=data.get("label_hide", "Yes"),
+            label_hide=data.get("label_hide", "Yes"),  # Keep for backward compatibility
+            label_content=label_content,
             label_alignment=data.get("label_alignment", "Centre"),
             label_horizontal_offset=data.get("label_horizontal_offset", 0.0),
             label_text_colour=data.get("label_text_colour", "black"),

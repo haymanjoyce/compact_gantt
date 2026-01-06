@@ -48,7 +48,8 @@ class ProjectData:
                 "finish_date": task.finish_date,
                 "row_number": task.row_number,
                 "label_placement": task.label_placement,
-                "label_hide": task.label_hide,
+                "label_hide": task.label_hide,  # Keep for backward compatibility
+                "label_content": task.label_content,
             }
             # Only save is_milestone if it's explicitly True (auto-detected from dates otherwise)
             if task.is_milestone:

@@ -198,6 +198,74 @@ class GanttChartService(QObject):
                 right = mid - 1
         return text[:right] + "…" if right > 0 else ""
 
+    def _format_label_text(self, task_name: str, start_date_str: str, finish_date_str: str, 
+                          label_content: str, is_milestone: bool) -> str:
+        """Format label text based on label_content option.
+        
+        Args:
+            task_name: The task name
+            start_date_str: Start date in internal format (yyyy-mm-dd)
+            finish_date_str: Finish date in internal format (yyyy-mm-dd)
+            label_content: One of "None", "Name only", "Date only", "Name and Date"
+            is_milestone: Whether this is a milestone (single date)
+            
+        Returns:
+            Formatted label text, or empty string if label_content is "None"
+        """
+        from utils.conversion import internal_to_display_date
+        
+        if label_content == "None":
+            return ""
+        elif label_content == "Name only":
+            return task_name
+        elif label_content == "Date only":
+            if is_milestone:
+                # For milestones, show single date
+                date_str = start_date_str if start_date_str else finish_date_str
+                return internal_to_display_date(date_str) if date_str else ""
+            else:
+                # For tasks, show date range
+                start_display = internal_to_display_date(start_date_str) if start_date_str else ""
+                finish_display = internal_to_display_date(finish_date_str) if finish_date_str else ""
+                if start_display and finish_display:
+                    if start_display == finish_display:
+                        return start_display
+                    else:
+                        return f"{start_display} - {finish_display}"
+                elif start_display:
+                    return start_display
+                elif finish_display:
+                    return finish_display
+                else:
+                    return ""
+        elif label_content == "Name and Date":
+            if is_milestone:
+                # For milestones: "Task Name (01/01/2025)"
+                date_str = start_date_str if start_date_str else finish_date_str
+                date_display = internal_to_display_date(date_str) if date_str else ""
+                if date_display:
+                    return f"{task_name} ({date_display})"
+                else:
+                    return task_name
+            else:
+                # For tasks: "Task Name (01/01/2025 - 31/01/2025)"
+                start_display = internal_to_display_date(start_date_str) if start_date_str else ""
+                finish_display = internal_to_display_date(finish_date_str) if finish_date_str else ""
+                if start_display and finish_display:
+                    if start_display == finish_display:
+                        return f"{task_name} ({start_display})"
+                    else:
+                        return f"{task_name} ({start_display} - {finish_display})"
+                elif start_display:
+                    return f"{task_name} ({start_display})"
+                elif finish_display:
+                    return f"{task_name} ({finish_display})"
+                else:
+                    return task_name
+        else:
+            # Default fallback: use name only
+            return task_name
+
     def _get_inside_label_text_color(self, fill_color: str) -> str:
         """Determine text color for inside labels based on fill color.
         
@@ -301,10 +369,19 @@ class GanttChartService(QObject):
             # A task is a milestone if explicitly marked or if start_date equals finish_date
             is_milestone = task.get("is_milestone", False) or (start_date_str and finish_date_str and start_date_str == finish_date_str)
             label_placement = task.get("label_placement", "Outside")
-            label_hide = task.get("label_hide", "Yes") == "No"
+            # Backward compatibility: if label_content is missing, use label_hide
+            label_content = task.get("label_content")
+            if label_content is None:
+                # Migrate from old label_hide field
+                label_hide = task.get("label_hide", "Yes")
+                label_content = "None" if label_hide == "No" else "Name only"
+            label_hide = label_content == "None"  # For rendering logic compatibility
             task_name = task.get("task_name", "Unnamed")
             fill_color = task.get("fill_color", "blue")  # Get fill color, default to blue
             label_horizontal_offset = task.get("label_horizontal_offset", 0.0)  # Get label offset, default to 0.0
+            
+            # Format label text based on label_content
+            label_text = self._format_label_text(task_name, start_date_str, finish_date_str, label_content, is_milestone)
             
             if not start_date_str and not finish_date_str:
                 continue
@@ -362,7 +439,7 @@ class GanttChartService(QObject):
                     # Use proportional positioning: center_y is at row_height * 0.5, apply factor to row_height
                     label_y_base = y_task + row_height * self.config.general.task_vertical_alignment_factor
                     milestone_right = center_x + half_size
-                    self._render_outside_label(task_name, milestone_right, center_y, label_y_base, label_horizontal_offset)
+                    self._render_outside_label(label_text, milestone_right, center_y, label_y_base, label_horizontal_offset)
             else:
                 if x_start < x + width:
                     y_offset = (row_height - task_height) / 2
@@ -380,9 +457,9 @@ class GanttChartService(QObject):
                         
                         if label_placement == "Inside":
                             # Simple inside label rendering - no multi-time-frame logic needed
-                            self._render_inside_label(task_name, x_start, width_task, label_y_base, fill_color)
+                            self._render_inside_label(label_text, x_start, width_task, label_y_base, fill_color)
                         elif label_placement == "Outside":
-                            self._render_outside_label(task_name, x_end, rect_y + task_height / 2, 
+                            self._render_outside_label(label_text, x_end, rect_y + task_height / 2, 
                                                       label_y_base, label_horizontal_offset)
 
     def _get_task_position(self, task_id: int, x, y, width, height, start_date, end_date, num_rows):
