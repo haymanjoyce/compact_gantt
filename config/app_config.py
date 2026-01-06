@@ -175,6 +175,14 @@ class GeneralConfig:
         return self.chart.header_footer_vertical_alignment_factor
 
     @property
+    def swimlane_top_vertical_alignment_factor(self) -> float:
+        return self.chart.swimlane_top_vertical_alignment_factor
+
+    @property
+    def swimlane_bottom_vertical_alignment_factor(self) -> float:
+        return self.chart.swimlane_bottom_vertical_alignment_factor
+
+    @property
     def font_family(self) -> str:
         return self.chart.font_family
 
@@ -197,6 +205,10 @@ class GeneralConfig:
     @property
     def text_box_font_size(self) -> int:
         return self.chart.text_box_font_size
+
+    @property
+    def swimlane_font_size(self) -> int:
+        return self.chart.swimlane_font_size
 
     @property
     def frame_border_width_heavy(self) -> float:

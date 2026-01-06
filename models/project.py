@@ -21,10 +21,13 @@ class ProjectData:
             header_footer_font_size=app_config.general.chart.header_footer_font_size,
             row_number_font_size=app_config.general.chart.row_number_font_size,
             text_box_font_size=app_config.general.chart.text_box_font_size,
+            swimlane_font_size=app_config.general.chart.swimlane_font_size,
             scale_vertical_alignment_factor=app_config.general.chart.scale_vertical_alignment_factor,
             task_vertical_alignment_factor=app_config.general.chart.task_vertical_alignment_factor,
             row_number_vertical_alignment_factor=app_config.general.chart.row_number_vertical_alignment_factor,
-            header_footer_vertical_alignment_factor=app_config.general.chart.header_footer_vertical_alignment_factor
+            header_footer_vertical_alignment_factor=app_config.general.chart.header_footer_vertical_alignment_factor,
+            swimlane_top_vertical_alignment_factor=app_config.general.chart.swimlane_top_vertical_alignment_factor,
+            swimlane_bottom_vertical_alignment_factor=app_config.general.chart.swimlane_bottom_vertical_alignment_factor
         )
         self.tasks: List[Task] = []
         self.links: List[Link] = []
@@ -81,10 +84,13 @@ class ProjectData:
             "header_footer_font_size": self.chart_config.header_footer_font_size,
             "row_number_font_size": self.chart_config.row_number_font_size,
             "text_box_font_size": self.chart_config.text_box_font_size,
+            "swimlane_font_size": self.chart_config.swimlane_font_size,
             "scale_vertical_alignment_factor": self.chart_config.scale_vertical_alignment_factor,
             "task_vertical_alignment_factor": self.chart_config.task_vertical_alignment_factor,
             "row_number_vertical_alignment_factor": self.chart_config.row_number_vertical_alignment_factor,
-            "header_footer_vertical_alignment_factor": self.chart_config.header_footer_vertical_alignment_factor
+            "header_footer_vertical_alignment_factor": self.chart_config.header_footer_vertical_alignment_factor,
+            "swimlane_top_vertical_alignment_factor": self.chart_config.swimlane_top_vertical_alignment_factor,
+            "swimlane_bottom_vertical_alignment_factor": self.chart_config.swimlane_bottom_vertical_alignment_factor
         }
         
         return {
@@ -113,11 +119,18 @@ class ProjectData:
         if chart_config_data:
             # Update project's chart_config with loaded values (only typography fields)
             for key in ["font_family", "task_font_size", "scale_font_size", "header_footer_font_size",
-                       "row_number_font_size", "text_box_font_size", "scale_vertical_alignment_factor",
-                       "task_vertical_alignment_factor", "row_number_vertical_alignment_factor",
-                       "header_footer_vertical_alignment_factor"]:
+                       "row_number_font_size", "text_box_font_size", "swimlane_font_size",
+                       "scale_vertical_alignment_factor", "task_vertical_alignment_factor",
+                       "row_number_vertical_alignment_factor", "header_footer_vertical_alignment_factor",
+                       "swimlane_top_vertical_alignment_factor", "swimlane_bottom_vertical_alignment_factor"]:
                 if key in chart_config_data:
                     setattr(project.chart_config, key, chart_config_data[key])
+            
+            # Handle backward compatibility: if old swimlane_vertical_alignment_factor exists, use it for both
+            if "swimlane_vertical_alignment_factor" in chart_config_data and "swimlane_top_vertical_alignment_factor" not in chart_config_data:
+                old_factor = chart_config_data["swimlane_vertical_alignment_factor"]
+                project.chart_config.swimlane_top_vertical_alignment_factor = old_factor
+                project.chart_config.swimlane_bottom_vertical_alignment_factor = old_factor
         
         # Load tasks
         for task_data in data.get("tasks", []):

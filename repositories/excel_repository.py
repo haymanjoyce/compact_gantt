@@ -197,12 +197,15 @@ class ExcelRepository:
         ws.append(["Header & Footer Font Size", chart_config.header_footer_font_size])
         ws.append(["Row Number Font Size", chart_config.row_number_font_size])
         ws.append(["Text Box Font Size", chart_config.text_box_font_size])
+        ws.append(["Swimlane Font Size", chart_config.swimlane_font_size])
         
         # Vertical Alignment Factors
         ws.append(["Scale Vertical Alignment Factor", chart_config.scale_vertical_alignment_factor])
         ws.append(["Task Vertical Alignment Factor", chart_config.task_vertical_alignment_factor])
         ws.append(["Row Number Vertical Alignment Factor", chart_config.row_number_vertical_alignment_factor])
         ws.append(["Header & Footer Vertical Alignment Factor", chart_config.header_footer_vertical_alignment_factor])
+        ws.append(["Swimlane Top Vertical Alignment Factor", chart_config.swimlane_top_vertical_alignment_factor])
+        ws.append(["Swimlane Bottom Vertical Alignment Factor", chart_config.swimlane_bottom_vertical_alignment_factor])
         
         # Auto-adjust column widths
         ws.column_dimensions['A'].width = 35
@@ -867,10 +870,14 @@ class ExcelRepository:
                     "Header & Footer Font Size": "header_footer_font_size",
                     "Row Number Font Size": "row_number_font_size",
                     "Text Box Font Size": "text_box_font_size",
+                    "Swimlane Font Size": "swimlane_font_size",
                     "Scale Vertical Alignment Factor": "scale_vertical_alignment_factor",
                     "Task Vertical Alignment Factor": "task_vertical_alignment_factor",
                     "Row Number Vertical Alignment Factor": "row_number_vertical_alignment_factor",
-                    "Header & Footer Vertical Alignment Factor": "header_footer_vertical_alignment_factor"
+                    "Header & Footer Vertical Alignment Factor": "header_footer_vertical_alignment_factor",
+                    "Swimlane Vertical Alignment Factor": "swimlane_vertical_alignment_factor",  # Old format for backward compatibility
+                    "Swimlane Top Vertical Alignment Factor": "swimlane_top_vertical_alignment_factor",
+                    "Swimlane Bottom Vertical Alignment Factor": "swimlane_bottom_vertical_alignment_factor"
                 }
                 
                 field_name = field_map.get(key)
@@ -888,6 +895,12 @@ class ExcelRepository:
                             data[field_name] = float(value) if value is not None else 0.7
                         except (ValueError, TypeError):
                             data[field_name] = 0.7
+        
+        # Handle backward compatibility: if old swimlane_vertical_alignment_factor exists, use it for both
+        if "swimlane_vertical_alignment_factor" in data and "swimlane_top_vertical_alignment_factor" not in data:
+            old_factor = data["swimlane_vertical_alignment_factor"]
+            data["swimlane_top_vertical_alignment_factor"] = old_factor
+            data["swimlane_bottom_vertical_alignment_factor"] = old_factor
         
         return data
     

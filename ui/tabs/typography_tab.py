@@ -92,6 +92,13 @@ class TypographyTab(BaseTab):
         self.text_box_font_size.setToolTip("Font size for text boxes in pixels")
         self.text_box_font_size.setValidator(validator)
 
+        # Swimlanes
+        swimlane_font_size_label = QLabel("Swimlanes:")
+        swimlane_font_size_label.setFixedWidth(label_width)
+        self.swimlane_font_size = QLineEdit("10")
+        self.swimlane_font_size.setToolTip("Font size for swimlane labels in pixels")
+        self.swimlane_font_size.setValidator(validator)
+
         layout.addWidget(task_font_size_label, 0, 0)
         layout.addWidget(self.task_font_size, 0, 1)
         layout.addWidget(scale_font_size_label, 1, 0)
@@ -102,6 +109,8 @@ class TypographyTab(BaseTab):
         layout.addWidget(self.row_number_font_size, 3, 1)
         layout.addWidget(text_box_font_size_label, 4, 0)
         layout.addWidget(self.text_box_font_size, 4, 1)
+        layout.addWidget(swimlane_font_size_label, 5, 0)
+        layout.addWidget(self.swimlane_font_size, 5, 1)
         layout.setColumnStretch(1, 1)
         group.setLayout(layout)
         return group
@@ -143,6 +152,20 @@ class TypographyTab(BaseTab):
         self.header_footer_vertical_alignment.setToolTip("Vertical position for header and footer text (0.0=top, 0.5=center, 1.0=bottom)")
         self.header_footer_vertical_alignment.setValidator(double_validator)
 
+        # Swimlanes - Top
+        swimlane_top_alignment_label = QLabel("Swimlanes (Top):")
+        swimlane_top_alignment_label.setFixedWidth(label_width)
+        self.swimlane_top_vertical_alignment = QLineEdit("0.7")
+        self.swimlane_top_vertical_alignment.setToolTip("Vertical position for top swimlane labels (0.0=top, 0.5=center, 1.0=bottom)")
+        self.swimlane_top_vertical_alignment.setValidator(double_validator)
+
+        # Swimlanes - Bottom
+        swimlane_bottom_alignment_label = QLabel("Swimlanes (Bottom):")
+        swimlane_bottom_alignment_label.setFixedWidth(label_width)
+        self.swimlane_bottom_vertical_alignment = QLineEdit("0.7")
+        self.swimlane_bottom_vertical_alignment.setToolTip("Vertical position for bottom swimlane labels (0.0=top, 0.5=center, 1.0=bottom)")
+        self.swimlane_bottom_vertical_alignment.setValidator(double_validator)
+
         layout.addWidget(scale_alignment_label, 0, 0)
         layout.addWidget(self.scale_vertical_alignment, 0, 1)
         layout.addWidget(task_alignment_label, 1, 0)
@@ -151,6 +174,10 @@ class TypographyTab(BaseTab):
         layout.addWidget(self.row_number_vertical_alignment, 2, 1)
         layout.addWidget(header_footer_alignment_label, 3, 0)
         layout.addWidget(self.header_footer_vertical_alignment, 3, 1)
+        layout.addWidget(swimlane_top_alignment_label, 4, 0)
+        layout.addWidget(self.swimlane_top_vertical_alignment, 4, 1)
+        layout.addWidget(swimlane_bottom_alignment_label, 5, 0)
+        layout.addWidget(self.swimlane_bottom_vertical_alignment, 5, 1)
         layout.setColumnStretch(1, 1)
         group.setLayout(layout)
         return group
@@ -165,12 +192,15 @@ class TypographyTab(BaseTab):
         self.header_footer_font_size.textChanged.connect(self._sync_data_if_not_initializing)
         self.row_number_font_size.textChanged.connect(self._sync_data_if_not_initializing)
         self.text_box_font_size.textChanged.connect(self._sync_data_if_not_initializing)
+        self.swimlane_font_size.textChanged.connect(self._sync_data_if_not_initializing)
         
         # Vertical Adjustment
         self.scale_vertical_alignment.textChanged.connect(self._sync_data_if_not_initializing)
         self.task_vertical_alignment.textChanged.connect(self._sync_data_if_not_initializing)
         self.row_number_vertical_alignment.textChanged.connect(self._sync_data_if_not_initializing)
         self.header_footer_vertical_alignment.textChanged.connect(self._sync_data_if_not_initializing)
+        self.swimlane_top_vertical_alignment.textChanged.connect(self._sync_data_if_not_initializing)
+        self.swimlane_bottom_vertical_alignment.textChanged.connect(self._sync_data_if_not_initializing)
 
     def _load_initial_data_impl(self):
         chart_config = self.app_config.general.chart
@@ -189,12 +219,15 @@ class TypographyTab(BaseTab):
         self.header_footer_font_size.setText(str(chart_config.header_footer_font_size))
         self.row_number_font_size.setText(str(chart_config.row_number_font_size))
         self.text_box_font_size.setText(str(chart_config.text_box_font_size))
+        self.swimlane_font_size.setText(str(chart_config.swimlane_font_size))
 
         # Load Vertical Adjustment
         self.scale_vertical_alignment.setText(str(chart_config.scale_vertical_alignment_factor))
         self.task_vertical_alignment.setText(str(chart_config.task_vertical_alignment_factor))
         self.row_number_vertical_alignment.setText(str(chart_config.row_number_vertical_alignment_factor))
         self.header_footer_vertical_alignment.setText(str(chart_config.header_footer_vertical_alignment_factor))
+        self.swimlane_top_vertical_alignment.setText(str(chart_config.swimlane_top_vertical_alignment_factor))
+        self.swimlane_bottom_vertical_alignment.setText(str(chart_config.swimlane_bottom_vertical_alignment_factor))
 
     def _sync_data_impl(self):
         chart_config = self.app_config.general.chart
@@ -206,6 +239,7 @@ class TypographyTab(BaseTab):
             "header_footer_font_size": self.header_footer_font_size.text(),
             "row_number_font_size": self.row_number_font_size.text(),
             "text_box_font_size": self.text_box_font_size.text(),
+            "swimlane_font_size": self.swimlane_font_size.text(),
         }
 
         for field_name, value in numeric_fields.items():
@@ -223,6 +257,8 @@ class TypographyTab(BaseTab):
             "task_vertical_alignment": self.task_vertical_alignment.text(),
             "row_number_vertical_alignment": self.row_number_vertical_alignment.text(),
             "header_footer_vertical_alignment": self.header_footer_vertical_alignment.text(),
+            "swimlane_top_vertical_alignment": self.swimlane_top_vertical_alignment.text(),
+            "swimlane_bottom_vertical_alignment": self.swimlane_bottom_vertical_alignment.text(),
         }
 
         for field_name, value in alignment_fields.items():
@@ -248,9 +284,12 @@ class TypographyTab(BaseTab):
         chart_config.header_footer_font_size = int(self.header_footer_font_size.text()) if self.header_footer_font_size.text().strip() else chart_config.header_footer_font_size
         chart_config.row_number_font_size = int(self.row_number_font_size.text()) if self.row_number_font_size.text().strip() else chart_config.row_number_font_size
         chart_config.text_box_font_size = int(self.text_box_font_size.text()) if self.text_box_font_size.text().strip() else chart_config.text_box_font_size
+        chart_config.swimlane_font_size = int(self.swimlane_font_size.text()) if self.swimlane_font_size.text().strip() else chart_config.swimlane_font_size
 
         chart_config.scale_vertical_alignment_factor = float(self.scale_vertical_alignment.text()) if self.scale_vertical_alignment.text().strip() else chart_config.scale_vertical_alignment_factor
         chart_config.task_vertical_alignment_factor = float(self.task_vertical_alignment.text()) if self.task_vertical_alignment.text().strip() else chart_config.task_vertical_alignment_factor
         chart_config.row_number_vertical_alignment_factor = float(self.row_number_vertical_alignment.text()) if self.row_number_vertical_alignment.text().strip() else chart_config.row_number_vertical_alignment_factor
         chart_config.header_footer_vertical_alignment_factor = float(self.header_footer_vertical_alignment.text()) if self.header_footer_vertical_alignment.text().strip() else chart_config.header_footer_vertical_alignment_factor
+        chart_config.swimlane_top_vertical_alignment_factor = float(self.swimlane_top_vertical_alignment.text()) if self.swimlane_top_vertical_alignment.text().strip() else chart_config.swimlane_top_vertical_alignment_factor
+        chart_config.swimlane_bottom_vertical_alignment_factor = float(self.swimlane_bottom_vertical_alignment.text()) if self.swimlane_bottom_vertical_alignment.text().strip() else chart_config.swimlane_bottom_vertical_alignment_factor
 

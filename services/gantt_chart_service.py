@@ -694,39 +694,55 @@ class GanttChartService(QObject):
                 offset = 5  # Fixed 5px offset from edges
                 label_position = swimlane.label_position if hasattr(swimlane, 'label_position') else "Bottom Right"
                 
+                # Get vertical adjustment factors from config (separate for top and bottom)
+                # Align labels with the row they occupy (first or last row of swimlane)
+                if label_position in ["Bottom Right", "Bottom Left"]:
+                    # Bottom labels: align with the last row of the swimlane
+                    row_top = row_y + last_row_0based * row_height
+                    vertical_factor = self.config.general.swimlane_bottom_vertical_alignment_factor
+                    label_y = row_top + row_height * vertical_factor
+                elif label_position in ["Top Left", "Top Right"]:
+                    # Top labels: align with the first row of the swimlane
+                    row_top = row_y + first_row_0based * row_height
+                    vertical_factor = self.config.general.swimlane_top_vertical_alignment_factor
+                    label_y = row_top + row_height * vertical_factor
+                else:
+                    # Default to bottom positioning
+                    row_top = row_y + last_row_0based * row_height
+                    vertical_factor = self.config.general.swimlane_bottom_vertical_alignment_factor
+                    label_y = row_top + row_height * vertical_factor
+                
                 if label_position == "Bottom Right":
                     label_x = x + width - offset
-                    label_y = swimlane_bottom - offset
                     text_anchor = "end"
-                    dominant_baseline = "auto"
+                    dominant_baseline = "middle"
                 elif label_position == "Bottom Left":
                     label_x = x + offset
-                    label_y = swimlane_bottom - offset
                     text_anchor = "start"
-                    dominant_baseline = "auto"
+                    dominant_baseline = "middle"
                 elif label_position == "Top Left":
                     label_x = x + offset
-                    label_y = swimlane_top + offset
                     text_anchor = "start"
-                    dominant_baseline = "hanging"
+                    dominant_baseline = "middle"
                 elif label_position == "Top Right":
                     label_x = x + width - offset
-                    label_y = swimlane_top + offset
                     text_anchor = "end"
-                    dominant_baseline = "hanging"
+                    dominant_baseline = "middle"
                 else:
                     # Default to Bottom Right if invalid
                     label_x = x + width - offset
-                    label_y = swimlane_bottom - offset
+                    row_top = row_y + last_row_0based * row_height
+                    vertical_factor = self.config.general.swimlane_bottom_vertical_alignment_factor
+                    label_y = row_top + row_height * vertical_factor
                     text_anchor = "end"
-                    dominant_baseline = "auto"
+                    dominant_baseline = "middle"
                 
                 # Create text element
                 text_element = self.dwg.text(
                     swimlane.title,
                     insert=(label_x, label_y),
                     fill="grey",
-                    font_size="14px",
+                    font_size=str(self.config.general.swimlane_font_size) + "px",
                     font_family=f"{self.config.general.font_family}, sans-serif",
                     text_anchor=text_anchor,
                     dominant_baseline=dominant_baseline
