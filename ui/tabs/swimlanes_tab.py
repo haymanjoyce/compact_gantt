@@ -129,6 +129,8 @@ class SwimlanesTab(BaseTab):
         self.detail_label_position.addItems(["Bottom Right", "Bottom Left", "Top Left", "Top Right"])
         self.detail_label_position.setToolTip("Position of the swimlane title label")
         self.detail_label_position.currentTextChanged.connect(self._on_detail_form_changed)
+        # Disable by default - will be enabled when a swimlane is selected
+        self.detail_label_position.setEnabled(False)
         
         layout.addWidget(position_label, 0, 0)
         layout.addWidget(self.detail_label_position, 0, 1)
@@ -160,8 +162,10 @@ class SwimlanesTab(BaseTab):
                 swimlane = self.project_data.swimlanes[row]
                 label_position = swimlane.label_position if hasattr(swimlane, 'label_position') else "Bottom Right"
                 self.detail_label_position.setCurrentText(label_position)
+                self.detail_label_position.setEnabled(True)
             else:
                 self.detail_label_position.setCurrentText("Bottom Right")
+                self.detail_label_position.setEnabled(False)
         finally:
             self._updating_form = False
     
@@ -170,6 +174,7 @@ class SwimlanesTab(BaseTab):
         self._updating_form = True
         try:
             self.detail_label_position.setCurrentText("Bottom Right")
+            self.detail_label_position.setEnabled(False)
         finally:
             self._updating_form = False
     
@@ -177,10 +182,9 @@ class SwimlanesTab(BaseTab):
         """Handle table selection changes - populate detail form."""
         selected_rows = self.swimlanes_table.selectionModel().selectedRows()
         if not selected_rows:
-            # Don't clear _selected_row if we're just losing focus (user might be editing detail form)
-            # Only clear if explicitly deselected (e.g., clicking elsewhere or pressing Escape)
-            # For now, preserve _selected_row to allow detail form changes to sync correctly
-            # The row will be cleared when explicitly needed (e.g., when switching tabs)
+            self._selected_row = None
+            self._selected_swimlane_id = None
+            self._clear_detail_form()
             return
         
         row = selected_rows[0].row()
@@ -417,6 +421,10 @@ class SwimlanesTab(BaseTab):
         # No sorting - order is explicit
         
         self._initializing = False
+        
+        # Disable detail form if no swimlanes exist or no selection
+        if row_count == 0 or self._selected_swimlane_id is None:
+            self._clear_detail_form()
 
     def _update_table_row_from_swimlane(self, row_idx: int, swimlane: Swimlane) -> None:
         """Populate a table row from a Swimlane object."""
