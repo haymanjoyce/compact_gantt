@@ -1,11 +1,9 @@
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QGridLayout, QGroupBox, QLineEdit, 
-                           QLabel, QMessageBox, QComboBox, QSpinBox)
+from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QGridLayout, QGroupBox, QLabel, 
+                           QMessageBox, QComboBox, QSpinBox)
 from PyQt5.QtCore import pyqtSignal, Qt
-from PyQt5.QtGui import QIntValidator
 from typing import Dict, Any
 import logging
 from .base_tab import BaseTab
-from validators.validators import DataValidator
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -59,45 +57,62 @@ class TypographyTab(BaseTab):
         # Task Labels
         task_font_size_label = QLabel("Task Labels:")
         task_font_size_label.setFixedWidth(label_width)
-        self.task_font_size = QLineEdit("10")
+        self.task_font_size = QSpinBox()
+        self.task_font_size.setMinimum(6)
+        self.task_font_size.setMaximum(72)
+        self.task_font_size.setValue(10)
+        self.task_font_size.setSuffix(" px")
         self.task_font_size.setToolTip("Font size for task labels in pixels")
-        validator = QIntValidator(6, 72, self)
-        self.task_font_size.setValidator(validator)
 
         # Scale Labels
         scale_font_size_label = QLabel("Scale Labels:")
         scale_font_size_label.setFixedWidth(label_width)
-        self.scale_font_size = QLineEdit("10")
+        self.scale_font_size = QSpinBox()
+        self.scale_font_size.setMinimum(6)
+        self.scale_font_size.setMaximum(72)
+        self.scale_font_size.setValue(10)
+        self.scale_font_size.setSuffix(" px")
         self.scale_font_size.setToolTip("Font size for scale labels in pixels")
-        self.scale_font_size.setValidator(validator)
 
         # Header & Footer
         header_footer_font_size_label = QLabel("Header & Footer:")
         header_footer_font_size_label.setFixedWidth(label_width)
-        self.header_footer_font_size = QLineEdit("10")
+        self.header_footer_font_size = QSpinBox()
+        self.header_footer_font_size.setMinimum(6)
+        self.header_footer_font_size.setMaximum(72)
+        self.header_footer_font_size.setValue(10)
+        self.header_footer_font_size.setSuffix(" px")
         self.header_footer_font_size.setToolTip("Font size for header and footer text in pixels")
-        self.header_footer_font_size.setValidator(validator)
 
         # Row Numbers
         row_number_font_size_label = QLabel("Row Numbers:")
         row_number_font_size_label.setFixedWidth(label_width)
-        self.row_number_font_size = QLineEdit("10")
+        self.row_number_font_size = QSpinBox()
+        self.row_number_font_size.setMinimum(6)
+        self.row_number_font_size.setMaximum(72)
+        self.row_number_font_size.setValue(10)
+        self.row_number_font_size.setSuffix(" px")
         self.row_number_font_size.setToolTip("Font size for row numbers in pixels")
-        self.row_number_font_size.setValidator(validator)
 
         # Notes
         note_font_size_label = QLabel("Notes:")
         note_font_size_label.setFixedWidth(label_width)
-        self.note_font_size = QLineEdit("10")
+        self.note_font_size = QSpinBox()
+        self.note_font_size.setMinimum(6)
+        self.note_font_size.setMaximum(72)
+        self.note_font_size.setValue(10)
+        self.note_font_size.setSuffix(" px")
         self.note_font_size.setToolTip("Font size for notes in pixels")
-        self.note_font_size.setValidator(validator)
 
         # Swimlanes
         swimlane_font_size_label = QLabel("Swimlanes:")
         swimlane_font_size_label.setFixedWidth(label_width)
-        self.swimlane_font_size = QLineEdit("10")
+        self.swimlane_font_size = QSpinBox()
+        self.swimlane_font_size.setMinimum(6)
+        self.swimlane_font_size.setMaximum(72)
+        self.swimlane_font_size.setValue(10)
+        self.swimlane_font_size.setSuffix(" px")
         self.swimlane_font_size.setToolTip("Font size for swimlane labels in pixels")
-        self.swimlane_font_size.setValidator(validator)
 
         layout.addWidget(task_font_size_label, 0, 0)
         layout.addWidget(self.task_font_size, 0, 1)
@@ -202,12 +217,12 @@ class TypographyTab(BaseTab):
         self.font_family.currentTextChanged.connect(self._sync_data_if_not_initializing)
         
         # Font Sizes
-        self.task_font_size.textChanged.connect(self._sync_data_if_not_initializing)
-        self.scale_font_size.textChanged.connect(self._sync_data_if_not_initializing)
-        self.header_footer_font_size.textChanged.connect(self._sync_data_if_not_initializing)
-        self.row_number_font_size.textChanged.connect(self._sync_data_if_not_initializing)
-        self.note_font_size.textChanged.connect(self._sync_data_if_not_initializing)
-        self.swimlane_font_size.textChanged.connect(self._sync_data_if_not_initializing)
+        self.task_font_size.valueChanged.connect(self._sync_data_if_not_initializing)
+        self.scale_font_size.valueChanged.connect(self._sync_data_if_not_initializing)
+        self.header_footer_font_size.valueChanged.connect(self._sync_data_if_not_initializing)
+        self.row_number_font_size.valueChanged.connect(self._sync_data_if_not_initializing)
+        self.note_font_size.valueChanged.connect(self._sync_data_if_not_initializing)
+        self.swimlane_font_size.valueChanged.connect(self._sync_data_if_not_initializing)
         
         # Vertical Adjustment
         self.scale_vertical_alignment.valueChanged.connect(self._sync_data_if_not_initializing)
@@ -229,12 +244,12 @@ class TypographyTab(BaseTab):
             self.font_family.setCurrentText("Arial")
 
         # Load Font Sizes
-        self.task_font_size.setText(str(chart_config.task_font_size))
-        self.scale_font_size.setText(str(chart_config.scale_font_size))
-        self.header_footer_font_size.setText(str(chart_config.header_footer_font_size))
-        self.row_number_font_size.setText(str(chart_config.row_number_font_size))
-        self.note_font_size.setText(str(chart_config.note_font_size))
-        self.swimlane_font_size.setText(str(chart_config.swimlane_font_size))
+        self.task_font_size.setValue(chart_config.task_font_size)
+        self.scale_font_size.setValue(chart_config.scale_font_size)
+        self.header_footer_font_size.setValue(chart_config.header_footer_font_size)
+        self.row_number_font_size.setValue(chart_config.row_number_font_size)
+        self.note_font_size.setValue(chart_config.note_font_size)
+        self.swimlane_font_size.setValue(chart_config.swimlane_font_size)
 
         # Load Vertical Adjustment (convert from decimal 0.0-1.0 to percent 0-100)
         self.scale_vertical_alignment.setValue(int(chart_config.scale_vertical_alignment_factor * 100))
@@ -247,36 +262,18 @@ class TypographyTab(BaseTab):
     def _sync_data_impl(self):
         chart_config = self.app_config.general.chart
 
-        # Validate numeric inputs - skip validation if field is empty (intermediate editing state)
-        numeric_fields = {
-            "task_font_size": self.task_font_size.text(),
-            "scale_font_size": self.scale_font_size.text(),
-            "header_footer_font_size": self.header_footer_font_size.text(),
-            "row_number_font_size": self.row_number_font_size.text(),
-            "note_font_size": self.note_font_size.text(),
-            "swimlane_font_size": self.swimlane_font_size.text(),
-        }
+        # Note: QSpinBox handles validation automatically for font sizes (6-72 range) and vertical adjustment (0-100 range), so no need for manual validation
 
-        for field_name, value in numeric_fields.items():
-            # Skip validation for empty strings (intermediate editing state)
-            if not value.strip():
-                continue
-            display_name = field_name.replace('_', ' ').title()
-            errors = DataValidator.validate_non_negative_integer_string(value, display_name)
-            if errors:
-                raise ValueError(errors[0])  # Raise first error
-
-        # Note: QSpinBox handles validation automatically (0-100 range), so no need for manual validation
-
-        # Update chart config - use current values as defaults for empty fields
+        # Update chart config
         chart_config.font_family = self.font_family.currentText()
         
-        chart_config.task_font_size = int(self.task_font_size.text()) if self.task_font_size.text().strip() else chart_config.task_font_size
-        chart_config.scale_font_size = int(self.scale_font_size.text()) if self.scale_font_size.text().strip() else chart_config.scale_font_size
-        chart_config.header_footer_font_size = int(self.header_footer_font_size.text()) if self.header_footer_font_size.text().strip() else chart_config.header_footer_font_size
-        chart_config.row_number_font_size = int(self.row_number_font_size.text()) if self.row_number_font_size.text().strip() else chart_config.row_number_font_size
-        chart_config.note_font_size = int(self.note_font_size.text()) if self.note_font_size.text().strip() else chart_config.note_font_size
-        chart_config.swimlane_font_size = int(self.swimlane_font_size.text()) if self.swimlane_font_size.text().strip() else chart_config.swimlane_font_size
+        # Font sizes from QSpinBox (no need to check for empty since spinbox always has a value)
+        chart_config.task_font_size = self.task_font_size.value()
+        chart_config.scale_font_size = self.scale_font_size.value()
+        chart_config.header_footer_font_size = self.header_footer_font_size.value()
+        chart_config.row_number_font_size = self.row_number_font_size.value()
+        chart_config.note_font_size = self.note_font_size.value()
+        chart_config.swimlane_font_size = self.swimlane_font_size.value()
 
         # Convert percent (0-100) from QSpinBox to decimal (0.0-1.0) for internal storage
         chart_config.scale_vertical_alignment_factor = self.scale_vertical_alignment.value() / 100.0
