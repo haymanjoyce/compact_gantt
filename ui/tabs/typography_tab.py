@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QGridLayout, QGroupBox, QLineEdit, 
-                           QLabel, QMessageBox, QComboBox)
+                           QLabel, QMessageBox, QComboBox, QSpinBox)
 from PyQt5.QtCore import pyqtSignal, Qt
-from PyQt5.QtGui import QIntValidator, QDoubleValidator
+from PyQt5.QtGui import QIntValidator
 from typing import Dict, Any
 import logging
 from .base_tab import BaseTab
@@ -121,51 +121,65 @@ class TypographyTab(BaseTab):
         layout.setHorizontalSpacing(10)
         layout.setVerticalSpacing(5)
 
-        # Validator for percent values (0-100) with support for decimal (0.0-1.0) for backward compatibility
-        double_validator = QDoubleValidator(0.0, 100.0, 2, self)
-        double_validator.setNotation(QDoubleValidator.StandardNotation)
-
         # Scale Labels
         scale_alignment_label = QLabel("Scale Labels:")
         scale_alignment_label.setFixedWidth(label_width)
-        self.scale_vertical_alignment = QLineEdit("70")
+        self.scale_vertical_alignment = QSpinBox()
+        self.scale_vertical_alignment.setMinimum(0)
+        self.scale_vertical_alignment.setMaximum(100)
+        self.scale_vertical_alignment.setValue(70)
+        self.scale_vertical_alignment.setSuffix("%")
         self.scale_vertical_alignment.setToolTip("Vertical position for scale labels (0-100%, where 0=top, 50=center, 100=bottom)")
-        self.scale_vertical_alignment.setValidator(double_validator)
 
         # Task Labels
         task_alignment_label = QLabel("Task Labels:")
         task_alignment_label.setFixedWidth(label_width)
-        self.task_vertical_alignment = QLineEdit("70")
+        self.task_vertical_alignment = QSpinBox()
+        self.task_vertical_alignment.setMinimum(0)
+        self.task_vertical_alignment.setMaximum(100)
+        self.task_vertical_alignment.setValue(70)
+        self.task_vertical_alignment.setSuffix("%")
         self.task_vertical_alignment.setToolTip("Vertical position for task labels (0-100%, where 0=top, 50=center, 100=bottom)")
-        self.task_vertical_alignment.setValidator(double_validator)
 
         # Row Numbers
         row_number_alignment_label = QLabel("Row Numbers:")
         row_number_alignment_label.setFixedWidth(label_width)
-        self.row_number_vertical_alignment = QLineEdit("70")
+        self.row_number_vertical_alignment = QSpinBox()
+        self.row_number_vertical_alignment.setMinimum(0)
+        self.row_number_vertical_alignment.setMaximum(100)
+        self.row_number_vertical_alignment.setValue(70)
+        self.row_number_vertical_alignment.setSuffix("%")
         self.row_number_vertical_alignment.setToolTip("Vertical position for row numbers (0-100%, where 0=top, 50=center, 100=bottom)")
-        self.row_number_vertical_alignment.setValidator(double_validator)
 
         # Header & Footer
         header_footer_alignment_label = QLabel("Header & Footer:")
         header_footer_alignment_label.setFixedWidth(label_width)
-        self.header_footer_vertical_alignment = QLineEdit("70")
+        self.header_footer_vertical_alignment = QSpinBox()
+        self.header_footer_vertical_alignment.setMinimum(0)
+        self.header_footer_vertical_alignment.setMaximum(100)
+        self.header_footer_vertical_alignment.setValue(70)
+        self.header_footer_vertical_alignment.setSuffix("%")
         self.header_footer_vertical_alignment.setToolTip("Vertical position for header and footer text (0-100%, where 0=top, 50=center, 100=bottom)")
-        self.header_footer_vertical_alignment.setValidator(double_validator)
 
         # Swimlanes - Top
         swimlane_top_alignment_label = QLabel("Swimlanes (Top):")
         swimlane_top_alignment_label.setFixedWidth(label_width)
-        self.swimlane_top_vertical_alignment = QLineEdit("70")
+        self.swimlane_top_vertical_alignment = QSpinBox()
+        self.swimlane_top_vertical_alignment.setMinimum(0)
+        self.swimlane_top_vertical_alignment.setMaximum(100)
+        self.swimlane_top_vertical_alignment.setValue(70)
+        self.swimlane_top_vertical_alignment.setSuffix("%")
         self.swimlane_top_vertical_alignment.setToolTip("Vertical position for top swimlane labels (0-100%, where 0=top, 50=center, 100=bottom)")
-        self.swimlane_top_vertical_alignment.setValidator(double_validator)
 
         # Swimlanes - Bottom
         swimlane_bottom_alignment_label = QLabel("Swimlanes (Bottom):")
         swimlane_bottom_alignment_label.setFixedWidth(label_width)
-        self.swimlane_bottom_vertical_alignment = QLineEdit("70")
+        self.swimlane_bottom_vertical_alignment = QSpinBox()
+        self.swimlane_bottom_vertical_alignment.setMinimum(0)
+        self.swimlane_bottom_vertical_alignment.setMaximum(100)
+        self.swimlane_bottom_vertical_alignment.setValue(70)
+        self.swimlane_bottom_vertical_alignment.setSuffix("%")
         self.swimlane_bottom_vertical_alignment.setToolTip("Vertical position for bottom swimlane labels (0-100%, where 0=top, 50=center, 100=bottom)")
-        self.swimlane_bottom_vertical_alignment.setValidator(double_validator)
 
         layout.addWidget(scale_alignment_label, 0, 0)
         layout.addWidget(self.scale_vertical_alignment, 0, 1)
@@ -196,12 +210,12 @@ class TypographyTab(BaseTab):
         self.swimlane_font_size.textChanged.connect(self._sync_data_if_not_initializing)
         
         # Vertical Adjustment
-        self.scale_vertical_alignment.textChanged.connect(self._sync_data_if_not_initializing)
-        self.task_vertical_alignment.textChanged.connect(self._sync_data_if_not_initializing)
-        self.row_number_vertical_alignment.textChanged.connect(self._sync_data_if_not_initializing)
-        self.header_footer_vertical_alignment.textChanged.connect(self._sync_data_if_not_initializing)
-        self.swimlane_top_vertical_alignment.textChanged.connect(self._sync_data_if_not_initializing)
-        self.swimlane_bottom_vertical_alignment.textChanged.connect(self._sync_data_if_not_initializing)
+        self.scale_vertical_alignment.valueChanged.connect(self._sync_data_if_not_initializing)
+        self.task_vertical_alignment.valueChanged.connect(self._sync_data_if_not_initializing)
+        self.row_number_vertical_alignment.valueChanged.connect(self._sync_data_if_not_initializing)
+        self.header_footer_vertical_alignment.valueChanged.connect(self._sync_data_if_not_initializing)
+        self.swimlane_top_vertical_alignment.valueChanged.connect(self._sync_data_if_not_initializing)
+        self.swimlane_bottom_vertical_alignment.valueChanged.connect(self._sync_data_if_not_initializing)
 
     def _load_initial_data_impl(self):
         chart_config = self.app_config.general.chart
@@ -223,12 +237,12 @@ class TypographyTab(BaseTab):
         self.swimlane_font_size.setText(str(chart_config.swimlane_font_size))
 
         # Load Vertical Adjustment (convert from decimal 0.0-1.0 to percent 0-100)
-        self.scale_vertical_alignment.setText(str(int(chart_config.scale_vertical_alignment_factor * 100)))
-        self.task_vertical_alignment.setText(str(int(chart_config.task_vertical_alignment_factor * 100)))
-        self.row_number_vertical_alignment.setText(str(int(chart_config.row_number_vertical_alignment_factor * 100)))
-        self.header_footer_vertical_alignment.setText(str(int(chart_config.header_footer_vertical_alignment_factor * 100)))
-        self.swimlane_top_vertical_alignment.setText(str(int(chart_config.swimlane_top_vertical_alignment_factor * 100)))
-        self.swimlane_bottom_vertical_alignment.setText(str(int(chart_config.swimlane_bottom_vertical_alignment_factor * 100)))
+        self.scale_vertical_alignment.setValue(int(chart_config.scale_vertical_alignment_factor * 100))
+        self.task_vertical_alignment.setValue(int(chart_config.task_vertical_alignment_factor * 100))
+        self.row_number_vertical_alignment.setValue(int(chart_config.row_number_vertical_alignment_factor * 100))
+        self.header_footer_vertical_alignment.setValue(int(chart_config.header_footer_vertical_alignment_factor * 100))
+        self.swimlane_top_vertical_alignment.setValue(int(chart_config.swimlane_top_vertical_alignment_factor * 100))
+        self.swimlane_bottom_vertical_alignment.setValue(int(chart_config.swimlane_bottom_vertical_alignment_factor * 100))
 
     def _sync_data_impl(self):
         chart_config = self.app_config.general.chart
@@ -252,39 +266,7 @@ class TypographyTab(BaseTab):
             if errors:
                 raise ValueError(errors[0])  # Raise first error
 
-        # Validate vertical adjustment factors
-        alignment_fields = {
-            "scale_vertical_alignment": self.scale_vertical_alignment.text(),
-            "task_vertical_alignment": self.task_vertical_alignment.text(),
-            "row_number_vertical_alignment": self.row_number_vertical_alignment.text(),
-            "header_footer_vertical_alignment": self.header_footer_vertical_alignment.text(),
-            "swimlane_top_vertical_alignment": self.swimlane_top_vertical_alignment.text(),
-            "swimlane_bottom_vertical_alignment": self.swimlane_bottom_vertical_alignment.text(),
-        }
-
-        for field_name, value in alignment_fields.items():
-            # Skip validation for empty strings (intermediate editing state)
-            if not value.strip():
-                continue
-            try:
-                float_value = float(value)
-                # Support both percent (0-100) and decimal (0.0-1.0) for backward compatibility
-                # If value > 1.0, treat as percent, otherwise as decimal
-                if float_value > 1.0:
-                    # Treat as percent (0-100)
-                    if float_value < 0.0 or float_value > 100.0:
-                        display_name = field_name.replace('_', ' ').title()
-                        raise ValueError(f"{display_name} must be between 0 and 100%")
-                else:
-                    # Treat as decimal (0.0-1.0) - backward compatibility
-                    if float_value < 0.0 or float_value > 1.0:
-                        display_name = field_name.replace('_', ' ').title()
-                        raise ValueError(f"{display_name} must be between 0 and 100%")
-            except ValueError as e:
-                if "must be between" in str(e):
-                    raise
-                display_name = field_name.replace('_', ' ').title()
-                raise ValueError(f"{display_name} must be a valid number between 0 and 100%")
+        # Note: QSpinBox handles validation automatically (0-100 range), so no need for manual validation
 
         # Update chart config - use current values as defaults for empty fields
         chart_config.font_family = self.font_family.currentText()
@@ -296,39 +278,11 @@ class TypographyTab(BaseTab):
         chart_config.note_font_size = int(self.note_font_size.text()) if self.note_font_size.text().strip() else chart_config.note_font_size
         chart_config.swimlane_font_size = int(self.swimlane_font_size.text()) if self.swimlane_font_size.text().strip() else chart_config.swimlane_font_size
 
-        # Convert percent (0-100) to decimal (0.0-1.0) for internal storage
-        # Support backward compatibility: if value <= 1.0, treat as decimal, otherwise as percent
-        def parse_percent_or_decimal(value_str):
-            if not value_str.strip():
-                return None
-            float_value = float(value_str)
-            # If value > 1.0, treat as percent (0-100), otherwise as decimal (0.0-1.0)
-            if float_value > 1.0:
-                return float_value / 100.0  # Convert percent to decimal
-            else:
-                return float_value  # Already decimal (backward compatibility)
-        
-        scale_val = parse_percent_or_decimal(self.scale_vertical_alignment.text())
-        if scale_val is not None:
-            chart_config.scale_vertical_alignment_factor = scale_val
-        
-        task_val = parse_percent_or_decimal(self.task_vertical_alignment.text())
-        if task_val is not None:
-            chart_config.task_vertical_alignment_factor = task_val
-        
-        row_num_val = parse_percent_or_decimal(self.row_number_vertical_alignment.text())
-        if row_num_val is not None:
-            chart_config.row_number_vertical_alignment_factor = row_num_val
-        
-        header_footer_val = parse_percent_or_decimal(self.header_footer_vertical_alignment.text())
-        if header_footer_val is not None:
-            chart_config.header_footer_vertical_alignment_factor = header_footer_val
-        
-        swimlane_top_val = parse_percent_or_decimal(self.swimlane_top_vertical_alignment.text())
-        if swimlane_top_val is not None:
-            chart_config.swimlane_top_vertical_alignment_factor = swimlane_top_val
-        
-        swimlane_bottom_val = parse_percent_or_decimal(self.swimlane_bottom_vertical_alignment.text())
-        if swimlane_bottom_val is not None:
-            chart_config.swimlane_bottom_vertical_alignment_factor = swimlane_bottom_val
+        # Convert percent (0-100) from QSpinBox to decimal (0.0-1.0) for internal storage
+        chart_config.scale_vertical_alignment_factor = self.scale_vertical_alignment.value() / 100.0
+        chart_config.task_vertical_alignment_factor = self.task_vertical_alignment.value() / 100.0
+        chart_config.row_number_vertical_alignment_factor = self.row_number_vertical_alignment.value() / 100.0
+        chart_config.header_footer_vertical_alignment_factor = self.header_footer_vertical_alignment.value() / 100.0
+        chart_config.swimlane_top_vertical_alignment_factor = self.swimlane_top_vertical_alignment.value() / 100.0
+        chart_config.swimlane_bottom_vertical_alignment_factor = self.swimlane_bottom_vertical_alignment.value() / 100.0
 
