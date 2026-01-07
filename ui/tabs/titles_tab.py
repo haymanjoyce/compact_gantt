@@ -1,11 +1,9 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QGridLayout, QGroupBox, QLineEdit, 
-                           QLabel, QMessageBox)
+                           QLabel, QMessageBox, QSpinBox)
 from PyQt5.QtCore import pyqtSignal, Qt
-from PyQt5.QtGui import QIntValidator
 from typing import Dict, Any
 import logging
 from .base_tab import BaseTab
-from validators.validators import DataValidator
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -36,11 +34,12 @@ class TitlesTab(BaseTab):
         # Header height
         header_height_label = QLabel("Header Height:")
         header_height_label.setFixedWidth(label_width)
-        self.header_height = QLineEdit("20")
+        self.header_height = QSpinBox()
+        self.header_height.setMinimum(0)
+        self.header_height.setMaximum(500)
+        self.header_height.setValue(20)
+        self.header_height.setSuffix(" px")
         self.header_height.setToolTip("Height of the header section in pixels (0 to hide header)")
-        # Add validator to only allow non-negative integers
-        validator = QIntValidator(0, 999999, self)
-        self.header_height.setValidator(validator)
 
         # Header text
         header_text_label = QLabel("Header Text:")
@@ -65,11 +64,12 @@ class TitlesTab(BaseTab):
         # Footer height
         footer_height_label = QLabel("Footer Height:")
         footer_height_label.setFixedWidth(label_width)
-        self.footer_height = QLineEdit("20")
+        self.footer_height = QSpinBox()
+        self.footer_height.setMinimum(0)
+        self.footer_height.setMaximum(500)
+        self.footer_height.setValue(20)
+        self.footer_height.setSuffix(" px")
         self.footer_height.setToolTip("Height of the footer section in pixels (0 to hide footer)")
-        # Add validator to only allow non-negative integers
-        validator = QIntValidator(0, 999999, self)
-        self.footer_height.setValidator(validator)
 
         # Footer text
         footer_text_label = QLabel("Footer Text:")
@@ -87,49 +87,36 @@ class TitlesTab(BaseTab):
 
     def _connect_signals(self):
         # Header signals
-        self.header_height.textChanged.connect(self._sync_data_if_not_initializing)
+        self.header_height.valueChanged.connect(self._sync_data_if_not_initializing)
         self.header_text.textChanged.connect(self._sync_data_if_not_initializing)
         
         # Footer signals
-        self.footer_height.textChanged.connect(self._sync_data_if_not_initializing)
+        self.footer_height.valueChanged.connect(self._sync_data_if_not_initializing)
         self.footer_text.textChanged.connect(self._sync_data_if_not_initializing)
 
     def _load_initial_data_impl(self):
         frame_config = self.project_data.frame_config
 
         # Load Header settings
-        self.header_height.setText(str(frame_config.header_height))
+        self.header_height.setValue(frame_config.header_height)
         # Use default if empty, otherwise use saved value
         header_text = frame_config.header_text if frame_config.header_text else "Header text"
         self.header_text.setText(header_text)
 
         # Load Footer settings
-        self.footer_height.setText(str(frame_config.footer_height))
+        self.footer_height.setValue(frame_config.footer_height)
         # Use default if empty, otherwise use saved value
         footer_text = frame_config.footer_text if frame_config.footer_text else "Footer text"
         self.footer_text.setText(footer_text)
 
     def _sync_data_impl(self):
-        # Validate numeric inputs - skip validation if field is empty (intermediate editing state)
-        numeric_fields = {
-            "header_height": self.header_height.text(),
-            "footer_height": self.footer_height.text(),
-        }
+        # Note: QSpinBox handles validation automatically for header/footer height (0-500 range), so no need for manual validation
 
-        for field_name, value in numeric_fields.items():
-            # Skip validation for empty strings (intermediate editing state)
-            if not value.strip():
-                continue
-            display_name = field_name.replace('_', ' ').title()
-            errors = DataValidator.validate_non_negative_integer_string(value, display_name)
-            if errors:
-                raise ValueError(errors[0])  # Raise first error
-
-        # Update frame config - use current values from frame_config as defaults for empty fields
+        # Update frame config - QSpinBox always has a value, so no need to check for empty
         frame_config = self.project_data.frame_config
-        self.project_data.frame_config.header_height = int(self.header_height.text()) if self.header_height.text().strip() else frame_config.header_height
+        self.project_data.frame_config.header_height = self.header_height.value()
         self.project_data.frame_config.header_text = self.header_text.text()
-        self.project_data.frame_config.footer_height = int(self.footer_height.text()) if self.footer_height.text().strip() else frame_config.footer_height
+        self.project_data.frame_config.footer_height = self.footer_height.value()
         self.project_data.frame_config.footer_text = self.footer_text.text()
 
         # Emit data updated signal
