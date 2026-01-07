@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import (QWidget, QTableWidget, QVBoxLayout, QPushButton, 
                            QHBoxLayout, QHeaderView, QTableWidgetItem, 
-                           QMessageBox, QGroupBox, QSizePolicy, QLabel, QGridLayout, QPlainTextEdit, QComboBox)
+                           QMessageBox, QGroupBox, QSizePolicy, QLabel, QGridLayout, QPlainTextEdit, QComboBox, QSpinBox)
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QBrush, QColor
 from typing import List, Dict, Any, Optional
@@ -284,23 +284,9 @@ class NotesTab(BaseTab):
             if col_name in ["ID", "Text Preview"]:
                 return
             
-            # Update UserRole for numeric columns (X, Y, Width, Height)
-            if col_name in ["X", "Y", "Width", "Height"]:
-                try:
-                    val_str = item.text().strip()
-                    if val_str:
-                        try:
-                            val_int = int(val_str)
-                            item.setData(Qt.UserRole, val_int)
-                        except ValueError:
-                            # Invalid numeric format - set UserRole to None
-                            item.setData(Qt.UserRole, None)
-                    else:
-                        item.setData(Qt.UserRole, None)
-                except Exception as e:
-                    # Catch any unexpected exceptions during numeric processing
-                    logging.error(f"Error processing numeric value in _on_item_changed: {e}")
-                    item.setData(Qt.UserRole, None)
+            # Note: X, Y, Width, Height are now QSpinBox widgets, not items
+            # They handle their own validation and trigger sync via valueChanged signal
+            # No need to process them here
             
             # Trigger sync
             self._sync_data_if_not_initializing()
@@ -365,49 +351,61 @@ class NotesTab(BaseTab):
                 item.setData(Qt.UserRole, note.note_id)
                 self.notes_table.setItem(row_idx, id_col, item)
         
-        # Update X column
+        # Update X column (QSpinBox widget)
         if x_col is not None:
-            item = self.notes_table.item(row_idx, x_col)
-            if item:
-                item.setText(str(note.x))
-                item.setData(Qt.UserRole, note.x)
+            spinbox = self.notes_table.cellWidget(row_idx, x_col)
+            if spinbox and isinstance(spinbox, QSpinBox):
+                spinbox.setValue(note.x)
             else:
-                item = NumericTableWidgetItem(str(note.x))
-                item.setData(Qt.UserRole, note.x)
-                self.notes_table.setItem(row_idx, x_col, item)
+                spinbox = QSpinBox()
+                spinbox.setMinimum(0)
+                spinbox.setMaximum(5000)
+                spinbox.setValue(note.x)
+                spinbox.setSuffix(" px")
+                spinbox.valueChanged.connect(self._sync_data_if_not_initializing)
+                self.notes_table.setCellWidget(row_idx, x_col, spinbox)
         
-        # Update Y column
+        # Update Y column (QSpinBox widget)
         if y_col is not None:
-            item = self.notes_table.item(row_idx, y_col)
-            if item:
-                item.setText(str(note.y))
-                item.setData(Qt.UserRole, note.y)
+            spinbox = self.notes_table.cellWidget(row_idx, y_col)
+            if spinbox and isinstance(spinbox, QSpinBox):
+                spinbox.setValue(note.y)
             else:
-                item = NumericTableWidgetItem(str(note.y))
-                item.setData(Qt.UserRole, note.y)
-                self.notes_table.setItem(row_idx, y_col, item)
+                spinbox = QSpinBox()
+                spinbox.setMinimum(0)
+                spinbox.setMaximum(5000)
+                spinbox.setValue(note.y)
+                spinbox.setSuffix(" px")
+                spinbox.valueChanged.connect(self._sync_data_if_not_initializing)
+                self.notes_table.setCellWidget(row_idx, y_col, spinbox)
         
-        # Update Width column
+        # Update Width column (QSpinBox widget)
         if width_col is not None:
-            item = self.notes_table.item(row_idx, width_col)
-            if item:
-                item.setText(str(note.width))
-                item.setData(Qt.UserRole, note.width)
+            spinbox = self.notes_table.cellWidget(row_idx, width_col)
+            if spinbox and isinstance(spinbox, QSpinBox):
+                spinbox.setValue(note.width)
             else:
-                item = NumericTableWidgetItem(str(note.width))
-                item.setData(Qt.UserRole, note.width)
-                self.notes_table.setItem(row_idx, width_col, item)
+                spinbox = QSpinBox()
+                spinbox.setMinimum(1)
+                spinbox.setMaximum(5000)
+                spinbox.setValue(note.width)
+                spinbox.setSuffix(" px")
+                spinbox.valueChanged.connect(self._sync_data_if_not_initializing)
+                self.notes_table.setCellWidget(row_idx, width_col, spinbox)
         
-        # Update Height column
+        # Update Height column (QSpinBox widget)
         if height_col is not None:
-            item = self.notes_table.item(row_idx, height_col)
-            if item:
-                item.setText(str(note.height))
-                item.setData(Qt.UserRole, note.height)
+            spinbox = self.notes_table.cellWidget(row_idx, height_col)
+            if spinbox and isinstance(spinbox, QSpinBox):
+                spinbox.setValue(note.height)
             else:
-                item = NumericTableWidgetItem(str(note.height))
-                item.setData(Qt.UserRole, note.height)
-                self.notes_table.setItem(row_idx, height_col, item)
+                spinbox = QSpinBox()
+                spinbox.setMinimum(1)
+                spinbox.setMaximum(5000)
+                spinbox.setValue(note.height)
+                spinbox.setSuffix(" px")
+                spinbox.valueChanged.connect(self._sync_data_if_not_initializing)
+                self.notes_table.setCellWidget(row_idx, height_col, spinbox)
         
         # Update Text Align column (combo box)
         text_align_col = self._get_column_index("Text Align")
@@ -482,36 +480,40 @@ class NotesTab(BaseTab):
             if note_id <= 0:
                 return None
             
-            # Extract X
-            x_item = self.notes_table.item(row_idx, x_col)
-            if not x_item or not x_item.text().strip():
+            # Extract X (from QSpinBox widget)
+            x_widget = self.notes_table.cellWidget(row_idx, x_col)
+            if x_widget and isinstance(x_widget, QSpinBox):
+                x = x_widget.value()
+            else:
                 return None
-            x = safe_int(x_item.text())
-            if x is None or x < 0:
-                return None
-            
-            # Extract Y
-            y_item = self.notes_table.item(row_idx, y_col)
-            if not y_item or not y_item.text().strip():
-                return None
-            y = safe_int(y_item.text())
-            if y is None or y < 0:
+            if x < 0:
                 return None
             
-            # Extract Width
-            width_item = self.notes_table.item(row_idx, width_col)
-            if not width_item or not width_item.text().strip():
+            # Extract Y (from QSpinBox widget)
+            y_widget = self.notes_table.cellWidget(row_idx, y_col)
+            if y_widget and isinstance(y_widget, QSpinBox):
+                y = y_widget.value()
+            else:
                 return None
-            width = safe_int(width_item.text())
-            if width is None or width <= 0:
+            if y < 0:
                 return None
             
-            # Extract Height
-            height_item = self.notes_table.item(row_idx, height_col)
-            if not height_item or not height_item.text().strip():
+            # Extract Width (from QSpinBox widget)
+            width_widget = self.notes_table.cellWidget(row_idx, width_col)
+            if width_widget and isinstance(width_widget, QSpinBox):
+                width = width_widget.value()
+            else:
                 return None
-            height = safe_int(height_item.text())
-            if height is None or height <= 0:
+            if width <= 0:
+                return None
+            
+            # Extract Height (from QSpinBox widget)
+            height_widget = self.notes_table.cellWidget(row_idx, height_col)
+            if height_widget and isinstance(height_widget, QSpinBox):
+                height = height_widget.value()
+            else:
+                return None
+            if height <= 0:
                 return None
             
             # Get Text from detail form if this row is selected, otherwise from existing note

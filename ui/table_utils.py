@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QTableWidgetItem, QComboBox, QCheckBox, QWidget, QHBoxLayout, QMessageBox
+from PyQt5.QtWidgets import QTableWidgetItem, QComboBox, QCheckBox, QWidget, QHBoxLayout, QMessageBox, QSpinBox
 from PyQt5.QtCore import Qt, QDate
 from PyQt5.QtGui import QBrush, QColor
 from datetime import datetime
@@ -253,15 +253,25 @@ def add_row(table, table_key, table_configs, parent, id_field_name, row_index=No
                 item = NumericTableWidgetItem("1")  # Default row count
                 item.setData(Qt.UserRole, 1)
                 table.setItem(row_index, col_idx, item)
-            # Numeric columns for text boxes (X, Y, Width, Height)
+            # Numeric columns for notes (X, Y, Width, Height) - use QSpinBox widgets
             elif header_text in ["X", "Y"]:
-                item = NumericTableWidgetItem("0")  # Default to 0 for coordinates
-                item.setData(Qt.UserRole, 0)
-                table.setItem(row_index, col_idx, item)
+                spinbox = QSpinBox()
+                spinbox.setMinimum(0)
+                spinbox.setMaximum(5000)
+                spinbox.setValue(0)
+                spinbox.setSuffix(" px")
+                if hasattr(parent, '_sync_data_if_not_initializing'):
+                    spinbox.valueChanged.connect(parent._sync_data_if_not_initializing)
+                table.setCellWidget(row_index, col_idx, spinbox)
             elif header_text in ["Width", "Height"]:
-                item = NumericTableWidgetItem("100")  # Default width/height
-                item.setData(Qt.UserRole, 100)
-                table.setItem(row_index, col_idx, item)
+                spinbox = QSpinBox()
+                spinbox.setMinimum(1)
+                spinbox.setMaximum(5000)
+                spinbox.setValue(100)
+                spinbox.setSuffix(" px")
+                if hasattr(parent, '_sync_data_if_not_initializing'):
+                    spinbox.valueChanged.connect(parent._sync_data_if_not_initializing)
+                table.setCellWidget(row_index, col_idx, spinbox)
             # Numeric column for links (From Task ID, To Task ID) - both should be editable
             elif is_links_table and header_text in ["From Task ID", "To Task ID"]:
                 item = NumericTableWidgetItem("")
