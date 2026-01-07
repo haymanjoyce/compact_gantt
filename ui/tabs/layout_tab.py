@@ -72,11 +72,11 @@ class LayoutTab(BaseTab):
         # Number of Rows
         rows_label = QLabel("Number of Rows:")
         rows_label.setFixedWidth(label_width)
-        self.num_rows = QLineEdit(str(self.app_config.general.tasks_rows))
+        self.num_rows = QSpinBox()
+        self.num_rows.setMinimum(0)
+        self.num_rows.setMaximum(200)
+        self.num_rows.setValue(self.app_config.general.tasks_rows)
         self.num_rows.setToolTip("Number of rows in the chart")
-        # Add validator to only allow non-negative integers
-        validator = QIntValidator(0, 999999, self)
-        self.num_rows.setValidator(validator)
 
         # Show Row Numbers (using combobox instead of checkbox)
         row_numbers_label = QLabel("Row Numbers:")
@@ -132,7 +132,7 @@ class LayoutTab(BaseTab):
     def _connect_signals(self):
         self.outer_width.textChanged.connect(self._sync_data_if_not_initializing)
         self.outer_height.textChanged.connect(self._sync_data_if_not_initializing)
-        self.num_rows.textChanged.connect(self._sync_data_if_not_initializing)
+        self.num_rows.valueChanged.connect(self._sync_data_if_not_initializing)
         self.show_row_numbers.currentTextChanged.connect(self._sync_data_if_not_initializing)
         self.show_row_gridlines.currentTextChanged.connect(self._sync_data_if_not_initializing)
         for margin in self.margin_inputs:
@@ -144,7 +144,7 @@ class LayoutTab(BaseTab):
         # Load Dimensions
         self.outer_width.setText(str(frame_config.outer_width))
         self.outer_height.setText(str(frame_config.outer_height))
-        self.num_rows.setText(str(frame_config.num_rows))
+        self.num_rows.setValue(frame_config.num_rows)
         show_row_numbers = getattr(frame_config, 'show_row_numbers', False)
         self.show_row_numbers.setCurrentText("Yes" if show_row_numbers else "No")
         self.show_row_gridlines.setCurrentText("Yes" if frame_config.horizontal_gridlines else "No")
@@ -158,11 +158,10 @@ class LayoutTab(BaseTab):
 
     def _sync_data_impl(self):
         # Validate numeric inputs - skip validation if field is empty (intermediate editing state)
-        # Note: QSpinBox handles validation automatically for margins (0-300 range), so no need for manual validation
+        # Note: QSpinBox handles validation automatically for margins (0-300 range) and num_rows (0-200 range), so no need for manual validation
         numeric_fields = {
             "outer_width": self.outer_width.text(),
-            "outer_height": self.outer_height.text(),
-            "num_rows": self.num_rows.text()
+            "outer_height": self.outer_height.text()
         }
 
         for field_name, value in numeric_fields.items():
@@ -185,6 +184,7 @@ class LayoutTab(BaseTab):
             self.margin_left.value(),
             self.margin_right.value()
         )
-        self.project_data.frame_config.num_rows = int(self.num_rows.text()) if self.num_rows.text().strip() else frame_config.num_rows
+        # Number of rows from QSpinBox (no need to check for empty since spinbox always has a value)
+        self.project_data.frame_config.num_rows = self.num_rows.value()
         self.project_data.frame_config.show_row_numbers = self.show_row_numbers.currentText() == "Yes"
         self.project_data.frame_config.horizontal_gridlines = self.show_row_gridlines.currentText() == "Yes"
