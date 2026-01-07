@@ -367,6 +367,11 @@ class LinksTab(BaseTab):
         finally:
             self.links_table.blockSignals(False)
         
+        # Re-populate detail form if a row is currently selected
+        # This ensures the detail form is enabled when a new link becomes valid
+        if self._selected_row is not None and self._selected_row < self.links_table.rowCount():
+            self._populate_detail_form(self._selected_row)
+        
         # Don't emit data_updated here - chart will update when user clicks "Update Chart" button
         # This matches the behavior of the tasks tab
     
