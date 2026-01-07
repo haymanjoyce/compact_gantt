@@ -1,5 +1,5 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QGridLayout, QGroupBox, QLineEdit, 
-                           QLabel, QMessageBox, QComboBox)
+                           QLabel, QMessageBox, QComboBox, QSpinBox)
 from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtGui import QIntValidator
 from typing import Dict, Any, Tuple
@@ -111,14 +111,15 @@ class LayoutTab(BaseTab):
         # Create margin inputs
         margin_labels = ["Top:", "Bottom:", "Left:", "Right:"]
         self.margin_inputs = []
-        validator = QIntValidator(0, 999999, self)  # Create validator once for all margins
         for i, label_text in enumerate(margin_labels):
             label = QLabel(label_text)
             label.setFixedWidth(label_width)
-            input_field = QLineEdit("10")
+            input_field = QSpinBox()
+            input_field.setMinimum(0)
+            input_field.setMaximum(300)
+            input_field.setValue(10)
+            input_field.setSuffix(" px")
             input_field.setToolTip(f"{label_text.strip(':')} margin in pixels")
-            # Add validator to only allow non-negative integers
-            input_field.setValidator(validator)
             layout.addWidget(label, i, 0)
             layout.addWidget(input_field, i, 1)
             self.margin_inputs.append(input_field)
@@ -135,7 +136,7 @@ class LayoutTab(BaseTab):
         self.show_row_numbers.currentTextChanged.connect(self._sync_data_if_not_initializing)
         self.show_row_gridlines.currentTextChanged.connect(self._sync_data_if_not_initializing)
         for margin in self.margin_inputs:
-            margin.textChanged.connect(self._sync_data_if_not_initializing)
+            margin.valueChanged.connect(self._sync_data_if_not_initializing)
 
     def _load_initial_data_impl(self):
         frame_config = self.project_data.frame_config
@@ -150,21 +151,18 @@ class LayoutTab(BaseTab):
 
         # Load Margins
         margins = frame_config.margins
-        self.margin_top.setText(str(margins[0]))
-        self.margin_bottom.setText(str(margins[1]))
-        self.margin_left.setText(str(margins[2]))
-        self.margin_right.setText(str(margins[3]))
+        self.margin_top.setValue(margins[0])
+        self.margin_bottom.setValue(margins[1])
+        self.margin_left.setValue(margins[2])
+        self.margin_right.setValue(margins[3])
 
     def _sync_data_impl(self):
         # Validate numeric inputs - skip validation if field is empty (intermediate editing state)
+        # Note: QSpinBox handles validation automatically for margins (0-300 range), so no need for manual validation
         numeric_fields = {
             "outer_width": self.outer_width.text(),
             "outer_height": self.outer_height.text(),
-            "num_rows": self.num_rows.text(),
-            "margin_top": self.margin_top.text(),
-            "margin_bottom": self.margin_bottom.text(),
-            "margin_left": self.margin_left.text(),
-            "margin_right": self.margin_right.text()
+            "num_rows": self.num_rows.text()
         }
 
         for field_name, value in numeric_fields.items():
@@ -180,11 +178,12 @@ class LayoutTab(BaseTab):
         frame_config = self.project_data.frame_config
         self.project_data.frame_config.outer_width = int(self.outer_width.text()) if self.outer_width.text().strip() else frame_config.outer_width
         self.project_data.frame_config.outer_height = int(self.outer_height.text()) if self.outer_height.text().strip() else frame_config.outer_height
+        # Margins from QSpinBox (no need to check for empty since spinbox always has a value)
         self.project_data.frame_config.margins = (
-            int(self.margin_top.text()) if self.margin_top.text().strip() else frame_config.margins[0],
-            int(self.margin_bottom.text()) if self.margin_bottom.text().strip() else frame_config.margins[1],
-            int(self.margin_left.text()) if self.margin_left.text().strip() else frame_config.margins[2],
-            int(self.margin_right.text()) if self.margin_right.text().strip() else frame_config.margins[3]
+            self.margin_top.value(),
+            self.margin_bottom.value(),
+            self.margin_left.value(),
+            self.margin_right.value()
         )
         self.project_data.frame_config.num_rows = int(self.num_rows.text()) if self.num_rows.text().strip() else frame_config.num_rows
         self.project_data.frame_config.show_row_numbers = self.show_row_numbers.currentText() == "Yes"
