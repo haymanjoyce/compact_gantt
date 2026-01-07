@@ -55,8 +55,9 @@ class WindowsTab(BaseTab):
         x_label.setFixedWidth(label_width)
         custom_x = QSpinBox()
         custom_x.setMinimum(0)
-        custom_x.setMaximum(9999)
-        custom_x.setToolTip("X coordinate in pixels")
+        custom_x.setMaximum(50000)
+        custom_x.setSuffix(" px")
+        custom_x.setToolTip("X coordinate in pixels (window left edge position)")
         setattr(self, f"{prefix}_custom_x", custom_x)
 
         # Y position
@@ -64,8 +65,9 @@ class WindowsTab(BaseTab):
         y_label.setFixedWidth(label_width)
         custom_y = QSpinBox()
         custom_y.setMinimum(0)
-        custom_y.setMaximum(9999)
-        custom_y.setToolTip("Y coordinate in pixels")
+        custom_y.setMaximum(50000)
+        custom_y.setSuffix(" px")
+        custom_y.setToolTip("Y coordinate in pixels (window top edge position)")
         setattr(self, f"{prefix}_custom_y", custom_y)
 
         layout.addWidget(screen_label, 0, 0)
