@@ -106,7 +106,10 @@ class TimelineTab(BaseTab):
         return group
 
     def _connect_signals(self):
+        # Connect date signals with constraint updates
+        self.start_date.dateChanged.connect(self._update_date_constraints)
         self.start_date.dateChanged.connect(self._sync_data_if_not_initializing)
+        self.finish_date.dateChanged.connect(self._update_date_constraints)
         self.finish_date.dateChanged.connect(self._sync_data_if_not_initializing)
         self.show_years.stateChanged.connect(self._sync_data_if_not_initializing)
         self.show_months.stateChanged.connect(self._sync_data_if_not_initializing)
@@ -116,6 +119,19 @@ class TimelineTab(BaseTab):
         self.vertical_gridline_months.stateChanged.connect(self._sync_data_if_not_initializing)
         self.vertical_gridline_weeks.stateChanged.connect(self._sync_data_if_not_initializing)
         self.vertical_gridline_days.stateChanged.connect(self._sync_data_if_not_initializing)
+    
+    def _update_date_constraints(self):
+        """Update date constraints to prevent invalid date ranges."""
+        start_qdate = self.start_date.date()
+        finish_qdate = self.finish_date.date()
+        
+        # Set finish date minimum to start date + 1 day
+        min_finish_date = start_qdate.addDays(1)
+        self.finish_date.setMinimumDate(min_finish_date)
+        
+        # Set start date maximum to finish date - 1 day
+        max_start_date = finish_qdate.addDays(-1)
+        self.start_date.setMaximumDate(max_start_date)
 
     def _load_initial_data_impl(self):
         frame_config = self.project_data.frame_config
@@ -137,14 +153,30 @@ class TimelineTab(BaseTab):
         try:
             start_dt = datetime.strptime(start_date_str, "%Y-%m-%d")
             finish_dt = datetime.strptime(finish_date_str, "%Y-%m-%d")
-            self.start_date.setDate(QDate(start_dt.year, start_dt.month, start_dt.day))
-            self.finish_date.setDate(QDate(finish_dt.year, finish_dt.month, finish_dt.day))
+            start_qdate = QDate(start_dt.year, start_dt.month, start_dt.day)
+            finish_qdate = QDate(finish_dt.year, finish_dt.month, finish_dt.day)
+            
+            # Set dates (block signals temporarily to avoid constraint updates during initial load)
+            self.start_date.blockSignals(True)
+            self.finish_date.blockSignals(True)
+            self.start_date.setDate(start_qdate)
+            self.finish_date.setDate(finish_qdate)
+            self.start_date.blockSignals(False)
+            self.finish_date.blockSignals(False)
+            
+            # Update constraints after setting dates
+            self._update_date_constraints()
         except ValueError:
             # Fallback to defaults if parsing fails
             default_start = QDate(2024, 12, 30)
             default_finish = QDate(2025, 1, 29)
+            self.start_date.blockSignals(True)
+            self.finish_date.blockSignals(True)
             self.start_date.setDate(default_start)
             self.finish_date.setDate(default_finish)
+            self.start_date.blockSignals(False)
+            self.finish_date.blockSignals(False)
+            self._update_date_constraints()
 
         # Load Scales
         self.show_years.setChecked(getattr(frame_config, 'show_years', True))
