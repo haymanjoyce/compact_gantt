@@ -1633,6 +1633,9 @@ class GanttChartService(QObject):
             # Note: Qt font metrics may measure text wider than SVG renders,
             # so we add a small correction factor to account for this mismatch
             padding = 2
+            # Font metrics correction: Qt and SVG font rendering scale proportionately with font size,
+            # so a fixed factor (1.2) works across all font sizes. This accounts for the consistent
+            # difference between Qt's QFontMetrics measurement and SVG's actual text rendering.
             font_metrics_correction = 1.2  # Adjust if SVG renders more compactly than Qt measures
             available_width = max(1, (note.width - (2 * padding)) * font_metrics_correction)
             logging.debug(f"Note width: {note.width}, padding: {padding}, available_width: {available_width} (with {font_metrics_correction}x correction)")
