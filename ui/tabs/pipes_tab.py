@@ -1,12 +1,12 @@
 from PyQt5.QtWidgets import (QWidget, QTableWidget, QVBoxLayout, QPushButton, 
                            QHBoxLayout, QHeaderView, QTableWidgetItem, 
-                           QMessageBox, QGroupBox, QSizePolicy, QComboBox, QLabel, QGridLayout)
-from PyQt5.QtCore import Qt, pyqtSignal
+                           QMessageBox, QGroupBox, QSizePolicy, QComboBox, QLabel, QGridLayout, QDateEdit)
+from PyQt5.QtCore import Qt, pyqtSignal, QDate
 from PyQt5.QtGui import QBrush, QColor
 from typing import List, Dict, Any, Optional
 import logging
 from datetime import datetime
-from ui.table_utils import NumericTableWidgetItem, add_row, remove_row, CheckBoxWidget, DateTableWidgetItem
+from ui.table_utils import NumericTableWidgetItem, add_row, remove_row, CheckBoxWidget, DateTableWidgetItem, DateEditWidget
 from .base_tab import BaseTab
 from models.pipe import Pipe
 from utils.conversion import safe_int, display_to_internal_date, internal_to_display_date, normalize_display_date
@@ -222,23 +222,26 @@ class PipesTab(BaseTab):
             if col_name == "ID":
                 return
             
-            # Update UserRole for date columns - use normalize_display_date for flexible formats
+            # Skip date column - QDateEdit widget handles its own changes via dateChanged signal
             if col_name == "Date":
+                # Check if this is actually a QDateEdit widget (shouldn't trigger itemChanged)
+                date_widget = self.pipes_table.cellWidget(row, col_idx)
+                if isinstance(date_widget, QDateEdit):
+                    # QDateEdit handles its own changes, skip processing
+                    return
+                # Fallback: if it's a text item (backward compatibility), process it
                 try:
                     val_str = item.text().strip()
                     if val_str:
                         try:
-                            # Use normalize_display_date to handle flexible formats
                             normalized = normalize_display_date(val_str)
                             date_obj = datetime.strptime(normalized, "%d/%m/%Y")
                             item.setData(Qt.UserRole, date_obj)
                         except ValueError:
-                            # Invalid date format - set UserRole to None
                             item.setData(Qt.UserRole, None)
                     else:
                         item.setData(Qt.UserRole, None)
                 except Exception as e:
-                    # Catch any unexpected exceptions during date processing
                     logging.error(f"Error processing date in _on_item_changed: {e}")
                     item.setData(Qt.UserRole, None)
             
@@ -305,31 +308,48 @@ class PipesTab(BaseTab):
                 item.setData(Qt.UserRole, pipe.pipe_id)
                 self.pipes_table.setItem(row_idx, id_col, item)
         
-        # Update Date column
+        # Update Date column (QDateEdit widget)
         if date_col is not None:
-            date_display = internal_to_display_date(pipe.date) if pipe.date else ""
-            item = self.pipes_table.item(row_idx, date_col)
-            if item:
-                item.setText(date_display)
+            date_widget = self.pipes_table.cellWidget(row_idx, date_col)
+            if date_widget and isinstance(date_widget, QDateEdit):
+                # Update existing QDateEdit widget
+                if pipe.date:
+                    try:
+                        date_dt = datetime.strptime(pipe.date, "%Y-%m-%d")
+                        date_qdate = QDate(date_dt.year, date_dt.month, date_dt.day)
+                        date_widget.blockSignals(True)
+                        date_widget.setDate(date_qdate)
+                        date_widget.blockSignals(False)
+                    except ValueError:
+                        date_widget.blockSignals(True)
+                        date_widget.setDate(QDate.currentDate())
+                        date_widget.blockSignals(False)
+                else:
+                    date_widget.blockSignals(True)
+                    date_widget.setDate(QDate.currentDate())
+                    date_widget.blockSignals(False)
+                # Reconnect signal (disconnect first to avoid duplicates)
                 try:
-                    if date_display and date_display.strip():
-                        date_obj = datetime.strptime(date_display, "%d/%m/%Y")
-                        item.setData(Qt.UserRole, date_obj)
-                    else:
-                        item.setData(Qt.UserRole, None)
-                except (ValueError, AttributeError):
-                    item.setData(Qt.UserRole, None)
+                    date_widget.dateChanged.disconnect()
+                except:
+                    pass
+                if hasattr(self, '_sync_data_if_not_initializing'):
+                    date_widget.dateChanged.connect(self._sync_data_if_not_initializing)
             else:
-                item = DateTableWidgetItem(date_display)
-                try:
-                    if date_display and date_display.strip():
-                        date_obj = datetime.strptime(date_display, "%d/%m/%Y")
-                        item.setData(Qt.UserRole, date_obj)
-                    else:
-                        item.setData(Qt.UserRole, None)
-                except (ValueError, AttributeError):
-                    item.setData(Qt.UserRole, None)
-                self.pipes_table.setItem(row_idx, date_col, item)
+                # Create QDateEdit if it doesn't exist
+                date_widget = DateEditWidget()
+                if pipe.date:
+                    try:
+                        date_dt = datetime.strptime(pipe.date, "%Y-%m-%d")
+                        date_qdate = QDate(date_dt.year, date_dt.month, date_dt.day)
+                        date_widget.setDate(date_qdate)
+                    except ValueError:
+                        date_widget.setDate(QDate.currentDate())
+                else:
+                    date_widget.setDate(QDate.currentDate())
+                if hasattr(self, '_sync_data_if_not_initializing'):
+                    date_widget.dateChanged.connect(self._sync_data_if_not_initializing)
+                self.pipes_table.setCellWidget(row_idx, date_col, date_widget)
         
         # Update Name column
         if name_col is not None:
@@ -358,15 +378,22 @@ class PipesTab(BaseTab):
             if pipe_id <= 0:
                 return None
             
-            # Extract Date (convert from display format to internal format)
-            date_item = self.pipes_table.item(row_idx, date_col)
-            if not date_item or not date_item.text().strip():
-                return None
-            try:
-                date_internal = display_to_internal_date(date_item.text())
-            except ValueError:
-                # Invalid date format - return None to skip this row
-                return None
+            # Extract Date from QDateEdit widget or fallback to text item
+            date_widget = self.pipes_table.cellWidget(row_idx, date_col)
+            if date_widget and isinstance(date_widget, QDateEdit):
+                # Read from QDateEdit widget
+                date_qdate = date_widget.date()
+                date_internal = date_qdate.toString("yyyy-MM-dd")
+            else:
+                # Fallback to text-based item (for backward compatibility)
+                date_item = self.pipes_table.item(row_idx, date_col)
+                if not date_item or not date_item.text().strip():
+                    return None
+                try:
+                    date_internal = display_to_internal_date(date_item.text())
+                except ValueError:
+                    # Invalid date format - return None to skip this row
+                    return None
             
             # Get Color from detail form if this row is selected, otherwise from existing pipe
             color = "red"

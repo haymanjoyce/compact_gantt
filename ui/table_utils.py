@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QTableWidgetItem, QComboBox, QCheckBox, QWidget, QHBoxLayout, QMessageBox, QSpinBox
+from PyQt5.QtWidgets import QTableWidgetItem, QComboBox, QCheckBox, QWidget, QHBoxLayout, QMessageBox, QSpinBox, QDateEdit
 from PyQt5.QtCore import Qt, QDate
 from PyQt5.QtGui import QBrush, QColor
 from datetime import datetime
@@ -73,6 +73,14 @@ class CheckBoxWidget(QWidget):
         layout.addWidget(self.checkbox, alignment=Qt.AlignCenter)
         self.setLayout(layout)
 
+class DateEditWidget(QDateEdit):
+    """QDateEdit widget for use in table cells with calendar popup."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setCalendarPopup(True)
+        self.setDisplayFormat("dd/MM/yyyy")
+        self.setDate(QDate.currentDate())
+
 def highlight_table_errors(table, errors):
     """
     Common function to highlight errors in table rows.
@@ -117,7 +125,7 @@ def extract_table_data(table, include_widgets=True):
     
     Args:
         table: QTableWidget to extract data from
-        include_widgets: Whether to handle widget cells (like QComboBox)
+        include_widgets: Whether to handle widget cells (like QComboBox, QDateEdit)
     
     Returns:
         List of lists containing table data
@@ -131,6 +139,9 @@ def extract_table_data(table, include_widgets=True):
                 widget = table.cellWidget(row, col)
                 if widget and isinstance(widget, QComboBox):
                     row_data.append(widget.currentText())
+                elif widget and isinstance(widget, QDateEdit):
+                    # Format date as dd/MM/yyyy for display
+                    row_data.append(widget.date().toString("dd/MM/yyyy"))
                 else:
                     item = table.item(row, col)
                     row_data.append(item.text() if item else "")
@@ -238,11 +249,14 @@ def add_row(table, table_key, table_configs, parent, id_field_name, row_index=No
                 if hasattr(parent, '_sync_data_if_not_initializing'):
                     combo.currentTextChanged.connect(parent._sync_data_if_not_initializing)
                 table.setCellWidget(row_index, col_idx, combo)
-            # Date column - check by column name for tasks table (Start Date, Finish Date)
-            elif header_text in ["Start Date", "Finish Date"]:
-                item = DateTableWidgetItem("")
-                item.setData(Qt.UserRole, None)
-                table.setItem(row_index, col_idx, item)
+            # Date column - check by column name for tasks, pipes, and curtains tables
+            elif header_text in ["Start Date", "Finish Date", "Date", "End Date"]:
+                date_edit = DateEditWidget()
+                date_edit.setDate(QDate.currentDate())  # Default to today
+                # Connect signal to sync data when date changes
+                if hasattr(parent, '_sync_data_if_not_initializing'):
+                    date_edit.dateChanged.connect(parent._sync_data_if_not_initializing)
+                table.setCellWidget(row_index, col_idx, date_edit)
             # Numeric column - check by column name for tasks table (Row) - ID handled above
             elif header_text == "Row":
                 item = NumericTableWidgetItem("1")  # Default row number

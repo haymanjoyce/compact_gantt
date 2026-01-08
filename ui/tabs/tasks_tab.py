@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import (QWidget, QTableWidget, QVBoxLayout, QPushButton, 
                            QHBoxLayout, QComboBox, QHeaderView, QTableWidgetItem, 
-                           QMessageBox, QGroupBox, QSizePolicy, QLabel, QGridLayout, QLineEdit, QSpinBox)
-from PyQt5.QtCore import Qt, pyqtSignal
+                           QMessageBox, QGroupBox, QSizePolicy, QLabel, QGridLayout, QLineEdit, QSpinBox, QDateEdit)
+from PyQt5.QtCore import Qt, pyqtSignal, QDate
 from PyQt5.QtGui import QBrush, QColor
 from typing import List, Dict, Any, Optional, Set
 from datetime import datetime
@@ -9,7 +9,7 @@ import logging
 from utils.conversion import normalize_display_date, safe_int, display_to_internal_date, internal_to_display_date
 from models import Task
 
-from ui.table_utils import NumericTableWidgetItem, DateTableWidgetItem, add_row, remove_row, CheckBoxWidget, highlight_table_errors, extract_table_data
+from ui.table_utils import NumericTableWidgetItem, DateTableWidgetItem, DateEditWidget, add_row, remove_row, CheckBoxWidget, highlight_table_errors, extract_table_data
 from .base_tab import BaseTab
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -295,28 +295,42 @@ class TasksTab(BaseTab):
             if task_id <= 0:
                 return None
             
-            # Extract dates (convert from display format to internal format)
+            # Extract dates from QDateEdit widgets or fallback to text items
             start_date_internal = ""
             start_date_conversion_failed = False
             if start_date_vis_col is not None:
-                start_date_item = self.tasks_table.item(row_idx, start_date_vis_col)
-                if start_date_item and start_date_item.text().strip():
-                    try:
-                        start_date_internal = display_to_internal_date(start_date_item.text())
-                    except ValueError:
-                        start_date_internal = ""
-                        start_date_conversion_failed = True  # Track that conversion failed
+                start_date_widget = self.tasks_table.cellWidget(row_idx, start_date_vis_col)
+                if start_date_widget and isinstance(start_date_widget, QDateEdit):
+                    # Read from QDateEdit widget
+                    start_qdate = start_date_widget.date()
+                    start_date_internal = start_qdate.toString("yyyy-MM-dd")
+                else:
+                    # Fallback to text-based item (for backward compatibility)
+                    start_date_item = self.tasks_table.item(row_idx, start_date_vis_col)
+                    if start_date_item and start_date_item.text().strip():
+                        try:
+                            start_date_internal = display_to_internal_date(start_date_item.text())
+                        except ValueError:
+                            start_date_internal = ""
+                            start_date_conversion_failed = True
             
             finish_date_internal = ""
             finish_date_conversion_failed = False
             if finish_date_vis_col is not None:
-                finish_date_item = self.tasks_table.item(row_idx, finish_date_vis_col)
-                if finish_date_item and finish_date_item.text().strip():
-                    try:
-                        finish_date_internal = display_to_internal_date(finish_date_item.text())
-                    except ValueError:
-                        finish_date_internal = ""
-                        finish_date_conversion_failed = True  # Track that conversion failed
+                finish_date_widget = self.tasks_table.cellWidget(row_idx, finish_date_vis_col)
+                if finish_date_widget and isinstance(finish_date_widget, QDateEdit):
+                    # Read from QDateEdit widget
+                    finish_qdate = finish_date_widget.date()
+                    finish_date_internal = finish_qdate.toString("yyyy-MM-dd")
+                else:
+                    # Fallback to text-based item (for backward compatibility)
+                    finish_date_item = self.tasks_table.item(row_idx, finish_date_vis_col)
+                    if finish_date_item and finish_date_item.text().strip():
+                        try:
+                            finish_date_internal = display_to_internal_date(finish_date_item.text())
+                        except ValueError:
+                            finish_date_internal = ""
+                            finish_date_conversion_failed = True
             
             # Auto-populate missing date field for milestones (if only one date is provided)
             # Only auto-populate if the field was actually empty (not if conversion failed)
@@ -432,57 +446,94 @@ class TasksTab(BaseTab):
                     item = QTableWidgetItem(task.task_name)
                     self.tasks_table.setItem(row_idx, name_vis_col, item)
             
-            # Update Start Date column
+            # Update Start Date column (QDateEdit widget)
             if start_date_vis_col is not None:
-                start_date_display = internal_to_display_date(task.start_date)
-                item = self.tasks_table.item(row_idx, start_date_vis_col)
-                if item:
-                    item.setText(start_date_display)
+                date_widget = self.tasks_table.cellWidget(row_idx, start_date_vis_col)
+                if date_widget and isinstance(date_widget, QDateEdit):
+                    # Update existing QDateEdit widget
+                    if task.start_date:
+                        try:
+                            start_dt = datetime.strptime(task.start_date, "%Y-%m-%d")
+                            start_qdate = QDate(start_dt.year, start_dt.month, start_dt.day)
+                            date_widget.blockSignals(True)
+                            date_widget.setDate(start_qdate)
+                            date_widget.blockSignals(False)
+                        except ValueError:
+                            date_widget.blockSignals(True)
+                            date_widget.setDate(QDate.currentDate())
+                            date_widget.blockSignals(False)
+                    else:
+                        date_widget.blockSignals(True)
+                        date_widget.setDate(QDate.currentDate())
+                        date_widget.blockSignals(False)
+                    # Reconnect signals (disconnect first to avoid duplicates)
                     try:
-                        if start_date_display and start_date_display.strip():
-                            date_obj = datetime.strptime(start_date_display, "%d/%m/%Y")
-                            item.setData(Qt.UserRole, date_obj)
-                        else:
-                            item.setData(Qt.UserRole, None)
-                    except (ValueError, AttributeError):
-                        item.setData(Qt.UserRole, None)
+                        date_widget.dateChanged.disconnect()
+                    except:
+                        pass
+                    date_widget.dateChanged.connect(lambda: self._update_task_date_constraints(row_idx))
+                    date_widget.dateChanged.connect(self._sync_data_if_not_initializing)
                 else:
-                    item = DateTableWidgetItem(start_date_display)
-                    try:
-                        if start_date_display and start_date_display.strip():
-                            date_obj = datetime.strptime(start_date_display, "%d/%m/%Y")
-                            item.setData(Qt.UserRole, date_obj)
-                        else:
-                            item.setData(Qt.UserRole, None)
-                    except (ValueError, AttributeError):
-                        item.setData(Qt.UserRole, None)
-                    self.tasks_table.setItem(row_idx, start_date_vis_col, item)
+                    # Create QDateEdit if it doesn't exist
+                    date_widget = DateEditWidget()
+                    if task.start_date:
+                        try:
+                            start_dt = datetime.strptime(task.start_date, "%Y-%m-%d")
+                            start_qdate = QDate(start_dt.year, start_dt.month, start_dt.day)
+                            date_widget.setDate(start_qdate)
+                        except ValueError:
+                            date_widget.setDate(QDate.currentDate())
+                    else:
+                        date_widget.setDate(QDate.currentDate())
+                    date_widget.dateChanged.connect(lambda: self._update_task_date_constraints(row_idx))
+                    date_widget.dateChanged.connect(self._sync_data_if_not_initializing)
+                    self.tasks_table.setCellWidget(row_idx, start_date_vis_col, date_widget)
             
-            # Update Finish Date column
+            # Update Finish Date column (QDateEdit widget)
             if finish_date_vis_col is not None:
-                finish_date_display = internal_to_display_date(task.finish_date)
-                item = self.tasks_table.item(row_idx, finish_date_vis_col)
-                if item:
-                    item.setText(finish_date_display)
+                date_widget = self.tasks_table.cellWidget(row_idx, finish_date_vis_col)
+                if date_widget and isinstance(date_widget, QDateEdit):
+                    # Update existing QDateEdit widget
+                    if task.finish_date:
+                        try:
+                            finish_dt = datetime.strptime(task.finish_date, "%Y-%m-%d")
+                            finish_qdate = QDate(finish_dt.year, finish_dt.month, finish_dt.day)
+                            date_widget.blockSignals(True)
+                            date_widget.setDate(finish_qdate)
+                            date_widget.blockSignals(False)
+                        except ValueError:
+                            date_widget.blockSignals(True)
+                            date_widget.setDate(QDate.currentDate())
+                            date_widget.blockSignals(False)
+                    else:
+                        date_widget.blockSignals(True)
+                        date_widget.setDate(QDate.currentDate())
+                        date_widget.blockSignals(False)
+                    # Reconnect signals (disconnect first to avoid duplicates)
                     try:
-                        if finish_date_display and finish_date_display.strip():
-                            date_obj = datetime.strptime(finish_date_display, "%d/%m/%Y")
-                            item.setData(Qt.UserRole, date_obj)
-                        else:
-                            item.setData(Qt.UserRole, None)
-                    except (ValueError, AttributeError):
-                        item.setData(Qt.UserRole, None)
+                        date_widget.dateChanged.disconnect()
+                    except:
+                        pass
+                    date_widget.dateChanged.connect(lambda: self._update_task_date_constraints(row_idx))
+                    date_widget.dateChanged.connect(self._sync_data_if_not_initializing)
                 else:
-                    item = DateTableWidgetItem(finish_date_display)
-                    try:
-                        if finish_date_display and finish_date_display.strip():
-                            date_obj = datetime.strptime(finish_date_display, "%d/%m/%Y")
-                            item.setData(Qt.UserRole, date_obj)
-                        else:
-                            item.setData(Qt.UserRole, None)
-                    except (ValueError, AttributeError):
-                        item.setData(Qt.UserRole, None)
-                    self.tasks_table.setItem(row_idx, finish_date_vis_col, item)
+                    # Create QDateEdit if it doesn't exist
+                    date_widget = DateEditWidget()
+                    if task.finish_date:
+                        try:
+                            finish_dt = datetime.strptime(task.finish_date, "%Y-%m-%d")
+                            finish_qdate = QDate(finish_dt.year, finish_dt.month, finish_dt.day)
+                            date_widget.setDate(finish_qdate)
+                        except ValueError:
+                            date_widget.setDate(QDate.currentDate())
+                    else:
+                        date_widget.setDate(QDate.currentDate())
+                    date_widget.dateChanged.connect(lambda: self._update_task_date_constraints(row_idx))
+                    date_widget.dateChanged.connect(self._sync_data_if_not_initializing)
+                    self.tasks_table.setCellWidget(row_idx, finish_date_vis_col, date_widget)
+            
+            # Update date constraints after setting both dates
+            self._update_task_date_constraints(row_idx)
             
             # Update Valid column (calculate valid status)
             if valid_vis_col is not None:
@@ -500,6 +551,35 @@ class TasksTab(BaseTab):
                     self.tasks_table.setItem(row_idx, valid_vis_col, item)
         finally:
             self.tasks_table.blockSignals(was_blocked)
+    
+    def _update_task_date_constraints(self, row_idx: int):
+        """Update date constraints for a task row to prevent invalid date ranges."""
+        start_date_col = self._get_column_index("Start Date")
+        finish_date_col = self._get_column_index("Finish Date")
+        
+        if start_date_col is None or finish_date_col is None:
+            return
+        
+        start_date_vis_col = self._reverse_column_mapping.get(start_date_col)
+        finish_date_vis_col = self._reverse_column_mapping.get(finish_date_col)
+        
+        if start_date_vis_col is None or finish_date_vis_col is None:
+            return
+        
+        start_widget = self.tasks_table.cellWidget(row_idx, start_date_vis_col)
+        finish_widget = self.tasks_table.cellWidget(row_idx, finish_date_vis_col)
+        
+        if not isinstance(start_widget, QDateEdit) or not isinstance(finish_widget, QDateEdit):
+            return
+        
+        start_qdate = start_widget.date()
+        finish_qdate = finish_widget.date()
+        
+        # Set finish date minimum to start date
+        finish_widget.setMinimumDate(start_qdate)
+        
+        # Set start date maximum to finish date
+        start_widget.setMaximumDate(finish_qdate)
     
     def _on_item_changed(self, item):
         """Handle item changes - update UserRole for numeric and date columns to maintain proper sorting."""
@@ -543,9 +623,17 @@ class TasksTab(BaseTab):
             col_name = headers[actual_col_idx] if actual_col_idx < len(headers) else ""
             logging.debug(f"_on_item_changed: col_name={col_name}, actual_col_idx={actual_col_idx}")
             
-            # Update UserRole for date columns (Start Date, Finish Date)
+            # Skip date columns - QDateEdit widgets handle their own changes via dateChanged signal
             if col_name in ["Start Date", "Finish Date"]:
-                logging.debug(f"_on_item_changed: Processing date column: {col_name}")
+                # Check if this is actually a QDateEdit widget (shouldn't trigger itemChanged)
+                # But handle gracefully if it does
+                date_widget = self.tasks_table.cellWidget(row, actual_col_idx)
+                if isinstance(date_widget, QDateEdit):
+                    # QDateEdit handles its own changes, skip processing
+                    logging.debug(f"_on_item_changed: Skipping date column {col_name} (handled by QDateEdit)")
+                    return
+                # Fallback: if it's a text item (backward compatibility), process it
+                logging.debug(f"_on_item_changed: Processing date column as text item: {col_name}")
                 try:
                     val_str = item.text().strip()
                     logging.debug(f"_on_item_changed: date value='{val_str}'")
@@ -562,33 +650,37 @@ class TasksTab(BaseTab):
                             if other_col_idx is not None:
                                 other_col_vis_idx = self._reverse_column_mapping.get(other_col_idx)
                                 if other_col_vis_idx is not None:
-                                    other_date_item = self.tasks_table.item(row, other_col_vis_idx)
-                                    if other_date_item:
-                                        other_date_text = other_date_item.text().strip()
-                                        if not other_date_text:
-                                            # Other date field is empty - auto-populate it with the same date
-                                            other_date_item.setText(normalized)
-                                            other_date_item.setData(Qt.UserRole, date_obj)
-                                            logging.debug(f"_on_item_changed: Auto-populated {other_col_name} with {normalized}")
+                                    other_date_widget = self.tasks_table.cellWidget(row, other_col_vis_idx)
+                                    if isinstance(other_date_widget, QDateEdit):
+                                        # Auto-populate the other QDateEdit widget
+                                        other_qdate = QDate(date_obj.year, date_obj.month, date_obj.day)
+                                        other_date_widget.blockSignals(True)
+                                        other_date_widget.setDate(other_qdate)
+                                        other_date_widget.blockSignals(False)
+                                        logging.debug(f"_on_item_changed: Auto-populated {other_col_name} QDateEdit with {normalized}")
                                     else:
-                                        # Other date item doesn't exist - create it
-                                        other_date_item = DateTableWidgetItem(normalized)
-                                        other_date_item.setData(Qt.UserRole, date_obj)
-                                        self.tasks_table.setItem(row, other_col_vis_idx, other_date_item)
-                                        logging.debug(f"_on_item_changed: Created and auto-populated {other_col_name} with {normalized}")
+                                        # Fallback to text item
+                                        other_date_item = self.tasks_table.item(row, other_col_vis_idx)
+                                        if other_date_item:
+                                            other_date_text = other_date_item.text().strip()
+                                            if not other_date_text:
+                                                other_date_item.setText(normalized)
+                                                other_date_item.setData(Qt.UserRole, date_obj)
+                                                logging.debug(f"_on_item_changed: Auto-populated {other_col_name} with {normalized}")
+                                        else:
+                                            other_date_item = DateTableWidgetItem(normalized)
+                                            other_date_item.setData(Qt.UserRole, date_obj)
+                                            self.tasks_table.setItem(row, other_col_vis_idx, other_date_item)
+                                            logging.debug(f"_on_item_changed: Created and auto-populated {other_col_name} with {normalized}")
                         except ValueError as e:
                             logging.debug(f"_on_item_changed: Date parsing failed: {e}")
                             date_obj = None
-                            # Date is invalid - ensure validation will catch this
-                            # The invalid text remains in the cell, which will cause
-                            # _task_from_table_row() to set the date to "" when converting
                         
                         # Check if UserRole already has the same value to avoid unnecessary updates
                         current_role = item.data(Qt.UserRole)
                         if current_role != date_obj:
                             logging.debug(f"_on_item_changed: Setting UserRole with date_obj={date_obj} (was {current_role})")
                             item.setData(Qt.UserRole, date_obj)
-                            logging.debug(f"_on_item_changed: UserRole set successfully")
                         else:
                             logging.debug(f"_on_item_changed: UserRole already set to {date_obj}, skipping")
                     else:

@@ -1,12 +1,12 @@
 from PyQt5.QtWidgets import (QWidget, QTableWidget, QVBoxLayout, QPushButton, 
                            QHBoxLayout, QHeaderView, QTableWidgetItem, 
-                           QMessageBox, QGroupBox, QSizePolicy, QComboBox, QLabel, QGridLayout)
-from PyQt5.QtCore import Qt, pyqtSignal
+                           QMessageBox, QGroupBox, QSizePolicy, QComboBox, QLabel, QGridLayout, QDateEdit)
+from PyQt5.QtCore import Qt, pyqtSignal, QDate
 from PyQt5.QtGui import QBrush, QColor
 from typing import List, Dict, Any, Optional
 import logging
 from datetime import datetime
-from ui.table_utils import NumericTableWidgetItem, add_row, remove_row, CheckBoxWidget, DateTableWidgetItem
+from ui.table_utils import NumericTableWidgetItem, add_row, remove_row, CheckBoxWidget, DateTableWidgetItem, DateEditWidget
 from .base_tab import BaseTab
 from models.curtain import Curtain
 from utils.conversion import safe_int, display_to_internal_date, internal_to_display_date, normalize_display_date
@@ -218,27 +218,34 @@ class CurtainsTab(BaseTab):
             if col_name is None:
                 return
             
+            # Get row and column index
+            row = item.row()
+            col_idx = item.column()
+            
             # Don't trigger sync for ID column changes (it's read-only)
             if col_name == "ID":
                 return
             
-            # Update UserRole for date columns - use normalize_display_date for flexible formats
+            # Skip date columns - QDateEdit widgets handle their own changes via dateChanged signal
             if col_name in ["Start Date", "End Date"]:
+                # Check if this is actually a QDateEdit widget (shouldn't trigger itemChanged)
+                date_widget = self.curtains_table.cellWidget(row, col_idx)
+                if isinstance(date_widget, QDateEdit):
+                    # QDateEdit handles its own changes, skip processing
+                    return
+                # Fallback: if it's a text item (backward compatibility), process it
                 try:
                     val_str = item.text().strip()
                     if val_str:
                         try:
-                            # Use normalize_display_date to handle flexible formats
                             normalized = normalize_display_date(val_str)
                             date_obj = datetime.strptime(normalized, "%d/%m/%Y")
                             item.setData(Qt.UserRole, date_obj)
                         except ValueError:
-                            # Invalid date format - set UserRole to None
                             item.setData(Qt.UserRole, None)
                     else:
                         item.setData(Qt.UserRole, None)
                 except Exception as e:
-                    # Catch any unexpected exceptions during date processing
                     logging.error(f"Error processing date in _on_item_changed: {e}")
                     item.setData(Qt.UserRole, None)
             
@@ -306,57 +313,94 @@ class CurtainsTab(BaseTab):
                 item.setData(Qt.UserRole, curtain.curtain_id)
                 self.curtains_table.setItem(row_idx, id_col, item)
         
-        # Update Start Date column
+        # Update Start Date column (QDateEdit widget)
         if start_date_col is not None:
-            start_date_display = internal_to_display_date(curtain.start_date) if curtain.start_date else ""
-            item = self.curtains_table.item(row_idx, start_date_col)
-            if item:
-                item.setText(start_date_display)
+            date_widget = self.curtains_table.cellWidget(row_idx, start_date_col)
+            if date_widget and isinstance(date_widget, QDateEdit):
+                # Update existing QDateEdit widget
+                if curtain.start_date:
+                    try:
+                        start_dt = datetime.strptime(curtain.start_date, "%Y-%m-%d")
+                        start_qdate = QDate(start_dt.year, start_dt.month, start_dt.day)
+                        date_widget.blockSignals(True)
+                        date_widget.setDate(start_qdate)
+                        date_widget.blockSignals(False)
+                    except ValueError:
+                        date_widget.blockSignals(True)
+                        date_widget.setDate(QDate.currentDate())
+                        date_widget.blockSignals(False)
+                else:
+                    date_widget.blockSignals(True)
+                    date_widget.setDate(QDate.currentDate())
+                    date_widget.blockSignals(False)
+                # Reconnect signals (disconnect first to avoid duplicates)
                 try:
-                    if start_date_display and start_date_display.strip():
-                        date_obj = datetime.strptime(start_date_display, "%d/%m/%Y")
-                        item.setData(Qt.UserRole, date_obj)
-                    else:
-                        item.setData(Qt.UserRole, None)
-                except (ValueError, AttributeError):
-                    item.setData(Qt.UserRole, None)
+                    date_widget.dateChanged.disconnect()
+                except:
+                    pass
+                date_widget.dateChanged.connect(lambda: self._update_curtain_date_constraints(row_idx))
+                date_widget.dateChanged.connect(self._sync_data_if_not_initializing)
             else:
-                item = DateTableWidgetItem(start_date_display)
-                try:
-                    if start_date_display and start_date_display.strip():
-                        date_obj = datetime.strptime(start_date_display, "%d/%m/%Y")
-                        item.setData(Qt.UserRole, date_obj)
-                    else:
-                        item.setData(Qt.UserRole, None)
-                except (ValueError, AttributeError):
-                    item.setData(Qt.UserRole, None)
-                self.curtains_table.setItem(row_idx, start_date_col, item)
+                # Create QDateEdit if it doesn't exist
+                date_widget = DateEditWidget()
+                if curtain.start_date:
+                    try:
+                        start_dt = datetime.strptime(curtain.start_date, "%Y-%m-%d")
+                        start_qdate = QDate(start_dt.year, start_dt.month, start_dt.day)
+                        date_widget.setDate(start_qdate)
+                    except ValueError:
+                        date_widget.setDate(QDate.currentDate())
+                else:
+                    date_widget.setDate(QDate.currentDate())
+                date_widget.dateChanged.connect(lambda: self._update_curtain_date_constraints(row_idx))
+                date_widget.dateChanged.connect(self._sync_data_if_not_initializing)
+                self.curtains_table.setCellWidget(row_idx, start_date_col, date_widget)
         
-        # Update End Date column
+        # Update End Date column (QDateEdit widget)
         if end_date_col is not None:
-            end_date_display = internal_to_display_date(curtain.end_date) if curtain.end_date else ""
-            item = self.curtains_table.item(row_idx, end_date_col)
-            if item:
-                item.setText(end_date_display)
+            date_widget = self.curtains_table.cellWidget(row_idx, end_date_col)
+            if date_widget and isinstance(date_widget, QDateEdit):
+                # Update existing QDateEdit widget
+                if curtain.end_date:
+                    try:
+                        end_dt = datetime.strptime(curtain.end_date, "%Y-%m-%d")
+                        end_qdate = QDate(end_dt.year, end_dt.month, end_dt.day)
+                        date_widget.blockSignals(True)
+                        date_widget.setDate(end_qdate)
+                        date_widget.blockSignals(False)
+                    except ValueError:
+                        date_widget.blockSignals(True)
+                        date_widget.setDate(QDate.currentDate())
+                        date_widget.blockSignals(False)
+                else:
+                    date_widget.blockSignals(True)
+                    date_widget.setDate(QDate.currentDate())
+                    date_widget.blockSignals(False)
+                # Reconnect signals (disconnect first to avoid duplicates)
                 try:
-                    if end_date_display and end_date_display.strip():
-                        date_obj = datetime.strptime(end_date_display, "%d/%m/%Y")
-                        item.setData(Qt.UserRole, date_obj)
-                    else:
-                        item.setData(Qt.UserRole, None)
-                except (ValueError, AttributeError):
-                    item.setData(Qt.UserRole, None)
+                    date_widget.dateChanged.disconnect()
+                except:
+                    pass
+                date_widget.dateChanged.connect(lambda: self._update_curtain_date_constraints(row_idx))
+                date_widget.dateChanged.connect(self._sync_data_if_not_initializing)
             else:
-                item = DateTableWidgetItem(end_date_display)
-                try:
-                    if end_date_display and end_date_display.strip():
-                        date_obj = datetime.strptime(end_date_display, "%d/%m/%Y")
-                        item.setData(Qt.UserRole, date_obj)
-                    else:
-                        item.setData(Qt.UserRole, None)
-                except (ValueError, AttributeError):
-                    item.setData(Qt.UserRole, None)
-                self.curtains_table.setItem(row_idx, end_date_col, item)
+                # Create QDateEdit if it doesn't exist
+                date_widget = DateEditWidget()
+                if curtain.end_date:
+                    try:
+                        end_dt = datetime.strptime(curtain.end_date, "%Y-%m-%d")
+                        end_qdate = QDate(end_dt.year, end_dt.month, end_dt.day)
+                        date_widget.setDate(end_qdate)
+                    except ValueError:
+                        date_widget.setDate(QDate.currentDate())
+                else:
+                    date_widget.setDate(QDate.currentDate())
+                date_widget.dateChanged.connect(lambda: self._update_curtain_date_constraints(row_idx))
+                date_widget.dateChanged.connect(self._sync_data_if_not_initializing)
+                self.curtains_table.setCellWidget(row_idx, end_date_col, date_widget)
+        
+        # Update date constraints after setting both dates
+        self._update_curtain_date_constraints(row_idx)
         
         # Update Name column
         if name_col is not None:
@@ -366,6 +410,29 @@ class CurtainsTab(BaseTab):
             else:
                 item = QTableWidgetItem(curtain.name if curtain.name else "")
                 self.curtains_table.setItem(row_idx, name_col, item)
+    
+    def _update_curtain_date_constraints(self, row_idx: int):
+        """Update date constraints for a curtain row to prevent invalid date ranges."""
+        start_date_col = self._get_column_index("Start Date")
+        end_date_col = self._get_column_index("End Date")
+        
+        if start_date_col is None or end_date_col is None:
+            return
+        
+        start_widget = self.curtains_table.cellWidget(row_idx, start_date_col)
+        end_widget = self.curtains_table.cellWidget(row_idx, end_date_col)
+        
+        if not isinstance(start_widget, QDateEdit) or not isinstance(end_widget, QDateEdit):
+            return
+        
+        start_qdate = start_widget.date()
+        end_qdate = end_widget.date()
+        
+        # Set end date minimum to start date
+        end_widget.setMinimumDate(start_qdate)
+        
+        # Set start date maximum to end date
+        start_widget.setMaximumDate(end_qdate)
 
     def _curtain_from_table_row(self, row_idx: int) -> Optional[Curtain]:
         """Extract a Curtain object from a table row."""
@@ -386,25 +453,37 @@ class CurtainsTab(BaseTab):
             if curtain_id <= 0:
                 return None
             
-            # Extract Start Date (convert from display format to internal format)
-            start_date_item = self.curtains_table.item(row_idx, start_date_col)
-            if not start_date_item or not start_date_item.text().strip():
-                return None
-            try:
-                start_date_internal = display_to_internal_date(start_date_item.text())
-            except ValueError:
-                # Invalid date format - return None to skip this row
-                return None
+            # Extract Start Date from QDateEdit widget or fallback to text item
+            start_date_widget = self.curtains_table.cellWidget(row_idx, start_date_col)
+            if start_date_widget and isinstance(start_date_widget, QDateEdit):
+                # Read from QDateEdit widget
+                start_qdate = start_date_widget.date()
+                start_date_internal = start_qdate.toString("yyyy-MM-dd")
+            else:
+                # Fallback to text-based item (for backward compatibility)
+                start_date_item = self.curtains_table.item(row_idx, start_date_col)
+                if not start_date_item or not start_date_item.text().strip():
+                    return None
+                try:
+                    start_date_internal = display_to_internal_date(start_date_item.text())
+                except ValueError:
+                    return None
             
-            # Extract End Date (convert from display format to internal format)
-            end_date_item = self.curtains_table.item(row_idx, end_date_col)
-            if not end_date_item or not end_date_item.text().strip():
-                return None
-            try:
-                end_date_internal = display_to_internal_date(end_date_item.text())
-            except ValueError:
-                # Invalid date format - return None to skip this row
-                return None
+            # Extract End Date from QDateEdit widget or fallback to text item
+            end_date_widget = self.curtains_table.cellWidget(row_idx, end_date_col)
+            if end_date_widget and isinstance(end_date_widget, QDateEdit):
+                # Read from QDateEdit widget
+                end_qdate = end_date_widget.date()
+                end_date_internal = end_qdate.toString("yyyy-MM-dd")
+            else:
+                # Fallback to text-based item (for backward compatibility)
+                end_date_item = self.curtains_table.item(row_idx, end_date_col)
+                if not end_date_item or not end_date_item.text().strip():
+                    return None
+                try:
+                    end_date_internal = display_to_internal_date(end_date_item.text())
+                except ValueError:
+                    return None
             
             # Get Color from detail form if this row is selected, otherwise from existing curtain
             color = "red"
