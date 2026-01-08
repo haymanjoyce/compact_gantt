@@ -471,7 +471,7 @@ class TasksTab(BaseTab):
                         date_widget.dateChanged.disconnect()
                     except:
                         pass
-                    date_widget.dateChanged.connect(lambda: self._update_task_date_constraints(row_idx))
+                    date_widget.dateChanged.connect(lambda date, w=date_widget: self._update_task_date_constraints(widget=w))
                     date_widget.dateChanged.connect(self._sync_data_if_not_initializing)
                 else:
                     # Create QDateEdit if it doesn't exist
@@ -485,9 +485,9 @@ class TasksTab(BaseTab):
                             date_widget.setDate(QDate.currentDate())
                     else:
                         date_widget.setDate(QDate.currentDate())
-                    date_widget.dateChanged.connect(lambda: self._update_task_date_constraints(row_idx))
-                    date_widget.dateChanged.connect(self._sync_data_if_not_initializing)
-                    self.tasks_table.setCellWidget(row_idx, start_date_vis_col, date_widget)
+                date_widget.dateChanged.connect(lambda date, w=date_widget: self._update_task_date_constraints(widget=w))
+                date_widget.dateChanged.connect(self._sync_data_if_not_initializing)
+                self.tasks_table.setCellWidget(row_idx, start_date_vis_col, date_widget)
             
             # Update Finish Date column (QDateEdit widget)
             if finish_date_vis_col is not None:
@@ -514,7 +514,7 @@ class TasksTab(BaseTab):
                         date_widget.dateChanged.disconnect()
                     except:
                         pass
-                    date_widget.dateChanged.connect(lambda: self._update_task_date_constraints(row_idx))
+                    date_widget.dateChanged.connect(lambda date, w=date_widget: self._update_task_date_constraints(widget=w))
                     date_widget.dateChanged.connect(self._sync_data_if_not_initializing)
                 else:
                     # Create QDateEdit if it doesn't exist
@@ -528,12 +528,12 @@ class TasksTab(BaseTab):
                             date_widget.setDate(QDate.currentDate())
                     else:
                         date_widget.setDate(QDate.currentDate())
-                    date_widget.dateChanged.connect(lambda: self._update_task_date_constraints(row_idx))
+                    date_widget.dateChanged.connect(lambda date, w=date_widget: self._update_task_date_constraints(widget=w))
                     date_widget.dateChanged.connect(self._sync_data_if_not_initializing)
                     self.tasks_table.setCellWidget(row_idx, finish_date_vis_col, date_widget)
             
             # Update date constraints after setting both dates
-            self._update_task_date_constraints(row_idx)
+            self._update_task_date_constraints(row_idx=row_idx)
             
             # Update Valid column (calculate valid status)
             if valid_vis_col is not None:
@@ -552,8 +552,15 @@ class TasksTab(BaseTab):
         finally:
             self.tasks_table.blockSignals(was_blocked)
     
-    def _update_task_date_constraints(self, row_idx: int):
-        """Update date constraints for a task row to prevent invalid date ranges."""
+    def _update_task_date_constraints(self, widget=None, row_idx=None):
+        """Update date constraints for a task row to prevent invalid date ranges.
+        
+        For tasks: finish can be same as start (milestone) but not before start.
+        
+        Args:
+            widget: QDateEdit widget that triggered the update (optional)
+            row_idx: Row index (optional, will be found from widget if not provided)
+        """
         start_date_col = self._get_column_index("Start Date")
         finish_date_col = self._get_column_index("Finish Date")
         
@@ -566,6 +573,20 @@ class TasksTab(BaseTab):
         if start_date_vis_col is None or finish_date_vis_col is None:
             return
         
+        # Find row index if not provided
+        if row_idx is None and widget is not None:
+            # Search for the widget in the table to find its row
+            for r in range(self.tasks_table.rowCount()):
+                if (self.tasks_table.cellWidget(r, start_date_vis_col) == widget or
+                    self.tasks_table.cellWidget(r, finish_date_vis_col) == widget):
+                    row_idx = r
+                    break
+            if row_idx is None:
+                return
+        
+        if row_idx is None:
+            return
+        
         start_widget = self.tasks_table.cellWidget(row_idx, start_date_vis_col)
         finish_widget = self.tasks_table.cellWidget(row_idx, finish_date_vis_col)
         
@@ -575,11 +596,26 @@ class TasksTab(BaseTab):
         start_qdate = start_widget.date()
         finish_qdate = finish_widget.date()
         
-        # Set finish date minimum to start date
-        finish_widget.setMinimumDate(start_qdate)
+        # Block signals to prevent recursive updates
+        finish_widget.blockSignals(True)
+        start_widget.blockSignals(True)
         
-        # Set start date maximum to finish date
+        # For tasks: finish can be same as start (milestone), but not before
+        # Set constraints FIRST
+        finish_widget.setMinimumDate(start_qdate)
         start_widget.setMaximumDate(finish_qdate)
+        
+        # THEN validate and correct if dates are invalid (handles manual typing that bypasses constraints)
+        if finish_qdate < start_qdate:
+            finish_widget.setDate(start_qdate)
+            finish_qdate = start_qdate  # Update for constraint recalculation
+        
+        # Recalculate constraints with corrected dates
+        finish_widget.setMinimumDate(start_qdate)
+        start_widget.setMaximumDate(finish_qdate)
+        
+        start_widget.blockSignals(False)
+        finish_widget.blockSignals(False)
     
     def _on_item_changed(self, item):
         """Handle item changes - update UserRole for numeric and date columns to maintain proper sorting."""

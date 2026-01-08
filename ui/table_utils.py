@@ -256,6 +256,11 @@ def add_row(table, table_key, table_configs, parent, id_field_name, row_index=No
                 # Connect signal to sync data when date changes
                 if hasattr(parent, '_sync_data_if_not_initializing'):
                     date_edit.dateChanged.connect(parent._sync_data_if_not_initializing)
+                # Connect constraint updates for tasks and curtains (Start/Finish Date columns)
+                if header_text in ["Start Date", "Finish Date"] and hasattr(parent, '_update_task_date_constraints'):
+                    date_edit.dateChanged.connect(lambda date, w=date_edit: parent._update_task_date_constraints(widget=w))
+                elif header_text in ["Start Date", "End Date"] and hasattr(parent, '_update_curtain_date_constraints'):
+                    date_edit.dateChanged.connect(lambda date, w=date_edit: parent._update_curtain_date_constraints(widget=w))
                 table.setCellWidget(row_index, col_idx, date_edit)
             # Numeric column - check by column name for tasks table (Row) - ID handled above
             elif header_text == "Row":
@@ -311,6 +316,38 @@ def add_row(table, table_key, table_configs, parent, id_field_name, row_index=No
             else:
                 item = QTableWidgetItem("")
                 table.setItem(row_index, col_idx, item)
+
+        # Set initial date constraints for tasks and curtains tables
+        # This ensures constraints are active immediately when a new row is created
+        if table_key == "tasks" and hasattr(parent, '_update_task_date_constraints'):
+            # Find Start Date and Finish Date columns
+            start_date_col = None
+            finish_date_col = None
+            for col_idx in range(1, table.columnCount()):
+                header_text = table.horizontalHeaderItem(col_idx).text()
+                if header_text == "Start Date":
+                    start_date_col = col_idx
+                elif header_text == "Finish Date":
+                    finish_date_col = col_idx
+            
+            if start_date_col is not None and finish_date_col is not None:
+                # Set constraints for the new row
+                parent._update_task_date_constraints(row_idx=row_index)
+        
+        elif table_key == "curtains" and hasattr(parent, '_update_curtain_date_constraints'):
+            # Find Start Date and End Date columns
+            start_date_col = None
+            end_date_col = None
+            for col_idx in range(1, table.columnCount()):
+                header_text = table.horizontalHeaderItem(col_idx).text()
+                if header_text == "Start Date":
+                    start_date_col = col_idx
+                elif header_text == "End Date":
+                    end_date_col = col_idx
+            
+            if start_date_col is not None and end_date_col is not None:
+                # Set constraints for the new row
+                parent._update_curtain_date_constraints(row_idx=row_index)
 
         # Restore table state
         table.blockSignals(False)

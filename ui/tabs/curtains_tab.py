@@ -338,7 +338,7 @@ class CurtainsTab(BaseTab):
                     date_widget.dateChanged.disconnect()
                 except:
                     pass
-                date_widget.dateChanged.connect(lambda: self._update_curtain_date_constraints(row_idx))
+                date_widget.dateChanged.connect(lambda date, w=date_widget: self._update_curtain_date_constraints(widget=w))
                 date_widget.dateChanged.connect(self._sync_data_if_not_initializing)
             else:
                 # Create QDateEdit if it doesn't exist
@@ -352,7 +352,7 @@ class CurtainsTab(BaseTab):
                         date_widget.setDate(QDate.currentDate())
                 else:
                     date_widget.setDate(QDate.currentDate())
-                date_widget.dateChanged.connect(lambda: self._update_curtain_date_constraints(row_idx))
+                date_widget.dateChanged.connect(lambda date, w=date_widget: self._update_curtain_date_constraints(widget=w))
                 date_widget.dateChanged.connect(self._sync_data_if_not_initializing)
                 self.curtains_table.setCellWidget(row_idx, start_date_col, date_widget)
         
@@ -381,7 +381,7 @@ class CurtainsTab(BaseTab):
                     date_widget.dateChanged.disconnect()
                 except:
                     pass
-                date_widget.dateChanged.connect(lambda: self._update_curtain_date_constraints(row_idx))
+                date_widget.dateChanged.connect(lambda date, w=date_widget: self._update_curtain_date_constraints(widget=w))
                 date_widget.dateChanged.connect(self._sync_data_if_not_initializing)
             else:
                 # Create QDateEdit if it doesn't exist
@@ -395,12 +395,12 @@ class CurtainsTab(BaseTab):
                         date_widget.setDate(QDate.currentDate())
                 else:
                     date_widget.setDate(QDate.currentDate())
-                date_widget.dateChanged.connect(lambda: self._update_curtain_date_constraints(row_idx))
+                date_widget.dateChanged.connect(lambda date, w=date_widget: self._update_curtain_date_constraints(widget=w))
                 date_widget.dateChanged.connect(self._sync_data_if_not_initializing)
                 self.curtains_table.setCellWidget(row_idx, end_date_col, date_widget)
         
         # Update date constraints after setting both dates
-        self._update_curtain_date_constraints(row_idx)
+        self._update_curtain_date_constraints(row_idx=row_idx)
         
         # Update Name column
         if name_col is not None:
@@ -411,12 +411,33 @@ class CurtainsTab(BaseTab):
                 item = QTableWidgetItem(curtain.name if curtain.name else "")
                 self.curtains_table.setItem(row_idx, name_col, item)
     
-    def _update_curtain_date_constraints(self, row_idx: int):
-        """Update date constraints for a curtain row to prevent invalid date ranges."""
+    def _update_curtain_date_constraints(self, widget=None, row_idx=None):
+        """Update date constraints for a curtain row to prevent invalid date ranges.
+        
+        For curtains: finish must come after start (like timeframe fields).
+        
+        Args:
+            widget: QDateEdit widget that triggered the update (optional)
+            row_idx: Row index (optional, will be found from widget if not provided)
+        """
         start_date_col = self._get_column_index("Start Date")
         end_date_col = self._get_column_index("End Date")
         
         if start_date_col is None or end_date_col is None:
+            return
+        
+        # Find row index if not provided
+        if row_idx is None and widget is not None:
+            # Search for the widget in the table to find its row
+            for r in range(self.curtains_table.rowCount()):
+                if (self.curtains_table.cellWidget(r, start_date_col) == widget or
+                    self.curtains_table.cellWidget(r, end_date_col) == widget):
+                    row_idx = r
+                    break
+            if row_idx is None:
+                return
+        
+        if row_idx is None:
             return
         
         start_widget = self.curtains_table.cellWidget(row_idx, start_date_col)
@@ -428,11 +449,30 @@ class CurtainsTab(BaseTab):
         start_qdate = start_widget.date()
         end_qdate = end_widget.date()
         
-        # Set end date minimum to start date
-        end_widget.setMinimumDate(start_qdate)
+        # Block signals to prevent recursive updates
+        end_widget.blockSignals(True)
+        start_widget.blockSignals(True)
         
-        # Set start date maximum to end date
-        start_widget.setMaximumDate(end_qdate)
+        # For curtains: finish must come after start (like timeframe fields)
+        # Set constraints FIRST
+        min_end_date = start_qdate.addDays(1)
+        end_widget.setMinimumDate(min_end_date)
+        max_start_date = end_qdate.addDays(-1)
+        start_widget.setMaximumDate(max_start_date)
+        
+        # THEN validate and correct if dates are invalid (handles manual typing that bypasses constraints)
+        if end_qdate <= start_qdate:
+            end_widget.setDate(min_end_date)
+            end_qdate = min_end_date  # Update for constraint recalculation
+        
+        # Recalculate constraints with corrected dates
+        min_end_date = start_qdate.addDays(1)
+        end_widget.setMinimumDate(min_end_date)
+        max_start_date = end_qdate.addDays(-1)
+        start_widget.setMaximumDate(max_start_date)
+        
+        start_widget.blockSignals(False)
+        end_widget.blockSignals(False)
 
     def _curtain_from_table_row(self, row_idx: int) -> Optional[Curtain]:
         """Extract a Curtain object from a table row."""
