@@ -1013,57 +1013,114 @@ class GanttChartService(QObject):
             successor_above = to_task["row_num"] < from_task["row_num"]
             link_goes_right = to_center_x > from_center_x
             
-            # Calculate connection points for milestones based on link direction
+            # Calculate connection points for milestones based on link direction AND routing type
             # For circles, connection points are on the circumference
             if from_is_milestone:
-                # Origin (From Milestone): choose point on circle circumference based on link direction
                 from_center_x = (from_task["x_start"] + from_task["x_end"]) / 2
                 from_center_y = from_task["y_center"]
                 milestone_radius = milestone_half_size  # Circle radius
                 
-                if same_row and link_goes_right:
-                    # Link goes rightward - use rightmost point on circle
+                if link_routing == "HV":
+                    # HV routing: always use right side midpoint for origin (horizontal first)
                     origin_x = from_center_x + milestone_radius
                     origin_y = from_center_y
-                elif successor_below:
-                    # Link goes downward - use bottommost point on circle
-                    origin_x = from_center_x
-                    origin_y = from_center_y + milestone_radius
-                elif successor_above:
-                    # Link goes upward - use topmost point on circle
-                    origin_x = from_center_x
-                    origin_y = from_center_y - milestone_radius
+                elif link_routing == "VH":
+                    # VH routing: use top/bottom based on successor position (vertical first)
+                    if successor_below:
+                        # Successor below - use bottom
+                        origin_x = from_center_x
+                        origin_y = from_center_y + milestone_radius
+                    elif successor_above:
+                        # Successor above - use top
+                        origin_x = from_center_x
+                        origin_y = from_center_y - milestone_radius
+                    else:
+                        # Same row - use right side (fallback)
+                        origin_x = from_center_x + milestone_radius
+                        origin_y = from_center_y
                 else:
-                    # Fallback to center (shouldn't happen in FS dependencies)
-                    origin_x = from_center_x
-                    origin_y = from_center_y
+                    # Auto routing: use existing logic (right/bottom/top based on direction)
+                    if same_row and link_goes_right:
+                        # Link goes rightward - use rightmost point on circle
+                        origin_x = from_center_x + milestone_radius
+                        origin_y = from_center_y
+                    elif successor_below:
+                        # Link goes downward - use bottommost point on circle
+                        origin_x = from_center_x
+                        origin_y = from_center_y + milestone_radius
+                    elif successor_above:
+                        # Link goes upward - use topmost point on circle
+                        origin_x = from_center_x
+                        origin_y = from_center_y - milestone_radius
+                    else:
+                        # Fallback to center (shouldn't happen in FS dependencies)
+                        origin_x = from_center_x
+                        origin_y = from_center_y
             else:
                 # Regular task: use right edge
                 origin_x = from_task["x_end"]
                 origin_y = from_task["y_center"]
             
             if to_is_milestone:
-                # Termination (To Milestone): choose point on circle circumference based on link approach direction
+                # Termination (To Milestone): choose point on circle circumference based on routing type and approach direction
                 to_center_x = (to_task["x_start"] + to_task["x_end"]) / 2
                 to_center_y = to_task["y_center"]
                 milestone_radius = milestone_half_size  # Circle radius
                 
-                if same_row and link_goes_right:
-                    # Link approaches from left - use leftmost point on circle
-                    term_x = to_center_x - milestone_radius
-                    term_y = to_center_y
-                elif successor_below:
-                    # Link approaches from above - use topmost point on circle
-                    term_x = to_center_x
-                    term_y = to_center_y - milestone_radius
-                elif successor_above:
-                    # Link approaches from below - use bottommost point on circle
-                    term_x = to_center_x
-                    term_y = to_center_y + milestone_radius
+                if link_routing == "HV":
+                    # HV routing: use top/bottom/left based on approach direction
+                    if same_row and link_goes_right:
+                        # Horizontal approach - use left side
+                        term_x = to_center_x - milestone_radius
+                        term_y = to_center_y
+                    elif successor_below:
+                        # Vertical approach from above - use top
+                        term_x = to_center_x
+                        term_y = to_center_y - milestone_radius
+                    elif successor_above:
+                        # Vertical approach from below - use bottom
+                        term_x = to_center_x
+                        term_y = to_center_y + milestone_radius
+                    else:
+                        # Fallback to center
+                        term_x = to_center_x
+                        term_y = to_center_y
+                elif link_routing == "VH":
+                    # VH routing: use left side for horizontal approach, top/bottom for vertical
+                    if same_row or link_goes_right:
+                        # Horizontal approach - use left side
+                        term_x = to_center_x - milestone_radius
+                        term_y = to_center_y
+                    elif successor_below:
+                        # Vertical approach from above - use top
+                        term_x = to_center_x
+                        term_y = to_center_y - milestone_radius
+                    elif successor_above:
+                        # Vertical approach from below - use bottom
+                        term_x = to_center_x
+                        term_y = to_center_y + milestone_radius
+                    else:
+                        # Fallback to center
+                        term_x = to_center_x
+                        term_y = to_center_y
                 else:
-                    # Fallback to center (shouldn't happen in FS dependencies)
-                    term_x = to_center_x
-                    term_y = to_center_y
+                    # Auto routing: use existing logic
+                    if same_row and link_goes_right:
+                        # Link approaches from left - use leftmost point on circle
+                        term_x = to_center_x - milestone_radius
+                        term_y = to_center_y
+                    elif successor_below:
+                        # Link approaches from above - use topmost point on circle
+                        term_x = to_center_x
+                        term_y = to_center_y - milestone_radius
+                    elif successor_above:
+                        # Link approaches from below - use bottommost point on circle
+                        term_x = to_center_x
+                        term_y = to_center_y + milestone_radius
+                    else:
+                        # Fallback to center (shouldn't happen in FS dependencies)
+                        term_x = to_center_x
+                        term_y = to_center_y
             else:
                 # Regular task: use left edge
                 term_x = to_task["x_start"]
