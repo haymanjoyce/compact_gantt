@@ -133,7 +133,7 @@ class MainWindow(QMainWindow):
         self.typography_tab = TypographyTab(self.project_data, self.app_config)
 
     def _add_all_tabs(self):
-        """Add all tabs to the tab widget in default order."""
+        """Add all tabs to the tab widget in saved order (or default if no saved order)."""
         # Create a mapping of tab names to tab widgets for easy lookup
         self._tab_map = {
             "Windows": self.windows_tab,
@@ -149,12 +149,26 @@ class MainWindow(QMainWindow):
             "Typography": self.typography_tab,
         }
         
-        # Add all tabs in default order (will be reordered by _restore_tab_order if needed)
-        for tab_name, tab_widget in self._tab_map.items():
-            self.tab_widget.addTab(tab_widget, tab_name)
+        # Get saved order if available and valid
+        saved_order = self.app_config.general.window.tab_order
+        expected_tabs = set(self._tab_map.keys())
+        saved_tabs = set(saved_order)
+        
+        # Determine which order to use
+        if saved_tabs == expected_tabs:
+            # Use saved order - add tabs directly in saved order
+            tab_order = saved_order
+        else:
+            # Use default order (dictionary insertion order)
+            tab_order = list(self._tab_map.keys())
+        
+        # Add tabs in the determined order
+        for tab_name in tab_order:
+            widget = self._tab_map[tab_name]
+            self.tab_widget.addTab(widget, tab_name)
     
     def _restore_tab_order(self):
-        """Restore tab order from saved preferences."""
+        """Restore tab order from saved preferences (only needed if tabs were added in wrong order)."""
         saved_order = self.app_config.general.window.tab_order
         
         # Validate that saved order contains all expected tabs
@@ -166,16 +180,36 @@ class MainWindow(QMainWindow):
             logging.warning(f"Tab order mismatch. Expected: {expected_tabs}, Got: {saved_tabs}. Using default order.")
             return
         
-        # Reorder tabs according to saved order
-        for target_index, tab_name in enumerate(saved_order):
-            current_index = None
+        # Check if tabs are already in the correct order
+        current_order = [self.tab_widget.tabText(i) for i in range(self.tab_widget.count())]
+        if current_order == saved_order:
+            # Already in correct order, nothing to do
+            return
+        
+        # Store the current tab name (label) to restore selection after reordering
+        current_index = self.tab_widget.currentIndex()
+        current_tab_name = self.tab_widget.tabText(current_index) if current_index >= 0 else None
+        
+        # Remove all tabs explicitly (this properly unparents widgets)
+        # Using removeTab() instead of clear() ensures widgets are properly disconnected
+        while self.tab_widget.count() > 0:
+            self.tab_widget.removeTab(0)
+        
+        # Re-add tabs in saved order using the widget mapping
+        for tab_name in saved_order:
+            widget = self._tab_map[tab_name]
+            self.tab_widget.addTab(widget, tab_name)
+        
+        # Restore selection by finding the tab with the saved tab name
+        if current_tab_name:
             for i in range(self.tab_widget.count()):
-                if self.tab_widget.tabText(i) == tab_name:
-                    current_index = i
+                if self.tab_widget.tabText(i) == current_tab_name:
+                    self.tab_widget.setCurrentIndex(i)
                     break
-            
-            if current_index is not None and current_index != target_index:
-                self.tab_widget.tabBar().moveTab(current_index, target_index)
+        else:
+            # If no tab was selected, select the first one
+            if self.tab_widget.count() > 0:
+                self.tab_widget.setCurrentIndex(0)
     
     def _on_tab_moved(self, from_index: int, to_index: int):
         """Handle tab moved event - save new tab order."""
