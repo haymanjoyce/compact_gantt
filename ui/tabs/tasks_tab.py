@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import (QWidget, QTableWidget, QVBoxLayout, QPushButton,
                            QMessageBox, QGroupBox, QSizePolicy, QLabel, QGridLayout, QLineEdit, QSpinBox, QDateEdit)
 from PyQt5.QtCore import Qt, pyqtSignal, QDate
 from PyQt5.QtGui import QBrush, QColor
-from typing import List, Dict, Any, Optional, Set
+from typing import List, Dict, Any, Optional, Set, Tuple
 from datetime import datetime
 import logging
 from utils.conversion import normalize_display_date, safe_int, display_to_internal_date, internal_to_display_date
@@ -61,9 +61,9 @@ class TasksTab(BaseTab):
         table_group_layout.setSpacing(5)
         table_group_layout.setContentsMargins(5, 10, 5, 5)
         
-        # Create table - show: Select, ID, Row, Name, Start Date, Finish Date, Valid
+        # Create table - show: Select, ID, Row, Name, Start Date, Finish Date, Valid, Swimlane Order, Swimlane Name
         headers = [col.name for col in self.table_config.columns]
-        visible_columns = ["Select", "ID", "Row", "Name", "Start Date", "Finish Date", "Valid"]
+        visible_columns = ["Select", "ID", "Row", "Name", "Start Date", "Finish Date", "Valid", "Swimlane Order", "Swimlane Name"]
         visible_indices = [headers.index(col) for col in visible_columns if col in headers]
         
         self.tasks_table = QTableWidget(0, len(visible_indices))
@@ -96,6 +96,9 @@ class TasksTab(BaseTab):
         header.setSectionResizeMode(4, QHeaderView.ResizeToContents)  # Start Date
         header.setSectionResizeMode(5, QHeaderView.ResizeToContents)  # Finish Date
         header.setSectionResizeMode(6, QHeaderView.ResizeToContents)  # Valid
+        header.setSectionResizeMode(7, QHeaderView.Fixed)  # Swimlane Order
+        self.tasks_table.setColumnWidth(7, 100)
+        header.setSectionResizeMode(8, QHeaderView.ResizeToContents)  # Swimlane Name
 
         # Enable horizontal scroll bar
         self.tasks_table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
@@ -254,6 +257,111 @@ class TasksTab(BaseTab):
                 return idx
         return None
     
+    def _get_swimlane_info_for_row(self, row_number: int) -> Tuple[Optional[int], Optional[str]]:
+        """
+        Get swimlane order and name for a given row number.
+        
+        Args:
+            row_number: The row number (1-based) to find swimlane for
+            
+        Returns:
+            Tuple of (swimlane_order, swimlane_name) or (None, None) if not found
+        """
+        if not row_number or row_number < 1:
+            return (None, None)
+        
+        swimlanes = self.project_data.swimlanes
+        if not swimlanes:
+            return (None, None)
+        
+        # Calculate which swimlane contains this row
+        # Swimlanes are ordered in the list, and each spans row_count rows
+        current_first_row = 1  # 1-based
+        
+        for order, swimlane in enumerate(swimlanes, start=1):
+            first_row = current_first_row
+            last_row = current_first_row + swimlane.row_count - 1
+            
+            if first_row <= row_number <= last_row:
+                # Found the swimlane containing this row
+                swimlane_name = swimlane.title if swimlane.title else ""
+                # Truncate name if too long (e.g., 20 characters)
+                if len(swimlane_name) > 20:
+                    swimlane_name = swimlane_name[:17] + "..."
+                return (order, swimlane_name)
+            
+            current_first_row += swimlane.row_count
+        
+        # Row number is outside all swimlanes
+        return (None, None)
+    
+    def _refresh_swimlane_columns_for_row(self, row_idx: int):
+        """Refresh swimlane columns for a specific row."""
+        # Get row_number directly from the table's Row column (not from task object,
+        # since task might not be updated yet when this is called during editing)
+        row_col = self._get_column_index("Row")
+        row_vis_col = self._reverse_column_mapping.get(row_col) if row_col is not None else None
+        
+        if row_vis_col is None:
+            return
+        
+        row_item = self.tasks_table.item(row_idx, row_vis_col)
+        if row_item is None:
+            return
+        
+        # Get row_number from the table item (use UserRole if available, otherwise parse text)
+        row_number = row_item.data(Qt.UserRole)
+        if row_number is None:
+            try:
+                row_number = safe_int(row_item.text(), 1)
+            except (ValueError, AttributeError):
+                row_number = 1
+        
+        if not row_number or row_number < 1:
+            return
+        
+        swimlane_order_col = self._get_column_index("Swimlane Order")
+        swimlane_name_col = self._get_column_index("Swimlane Name")
+        
+        swimlane_order_vis_col = self._reverse_column_mapping.get(swimlane_order_col) if swimlane_order_col is not None else None
+        swimlane_name_vis_col = self._reverse_column_mapping.get(swimlane_name_col) if swimlane_name_col is not None else None
+        
+        # Get swimlane info for this row_number
+        swimlane_order, swimlane_name = self._get_swimlane_info_for_row(row_number)
+        
+        # Update Swimlane Order column
+        if swimlane_order_vis_col is not None:
+            order_text = str(swimlane_order) if swimlane_order is not None else ""
+            item = self.tasks_table.item(row_idx, swimlane_order_vis_col)
+            if item:
+                item.setText(order_text)
+                item.setFlags(item.flags() & ~Qt.ItemIsEditable)  # Make read-only
+                item.setBackground(QBrush(self.app_config.general.read_only_bg_color))  # Set background color
+            else:
+                item = QTableWidgetItem(order_text)
+                item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                item.setBackground(QBrush(self.app_config.general.read_only_bg_color))
+                self.tasks_table.setItem(row_idx, swimlane_order_vis_col, item)
+        
+        # Update Swimlane Name column
+        if swimlane_name_vis_col is not None:
+            name_text = swimlane_name if swimlane_name else ""
+            item = self.tasks_table.item(row_idx, swimlane_name_vis_col)
+            if item:
+                item.setText(name_text)
+                item.setFlags(item.flags() & ~Qt.ItemIsEditable)  # Make read-only
+                item.setBackground(QBrush(self.app_config.general.read_only_bg_color))  # Set background color
+            else:
+                item = QTableWidgetItem(name_text)
+                item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                item.setBackground(QBrush(self.app_config.general.read_only_bg_color))
+                self.tasks_table.setItem(row_idx, swimlane_name_vis_col, item)
+    
+    def _refresh_all_swimlane_columns(self):
+        """Refresh swimlane columns for all rows (useful when swimlanes are updated)."""
+        for row_idx in range(self.tasks_table.rowCount()):
+            self._refresh_swimlane_columns_for_row(row_idx)
+    
     def _task_from_table_row(self, row_idx: int) -> Optional[Task]:
         """
         Extract a Task object from a table row.
@@ -399,6 +507,8 @@ class TasksTab(BaseTab):
         name_col = self._get_column_index("Name")
         start_date_col = self._get_column_index("Start Date")
         finish_date_col = self._get_column_index("Finish Date")
+        swimlane_order_col = self._get_column_index("Swimlane Order")
+        swimlane_name_col = self._get_column_index("Swimlane Name")
         valid_col = self._get_column_index("Valid")
         
         # Map to visible column indices
@@ -407,6 +517,8 @@ class TasksTab(BaseTab):
         name_vis_col = self._reverse_column_mapping.get(name_col) if name_col is not None else None
         start_date_vis_col = self._reverse_column_mapping.get(start_date_col) if start_date_col is not None else None
         finish_date_vis_col = self._reverse_column_mapping.get(finish_date_col) if finish_date_col is not None else None
+        swimlane_order_vis_col = self._reverse_column_mapping.get(swimlane_order_col) if swimlane_order_col is not None else None
+        swimlane_name_vis_col = self._reverse_column_mapping.get(swimlane_name_col) if swimlane_name_col is not None else None
         valid_vis_col = self._reverse_column_mapping.get(valid_col) if valid_col is not None else None
         
         # Block signals to prevent recursive updates
@@ -534,6 +646,36 @@ class TasksTab(BaseTab):
             
             # Update date constraints after setting both dates
             self._update_task_date_constraints(row_idx=row_idx)
+            
+            # Update Swimlane Order column (read-only, calculated)
+            if swimlane_order_vis_col is not None:
+                swimlane_order, _ = self._get_swimlane_info_for_row(task.row_number)
+                order_text = str(swimlane_order) if swimlane_order is not None else ""
+                item = self.tasks_table.item(row_idx, swimlane_order_vis_col)
+                if item:
+                    item.setText(order_text)
+                    item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                    item.setBackground(QBrush(self.app_config.general.read_only_bg_color))
+                else:
+                    item = QTableWidgetItem(order_text)
+                    item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                    item.setBackground(QBrush(self.app_config.general.read_only_bg_color))
+                    self.tasks_table.setItem(row_idx, swimlane_order_vis_col, item)
+            
+            # Update Swimlane Name column (read-only, calculated)
+            if swimlane_name_vis_col is not None:
+                _, swimlane_name = self._get_swimlane_info_for_row(task.row_number)
+                name_text = swimlane_name if swimlane_name else ""
+                item = self.tasks_table.item(row_idx, swimlane_name_vis_col)
+                if item:
+                    item.setText(name_text)
+                    item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                    item.setBackground(QBrush(self.app_config.general.read_only_bg_color))
+                else:
+                    item = QTableWidgetItem(name_text)
+                    item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                    item.setBackground(QBrush(self.app_config.general.read_only_bg_color))
+                    self.tasks_table.setItem(row_idx, swimlane_name_vis_col, item)
             
             # Update Valid column (calculate valid status)
             if valid_vis_col is not None:
@@ -741,8 +883,12 @@ class TasksTab(BaseTab):
                 try:
                     val_str = item.text().strip()
                     item.setData(Qt.UserRole, int(val_str) if val_str else 1)
+                    # Refresh swimlane columns when row number changes
+                    self._refresh_swimlane_columns_for_row(row)
                 except (ValueError, AttributeError):
                     item.setData(Qt.UserRole, 1)
+                    # Refresh swimlane columns even if parsing failed
+                    self._refresh_swimlane_columns_for_row(row)
             
             # Don't trigger sync for Valid column changes (it's read-only and auto-calculated)
             if actual_col_idx < len(headers) and headers[actual_col_idx] != "Valid":
@@ -825,6 +971,8 @@ class TasksTab(BaseTab):
         
         # Calculate and update Valid column for all rows
         self._update_valid_column_only()
+        
+        # Swimlane columns are already populated by _update_table_row_from_task, no need to refresh
 
     def _sync_data(self):
         self._sync_data_impl()

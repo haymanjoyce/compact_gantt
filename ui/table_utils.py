@@ -211,11 +211,11 @@ def add_row(table, table_key, table_configs, parent, id_field_name, row_index=No
             header_text = table.horizontalHeaderItem(col_idx).text()
             col_config = None
             if hasattr(config, "columns"):
-                # Find the config for this column (config.columns includes "Select" at index 0)
-                try:
-                    col_config = config.columns[col_idx]
-                except (IndexError, AttributeError):
-                    pass
+                # Find the config for this column by name (not by index, since visible columns may be a subset)
+                for col in config.columns:
+                    if col.name == header_text:
+                        col_config = col
+                        break
 
             # Set ID column - use NumericTableWidgetItem for numeric sorting
             if col_idx == id_column:
@@ -299,6 +299,12 @@ def add_row(table, table_key, table_configs, parent, id_field_name, row_index=No
             # Name columns for links (From Task Name, To Task Name) - read-only text
             elif is_links_table and header_text in ["From Task Name", "To Task Name"]:
                 item = QTableWidgetItem("")
+                item.setFlags(item.flags() & ~Qt.ItemIsEditable)  # Make read-only
+                item.setBackground(QBrush(READ_ONLY_BG))  # Gray background
+                table.setItem(row_index, col_idx, item)
+            # Swimlane columns for tasks table (Swimlane Order, Swimlane Name) - read-only text
+            elif header_text in ["Swimlane Order", "Swimlane Name"]:
+                item = QTableWidgetItem("")  # Will be populated by tasks_tab
                 item.setFlags(item.flags() & ~Qt.ItemIsEditable)  # Make read-only
                 item.setBackground(QBrush(READ_ONLY_BG))  # Gray background
                 table.setItem(row_index, col_idx, item)

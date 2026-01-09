@@ -127,6 +127,7 @@ class MainWindow(QMainWindow):
         self.links_tab = LinksTab(self.project_data, self.app_config)
         self.links_tab.data_updated.connect(self._on_data_updated)
         self.swimlanes_tab = SwimlanesTab(self.project_data, self.app_config)
+        self.swimlanes_tab.data_updated.connect(self._on_swimlanes_updated)
         self.pipes_tab = PipesTab(self.project_data, self.app_config)
         self.curtains_tab = CurtainsTab(self.project_data, self.app_config)
         self.notes_tab = NotesTab(self.project_data, self.app_config)
@@ -327,8 +328,13 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Error loading Excel: {e}")
                 self.status_bar.showMessage("Error loading project from Excel")
-                logging.error(f"Error loading from Excel: {e}", exc_info=True)
-
+                logging.error(f"Error loading from Excel: {e}", exc_info=True                )
+    
+    def _on_swimlanes_updated(self, data):
+        """Handle updates from swimlanes tab - refresh swimlane columns in tasks table."""
+        if hasattr(self.tasks_tab, '_refresh_all_swimlane_columns'):
+            self.tasks_tab._refresh_all_swimlane_columns()
+    
     def _sync_all_tabs(self):
         """Sync all tabs to ensure project_data is up to date."""
         try:
@@ -425,4 +431,9 @@ class MainWindow(QMainWindow):
                     height=self.app_config.general.svg_display_height,
                     window_type="svg_display"
                 )
+    
+    def _on_swimlanes_updated(self, data):
+        """Handle updates from swimlanes tab - refresh swimlane columns in tasks table."""
+        if hasattr(self.tasks_tab, '_refresh_all_swimlane_columns'):
+            self.tasks_tab._refresh_all_swimlane_columns()
 

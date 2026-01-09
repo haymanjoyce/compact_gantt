@@ -667,6 +667,9 @@ class SwimlanesTab(BaseTab):
             # Refresh Order column after sync (in case rows were added/removed)
             self._refresh_order_column()
             
+            # Emit data_updated signal so other tabs (like Tasks) can refresh swimlane-dependent columns
+            self.data_updated.emit({})
+            
             logging.debug(f"_sync_data_impl: Sync complete")
         except Exception as e:
             # Catch any unexpected exceptions during sync
