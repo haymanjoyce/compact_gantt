@@ -1,8 +1,8 @@
 from PyQt5.QtWidgets import (QWidget, QTableWidget, QVBoxLayout, QPushButton, 
                            QHBoxLayout, QComboBox, QHeaderView, QTableWidgetItem, 
-                           QMessageBox, QGroupBox, QSizePolicy, QLabel, QGridLayout, QLineEdit, QSpinBox, QDateEdit)
-from PyQt5.QtCore import Qt, pyqtSignal, QDate
-from PyQt5.QtGui import QBrush, QColor
+                           QMessageBox, QGroupBox, QSizePolicy, QLabel, QGridLayout, QLineEdit, QSpinBox, QDateEdit, QStyledItemDelegate)
+from PyQt5.QtCore import Qt, pyqtSignal, QDate, QModelIndex
+from PyQt5.QtGui import QBrush, QColor, QPainter, QPen
 from typing import List, Dict, Any, Optional, Set, Tuple
 from datetime import datetime
 import logging
@@ -13,6 +13,45 @@ from ui.table_utils import NumericTableWidgetItem, DateTableWidgetItem, DateEdit
 from .base_tab import BaseTab
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Custom data role for marking swimlane boundary rows
+SWIMLANE_BOUNDARY_ROLE = Qt.UserRole + 100
+
+class SwimlaneDividerDelegate(QStyledItemDelegate):
+    """Delegate that draws a thicker bottom border for swimlane boundary rows."""
+    
+    def paint(self, painter, option, index):
+        # First, do the standard painting
+        super().paint(painter, option, index)
+        
+        # Check if this row is a swimlane boundary
+        # Check the current item's data role, or check the first column's item if current cell has no item
+        is_boundary = index.data(SWIMLANE_BOUNDARY_ROLE)
+        
+        # If current cell doesn't have boundary role but it's a widget cell, check the first column
+        if not is_boundary and index.column() > 0:
+            table = None
+            if hasattr(option, 'widget') and option.widget:
+                table = option.widget
+            if table and isinstance(table, QTableWidget):
+                first_col_item = table.item(index.row(), 0)
+                if first_col_item:
+                    is_boundary = first_col_item.data(SWIMLANE_BOUNDARY_ROLE)
+        
+        if is_boundary:
+            # Draw a thicker bottom border (2px, matching chart style)
+            painter.save()
+            pen = QPen(QColor("#808080"), 2)  # Gray, 2px thick
+            painter.setPen(pen)
+            
+            # Draw line at bottom of cell
+            # Drawing on all cells will create a continuous line
+            bottom = option.rect.bottom()
+            left = option.rect.left()
+            right = option.rect.right()
+            painter.drawLine(left, bottom, right, bottom)
+            
+            painter.restore()
 
 class TasksTab(BaseTab):
     data_updated = pyqtSignal(dict)
@@ -50,9 +89,21 @@ class TasksTab(BaseTab):
         duplicate_btn.setMinimumWidth(100)
         duplicate_btn.clicked.connect(self._duplicate_tasks)
         
+        move_up_btn = QPushButton("Move Up")
+        move_up_btn.setToolTip("Move selected task(s) up by one row")
+        move_up_btn.setMinimumWidth(100)
+        move_up_btn.clicked.connect(self._move_up)
+        
+        move_down_btn = QPushButton("Move Down")
+        move_down_btn.setToolTip("Move selected task(s) down by one row")
+        move_down_btn.setMinimumWidth(100)
+        move_down_btn.clicked.connect(self._move_down)
+        
         toolbar.addWidget(add_btn)
         toolbar.addWidget(remove_btn)
         toolbar.addWidget(duplicate_btn)
+        toolbar.addWidget(move_up_btn)
+        toolbar.addWidget(move_down_btn)
         toolbar.addStretch()  # Push buttons to the left
         
         # Create group box for table
@@ -83,6 +134,10 @@ class TasksTab(BaseTab):
         
         # Add bottom border to header row and gridline styling
         self.tasks_table.setStyleSheet(self.app_config.general.table_stylesheet)
+        
+        # Set custom delegate for swimlane divider rendering
+        self.swimlane_delegate = SwimlaneDividerDelegate(self.tasks_table)
+        self.tasks_table.setItemDelegate(self.swimlane_delegate)
         
         # Column sizing
         header = self.tasks_table.horizontalHeader()
@@ -361,6 +416,112 @@ class TasksTab(BaseTab):
         """Refresh swimlane columns for all rows (useful when swimlanes are updated)."""
         for row_idx in range(self.tasks_table.rowCount()):
             self._refresh_swimlane_columns_for_row(row_idx)
+        # Re-sort after swimlane changes since swimlane order affects task ordering
+        self._sort_tasks_by_swimlane_and_row()
+    
+    def _get_task_sort_key(self, task: Task) -> Tuple[int, int, int]:
+        """
+        Get sort key for task: (swimlane_order, row_number, task_id).
+        Used for sorting tasks by swimlane order, then row number, then ID.
+        """
+        swimlane_order, _ = self._get_swimlane_info_for_row(task.row_number)
+        # Use 9999 for tasks outside swimlanes (sort to end)
+        swimlane_order = swimlane_order if swimlane_order is not None else 9999
+        return (swimlane_order, task.row_number, task.task_id)
+    
+    def _sort_tasks_by_swimlane_and_row(self):
+        """Sort tasks table by swimlane order, then row number, then task ID."""
+        # Disable sorting during manual sort
+        was_sorting = self.tasks_table.isSortingEnabled()
+        self.tasks_table.setSortingEnabled(False)
+        
+        try:
+            # Store current checkbox states by task_id (for restoration after sort)
+            checkbox_states = {}
+            for row_idx in range(self.tasks_table.rowCount()):
+                checkbox_widget = self.tasks_table.cellWidget(row_idx, 0)
+                if checkbox_widget and isinstance(checkbox_widget, CheckBoxWidget):
+                    task = self._task_from_table_row(row_idx)
+                    if task is not None:
+                        checkbox_states[task.task_id] = checkbox_widget.checkbox.isChecked()
+            
+            # Get tasks from project_data and sort them
+            tasks = list(self.project_data.tasks)
+            tasks.sort(key=self._get_task_sort_key)
+            
+            # Block signals during rebuild
+            self.tasks_table.blockSignals(True)
+            
+            # Clear and repopulate in sorted order
+            self.tasks_table.setRowCount(0)
+            self.tasks_table.setRowCount(len(tasks))
+            
+            for new_row_idx, task in enumerate(tasks):
+                # Restore checkbox state
+                checkbox_widget = CheckBoxWidget()
+                if task.task_id in checkbox_states:
+                    checkbox_widget.checkbox.setChecked(checkbox_states[task.task_id])
+                self.tasks_table.setCellWidget(new_row_idx, 0, checkbox_widget)
+                
+                # Populate row from task
+                self._update_table_row_from_task(new_row_idx, task)
+            
+            self.tasks_table.blockSignals(False)
+            
+            # Mark swimlane boundaries
+            self._mark_swimlane_boundaries()
+            
+        finally:
+            # Restore sorting state
+            self.tasks_table.setSortingEnabled(was_sorting)
+    
+    def _mark_swimlane_boundaries(self):
+        """Mark rows that are the last row of each swimlane group with boundary role."""
+        # First, clear all boundary marks by storing row-level data
+        # Use the table's vertical header item data to store row-level boundary info
+        # Or use the first column's item as a row marker
+        for row_idx in range(self.tasks_table.rowCount()):
+            # Clear boundary marks from all items in the row
+            for col_idx in range(self.tasks_table.columnCount()):
+                item = self.tasks_table.item(row_idx, col_idx)
+                if item:
+                    item.setData(SWIMLANE_BOUNDARY_ROLE, False)
+        
+        if not self.project_data.swimlanes or self.tasks_table.rowCount() == 0:
+            return
+        
+        # Mark boundary rows: find the last visual row of each swimlane group
+        # Since tasks are sorted by swimlane_order, row_number, task_id,
+        # the last row of each swimlane group is the last row with that swimlane_order
+        current_swimlane_order = None
+        last_row_idx_in_swimlane = None
+        boundary_row_indices = set()
+        
+        for row_idx in range(self.tasks_table.rowCount()):
+            task = self._task_from_table_row(row_idx)
+            if task is None:
+                continue
+            
+            swimlane_order, _ = self._get_swimlane_info_for_row(task.row_number)
+            
+            # If swimlane order changed, mark the previous swimlane's last row
+            if current_swimlane_order is not None and swimlane_order != current_swimlane_order:
+                if last_row_idx_in_swimlane is not None:
+                    boundary_row_indices.add(last_row_idx_in_swimlane)
+            
+            current_swimlane_order = swimlane_order
+            last_row_idx_in_swimlane = row_idx
+        
+        # Mark the last swimlane's last row
+        if last_row_idx_in_swimlane is not None:
+            boundary_row_indices.add(last_row_idx_in_swimlane)
+        
+        # Mark all items in boundary rows
+        for row_idx in boundary_row_indices:
+            for col_idx in range(self.tasks_table.columnCount()):
+                item = self.tasks_table.item(row_idx, col_idx)
+                if item:
+                    item.setData(SWIMLANE_BOUNDARY_ROLE, True)
     
     def _task_from_table_row(self, row_idx: int) -> Optional[Task]:
         """
@@ -950,18 +1111,14 @@ class TasksTab(BaseTab):
             task = tasks[row_idx]
             self._update_table_row_from_task(row_idx, task)
         
-        # Sort by ID by default
-        headers = [col.name for col in self.table_config.columns]
-        id_col_vis_idx = None
-        for vis_idx, actual_idx in self._column_mapping.items():
-            if headers[actual_idx] == "ID":
-                id_col_vis_idx = vis_idx
-                break
-        if id_col_vis_idx is not None:
-            self.tasks_table.sortItems(id_col_vis_idx, Qt.AscendingOrder)
+        # Sort by swimlane order, row number, then ID
+        self._sort_tasks_by_swimlane_and_row()
         
         # Ensure all read-only cells have proper styling
         self._ensure_read_only_styling()
+        
+        # Mark swimlane boundaries for divider rendering
+        self._mark_swimlane_boundaries()
         
         self._initializing = False
         
@@ -1223,6 +1380,185 @@ class TasksTab(BaseTab):
         
         # Sync data to update project_data
         self._sync_data()
+    
+    def _move_up(self):
+        """Move selected task(s) up by one row (decrease row_number by 1)."""
+        # Get all checked rows
+        checked_rows = []
+        for row in range(self.tasks_table.rowCount()):
+            checkbox_widget = self.tasks_table.cellWidget(row, 0)
+            if checkbox_widget and isinstance(checkbox_widget, CheckBoxWidget):
+                if checkbox_widget.checkbox.isChecked():
+                    checked_rows.append(row)
+        
+        if not checked_rows:
+            QMessageBox.information(self, "No Selection", "Please select task(s) to move up by checking their checkboxes.")
+            return
+        
+        # Block signals and disable sorting during move
+        self.tasks_table.blockSignals(True)
+        was_sorting = self.tasks_table.isSortingEnabled()
+        self.tasks_table.setSortingEnabled(False)
+        
+        try:
+            moved_tasks = []
+            row_col = self._get_column_index("Row")
+            row_vis_col = self._reverse_column_mapping.get(row_col) if row_col is not None else None
+            
+            if row_vis_col is None:
+                return
+            
+            # Process each checked row
+            for row_idx in checked_rows:
+                task = self._task_from_table_row(row_idx)
+                if task is None:
+                    continue
+                
+                # Check if already at minimum row
+                if task.row_number <= 1:
+                    continue
+                
+                # Decrease row_number by 1
+                new_row_number = task.row_number - 1
+                
+                # Update the row number in the table
+                row_item = self.tasks_table.item(row_idx, row_vis_col)
+                if row_item:
+                    row_item.setText(str(new_row_number))
+                    row_item.setData(Qt.UserRole, new_row_number)
+                
+                # Update task object
+                task.row_number = new_row_number
+                moved_tasks.append((row_idx, task))
+            
+            if not moved_tasks:
+                QMessageBox.information(self, "Cannot Move", "Selected task(s) are already at the top (row 1).")
+                return
+            
+            # Refresh swimlane columns for moved tasks
+            for row_idx, _ in moved_tasks:
+                self._refresh_swimlane_columns_for_row(row_idx)
+            
+        finally:
+            self.tasks_table.blockSignals(False)
+            self.tasks_table.setSortingEnabled(was_sorting)
+        
+        # Sync data first to update project_data with new row_numbers
+        self._sync_data()
+        
+        # Re-sort after syncing
+        self._sort_tasks_by_swimlane_and_row()
+        
+        # Keep selection on moved tasks - find the new row index after sorting
+        if moved_tasks:
+            moved_task_ids = {task.task_id for _, task in moved_tasks}
+            id_col = self._get_column_index("ID")
+            id_vis_col = self._reverse_column_mapping.get(id_col) if id_col is not None else None
+            
+            if id_vis_col is not None:
+                for row_idx in range(self.tasks_table.rowCount()):
+                    item = self.tasks_table.item(row_idx, id_vis_col)
+                    if item:
+                        try:
+                            task_id = int(item.text())
+                            if task_id in moved_task_ids:
+                                # Restore checkbox state
+                                checkbox_widget = self.tasks_table.cellWidget(row_idx, 0)
+                                if checkbox_widget and isinstance(checkbox_widget, CheckBoxWidget):
+                                    checkbox_widget.checkbox.setChecked(True)
+                                # Select and scroll to first moved task
+                                self.tasks_table.selectRow(row_idx)
+                                self.tasks_table.scrollToItem(self.tasks_table.item(row_idx, 0))
+                                break
+                        except (ValueError, TypeError):
+                            continue
+    
+    def _move_down(self):
+        """Move selected task(s) down by one row (increase row_number by 1)."""
+        # Get all checked rows
+        checked_rows = []
+        for row in range(self.tasks_table.rowCount()):
+            checkbox_widget = self.tasks_table.cellWidget(row, 0)
+            if checkbox_widget and isinstance(checkbox_widget, CheckBoxWidget):
+                if checkbox_widget.checkbox.isChecked():
+                    checked_rows.append(row)
+        
+        if not checked_rows:
+            QMessageBox.information(self, "No Selection", "Please select task(s) to move down by checking their checkboxes.")
+            return
+        
+        # Block signals and disable sorting during move
+        self.tasks_table.blockSignals(True)
+        was_sorting = self.tasks_table.isSortingEnabled()
+        self.tasks_table.setSortingEnabled(False)
+        
+        try:
+            moved_tasks = []
+            row_col = self._get_column_index("Row")
+            row_vis_col = self._reverse_column_mapping.get(row_col) if row_col is not None else None
+            
+            if row_vis_col is None:
+                return
+            
+            # Process each checked row
+            for row_idx in checked_rows:
+                task = self._task_from_table_row(row_idx)
+                if task is None:
+                    continue
+                
+                # Increase row_number by 1 (no upper limit)
+                new_row_number = task.row_number + 1
+                
+                # Update the row number in the table
+                row_item = self.tasks_table.item(row_idx, row_vis_col)
+                if row_item:
+                    row_item.setText(str(new_row_number))
+                    row_item.setData(Qt.UserRole, new_row_number)
+                
+                # Update task object
+                task.row_number = new_row_number
+                moved_tasks.append((row_idx, task))
+            
+            if not moved_tasks:
+                return
+            
+            # Refresh swimlane columns for moved tasks
+            for row_idx, _ in moved_tasks:
+                self._refresh_swimlane_columns_for_row(row_idx)
+            
+        finally:
+            self.tasks_table.blockSignals(False)
+            self.tasks_table.setSortingEnabled(was_sorting)
+        
+        # Sync data first to update project_data with new row_numbers
+        self._sync_data()
+        
+        # Re-sort after syncing
+        self._sort_tasks_by_swimlane_and_row()
+        
+        # Keep selection on moved tasks - find the new row index after sorting
+        if moved_tasks:
+            moved_task_ids = {task.task_id for _, task in moved_tasks}
+            id_col = self._get_column_index("ID")
+            id_vis_col = self._reverse_column_mapping.get(id_col) if id_col is not None else None
+            
+            if id_vis_col is not None:
+                for row_idx in range(self.tasks_table.rowCount()):
+                    item = self.tasks_table.item(row_idx, id_vis_col)
+                    if item:
+                        try:
+                            task_id = int(item.text())
+                            if task_id in moved_task_ids:
+                                # Restore checkbox state
+                                checkbox_widget = self.tasks_table.cellWidget(row_idx, 0)
+                                if checkbox_widget and isinstance(checkbox_widget, CheckBoxWidget):
+                                    checkbox_widget.checkbox.setChecked(True)
+                                # Select and scroll to first moved task
+                                self.tasks_table.selectRow(row_idx)
+                                self.tasks_table.scrollToItem(self.tasks_table.item(row_idx, 0))
+                                break
+                        except (ValueError, TypeError):
+                            continue
 
     def _extract_row_data_from_table(self, row_idx):
         """Extract full row data from table for a given row index."""
