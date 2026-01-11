@@ -302,8 +302,8 @@ def add_row(table, table_key, table_configs, parent, id_field_name, row_index=No
                 item.setFlags(item.flags() & ~Qt.ItemIsEditable)  # Make read-only
                 item.setBackground(QBrush(READ_ONLY_BG))  # Gray background
                 table.setItem(row_index, col_idx, item)
-            # Swimlane columns for tasks table (Swimlane Order, Swimlane Name) - read-only text
-            elif header_text in ["Swimlane Order", "Swimlane Name"]:
+            # Lane column for tasks table - read-only text
+            elif header_text == "Lane":
                 item = QTableWidgetItem("")  # Will be populated by tasks_tab
                 item.setFlags(item.flags() & ~Qt.ItemIsEditable)  # Make read-only
                 item.setBackground(QBrush(READ_ONLY_BG))  # Gray background

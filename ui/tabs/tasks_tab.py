@@ -112,9 +112,9 @@ class TasksTab(BaseTab):
         table_group_layout.setSpacing(5)
         table_group_layout.setContentsMargins(5, 10, 5, 5)
         
-        # Create table - show: Select, ID, Row, Name, Start Date, Finish Date, Valid, Swimlane Order, Swimlane Name
+        # Create table - show: Select, Lane, ID, Row, Name, Start Date, Finish Date, Valid
         headers = [col.name for col in self.table_config.columns]
-        visible_columns = ["Select", "ID", "Row", "Name", "Start Date", "Finish Date", "Valid", "Swimlane Order", "Swimlane Name"]
+        visible_columns = ["Select", "Lane", "ID", "Row", "Name", "Start Date", "Finish Date", "Valid"]
         visible_indices = [headers.index(col) for col in visible_columns if col in headers]
         
         self.tasks_table = QTableWidget(0, len(visible_indices))
@@ -143,21 +143,20 @@ class TasksTab(BaseTab):
         header = self.tasks_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.Fixed)  # Select
         self.tasks_table.setColumnWidth(0, 50)
-        header.setSectionResizeMode(1, QHeaderView.Fixed)  # ID
-        self.tasks_table.setColumnWidth(1, 50)
-        header.setSectionResizeMode(2, QHeaderView.Fixed)  # Row
+        header.setSectionResizeMode(1, QHeaderView.Fixed)  # Lane
+        self.tasks_table.setColumnWidth(1, 60)
+        header.setSectionResizeMode(2, QHeaderView.Fixed)  # ID
         self.tasks_table.setColumnWidth(2, 50)
-        header.setSectionResizeMode(3, QHeaderView.Stretch)  # Name
-        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)  # Start Date
-        header.setSectionResizeMode(5, QHeaderView.ResizeToContents)  # Finish Date
-        header.setSectionResizeMode(6, QHeaderView.ResizeToContents)  # Valid
-        header.setSectionResizeMode(7, QHeaderView.Fixed)  # Swimlane Order
-        self.tasks_table.setColumnWidth(7, 100)
-        header.setSectionResizeMode(8, QHeaderView.ResizeToContents)  # Swimlane Name
+        header.setSectionResizeMode(3, QHeaderView.Fixed)  # Row
+        self.tasks_table.setColumnWidth(3, 50)
+        header.setSectionResizeMode(4, QHeaderView.Stretch)  # Name
+        header.setSectionResizeMode(5, QHeaderView.ResizeToContents)  # Start Date
+        header.setSectionResizeMode(6, QHeaderView.ResizeToContents)  # Finish Date
+        header.setSectionResizeMode(7, QHeaderView.ResizeToContents)  # Valid
 
         # Enable horizontal scroll bar
         self.tasks_table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        self.tasks_table.setSortingEnabled(True)
+        self.tasks_table.setSortingEnabled(False)  # Disable user sorting - automatic sort by Lane, Row, Finish Date
         
         # Set table size policy
         self.tasks_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -350,8 +349,16 @@ class TasksTab(BaseTab):
         # Row number is outside all swimlanes
         return (None, None)
     
+    def _truncate_tooltip_text(self, text: str, max_length: int = 50) -> str:
+        """Truncate text to max_length and add ellipsis if needed for tooltip display."""
+        if not text:
+            return ""
+        if len(text) <= max_length:
+            return text
+        return text[:max_length - 3] + "..."
+    
     def _refresh_swimlane_columns_for_row(self, row_idx: int):
-        """Refresh swimlane columns for a specific row."""
+        """Refresh Lane column for a specific row with tooltip showing swimlane name."""
         # Get row_number directly from the table's Row column (not from task object,
         # since task might not be updated yet when this is called during editing)
         row_col = self._get_column_index("Row")
@@ -375,62 +382,56 @@ class TasksTab(BaseTab):
         if not row_number or row_number < 1:
             return
         
-        swimlane_order_col = self._get_column_index("Swimlane Order")
-        swimlane_name_col = self._get_column_index("Swimlane Name")
-        
-        swimlane_order_vis_col = self._reverse_column_mapping.get(swimlane_order_col) if swimlane_order_col is not None else None
-        swimlane_name_vis_col = self._reverse_column_mapping.get(swimlane_name_col) if swimlane_name_col is not None else None
+        lane_col = self._get_column_index("Lane")
+        lane_vis_col = self._reverse_column_mapping.get(lane_col) if lane_col is not None else None
         
         # Get swimlane info for this row_number
         swimlane_order, swimlane_name = self._get_swimlane_info_for_row(row_number)
         
-        # Update Swimlane Order column
-        if swimlane_order_vis_col is not None:
+        # Update Lane column
+        if lane_vis_col is not None:
             order_text = str(swimlane_order) if swimlane_order is not None else ""
-            item = self.tasks_table.item(row_idx, swimlane_order_vis_col)
+            # Prepare tooltip text: show swimlane name (truncated if long) or "Unhomed"
+            if swimlane_name:
+                tooltip_text = self._truncate_tooltip_text(swimlane_name, 50)
+            else:
+                tooltip_text = "Unhomed"
+            
+            item = self.tasks_table.item(row_idx, lane_vis_col)
             if item:
                 item.setText(order_text)
+                item.setToolTip(tooltip_text)
                 item.setFlags(item.flags() & ~Qt.ItemIsEditable)  # Make read-only
                 item.setBackground(QBrush(self.app_config.general.read_only_bg_color))  # Set background color
             else:
                 item = QTableWidgetItem(order_text)
+                item.setToolTip(tooltip_text)
                 item.setFlags(item.flags() & ~Qt.ItemIsEditable)
                 item.setBackground(QBrush(self.app_config.general.read_only_bg_color))
-                self.tasks_table.setItem(row_idx, swimlane_order_vis_col, item)
-        
-        # Update Swimlane Name column
-        if swimlane_name_vis_col is not None:
-            name_text = swimlane_name if swimlane_name else ""
-            item = self.tasks_table.item(row_idx, swimlane_name_vis_col)
-            if item:
-                item.setText(name_text)
-                item.setFlags(item.flags() & ~Qt.ItemIsEditable)  # Make read-only
-                item.setBackground(QBrush(self.app_config.general.read_only_bg_color))  # Set background color
-            else:
-                item = QTableWidgetItem(name_text)
-                item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-                item.setBackground(QBrush(self.app_config.general.read_only_bg_color))
-                self.tasks_table.setItem(row_idx, swimlane_name_vis_col, item)
+                self.tasks_table.setItem(row_idx, lane_vis_col, item)
     
     def _refresh_all_swimlane_columns(self):
-        """Refresh swimlane columns for all rows (useful when swimlanes are updated)."""
-        for row_idx in range(self.tasks_table.rowCount()):
-            self._refresh_swimlane_columns_for_row(row_idx)
-        # Re-sort after swimlane changes since swimlane order affects task ordering
+        """Refresh Lane column for all rows (useful when swimlanes are updated)."""
+        # Re-sort after swimlane changes since lane order affects task ordering
+        # The sort will repopulate all rows via _update_table_row_from_task, which calls
+        # _refresh_swimlane_columns_for_row to set tooltips correctly
         self._sort_tasks_by_swimlane_and_row()
     
-    def _get_task_sort_key(self, task: Task) -> Tuple[int, int, int]:
+    def _get_task_sort_key(self, task: Task) -> Tuple[int, int, str]:
         """
-        Get sort key for task: (swimlane_order, row_number, task_id).
-        Used for sorting tasks by swimlane order, then row number, then ID.
+        Get sort key for task: (swimlane_order, row_number, finish_date).
+        Used for sorting tasks by swimlane order (Lane), then row number, then finish date.
+        Empty finish dates sort to the end (after valid dates).
         """
         swimlane_order, _ = self._get_swimlane_info_for_row(task.row_number)
         # Use 9999 for tasks outside swimlanes (sort to end)
         swimlane_order = swimlane_order if swimlane_order is not None else 9999
-        return (swimlane_order, task.row_number, task.task_id)
+        # Use 'ZZZZ-ZZ-ZZ' for empty finish dates to sort them to the end (after valid dates)
+        finish_date = task.finish_date if task.finish_date else "ZZZZ-ZZ-ZZ"
+        return (swimlane_order, task.row_number, finish_date)
     
     def _sort_tasks_by_swimlane_and_row(self):
-        """Sort tasks table by swimlane order, then row number, then task ID."""
+        """Sort tasks table by swimlane order (Lane), then row number, then finish date."""
         # Disable sorting during manual sort
         was_sorting = self.tasks_table.isSortingEnabled()
         self.tasks_table.setSortingEnabled(False)
@@ -668,8 +669,7 @@ class TasksTab(BaseTab):
         name_col = self._get_column_index("Name")
         start_date_col = self._get_column_index("Start Date")
         finish_date_col = self._get_column_index("Finish Date")
-        swimlane_order_col = self._get_column_index("Swimlane Order")
-        swimlane_name_col = self._get_column_index("Swimlane Name")
+        lane_col = self._get_column_index("Lane")
         valid_col = self._get_column_index("Valid")
         
         # Map to visible column indices
@@ -678,15 +678,14 @@ class TasksTab(BaseTab):
         name_vis_col = self._reverse_column_mapping.get(name_col) if name_col is not None else None
         start_date_vis_col = self._reverse_column_mapping.get(start_date_col) if start_date_col is not None else None
         finish_date_vis_col = self._reverse_column_mapping.get(finish_date_col) if finish_date_col is not None else None
-        swimlane_order_vis_col = self._reverse_column_mapping.get(swimlane_order_col) if swimlane_order_col is not None else None
-        swimlane_name_vis_col = self._reverse_column_mapping.get(swimlane_name_col) if swimlane_name_col is not None else None
+        lane_vis_col = self._reverse_column_mapping.get(lane_col) if lane_col is not None else None
         valid_vis_col = self._reverse_column_mapping.get(valid_col) if valid_col is not None else None
         
         # Block signals to prevent recursive updates
         was_blocked = self.tasks_table.signalsBlocked()
         self.tasks_table.blockSignals(True)
         try:
-            # Update ID column
+            # Update ID column (read-only)
             if id_vis_col is not None:
                 item = self.tasks_table.item(row_idx, id_vis_col)
                 if item:
@@ -808,35 +807,9 @@ class TasksTab(BaseTab):
             # Update date constraints after setting both dates
             self._update_task_date_constraints(row_idx=row_idx)
             
-            # Update Swimlane Order column (read-only, calculated)
-            if swimlane_order_vis_col is not None:
-                swimlane_order, _ = self._get_swimlane_info_for_row(task.row_number)
-                order_text = str(swimlane_order) if swimlane_order is not None else ""
-                item = self.tasks_table.item(row_idx, swimlane_order_vis_col)
-                if item:
-                    item.setText(order_text)
-                    item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-                    item.setBackground(QBrush(self.app_config.general.read_only_bg_color))
-                else:
-                    item = QTableWidgetItem(order_text)
-                    item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-                    item.setBackground(QBrush(self.app_config.general.read_only_bg_color))
-                    self.tasks_table.setItem(row_idx, swimlane_order_vis_col, item)
-            
-            # Update Swimlane Name column (read-only, calculated)
-            if swimlane_name_vis_col is not None:
-                _, swimlane_name = self._get_swimlane_info_for_row(task.row_number)
-                name_text = swimlane_name if swimlane_name else ""
-                item = self.tasks_table.item(row_idx, swimlane_name_vis_col)
-                if item:
-                    item.setText(name_text)
-                    item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-                    item.setBackground(QBrush(self.app_config.general.read_only_bg_color))
-                else:
-                    item = QTableWidgetItem(name_text)
-                    item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-                    item.setBackground(QBrush(self.app_config.general.read_only_bg_color))
-                    self.tasks_table.setItem(row_idx, swimlane_name_vis_col, item)
+            # Update Lane column (read-only, calculated) - will be handled by _refresh_swimlane_columns_for_row
+            # We call it here to ensure tooltip is set correctly
+            self._refresh_swimlane_columns_for_row(row_idx)
             
             # Update Valid column (calculate valid status)
             if valid_vis_col is not None:
@@ -1111,7 +1084,7 @@ class TasksTab(BaseTab):
             task = tasks[row_idx]
             self._update_table_row_from_task(row_idx, task)
         
-        # Sort by swimlane order, row number, then ID
+        # Sort by lane order, row number, then finish date
         self._sort_tasks_by_swimlane_and_row()
         
         # Ensure all read-only cells have proper styling
@@ -1129,7 +1102,12 @@ class TasksTab(BaseTab):
         # Calculate and update Valid column for all rows
         self._update_valid_column_only()
         
-        # Swimlane columns are already populated by _update_table_row_from_task, no need to refresh
+        # Refresh Lane columns to ensure tooltips are up-to-date after initial load and sort
+        # This ensures tooltips are set correctly even if swimlanes were loaded before tasks
+        # Note: This will trigger a re-sort, but that's okay since we just sorted above
+        # The re-sort ensures all lane tooltips are refreshed with current swimlane data
+        for row_idx in range(self.tasks_table.rowCount()):
+            self._refresh_swimlane_columns_for_row(row_idx)
 
     def _sync_data(self):
         self._sync_data_impl()
@@ -1165,16 +1143,11 @@ class TasksTab(BaseTab):
             self._sync_data()
     
     def _ensure_read_only_styling(self):
-        """Ensure all read-only cells (Task ID, Valid) have proper styling."""
-        headers = [col.name for col in self.table_config.columns]
-        id_col_vis_idx = None
-        valid_col_vis_idx = None
-        
-        for vis_idx, act_idx in self._column_mapping.items():
-            if act_idx == 1:  # Task ID column
-                id_col_vis_idx = vis_idx
-            elif act_idx < len(headers) and headers[act_idx] == "Valid":
-                valid_col_vis_idx = vis_idx
+        """Ensure all read-only cells (ID, Valid, Lane) have proper styling."""
+        id_col = self._get_column_index("ID")
+        valid_col = self._get_column_index("Valid")
+        id_col_vis_idx = self._reverse_column_mapping.get(id_col) if id_col is not None else None
+        valid_col_vis_idx = self._reverse_column_mapping.get(valid_col) if valid_col is not None else None
         
         if id_col_vis_idx is not None:
             for row in range(self.tasks_table.rowCount()):
@@ -1236,7 +1209,7 @@ class TasksTab(BaseTab):
                     
                     # For each table row, find the corresponding task by task_id
                     for row_idx in range(self.tasks_table.rowCount()):
-                        # Extract task_id from table
+                        # Extract task_id from ID column
                         id_item = self.tasks_table.item(row_idx, id_vis_col)
                         if not id_item:
                             continue
@@ -1539,26 +1512,23 @@ class TasksTab(BaseTab):
         # Keep selection on moved tasks - find the new row index after sorting
         if moved_tasks:
             moved_task_ids = {task.task_id for _, task in moved_tasks}
-            id_col = self._get_column_index("ID")
-            id_vis_col = self._reverse_column_mapping.get(id_col) if id_col is not None else None
+            name_col = self._get_column_index("Name")
+            name_vis_col = self._reverse_column_mapping.get(name_col) if name_col is not None else None
             
-            if id_vis_col is not None:
+            if name_vis_col is not None:
                 for row_idx in range(self.tasks_table.rowCount()):
-                    item = self.tasks_table.item(row_idx, id_vis_col)
+                    item = self.tasks_table.item(row_idx, name_vis_col)
                     if item:
-                        try:
-                            task_id = int(item.text())
-                            if task_id in moved_task_ids:
-                                # Restore checkbox state
-                                checkbox_widget = self.tasks_table.cellWidget(row_idx, 0)
-                                if checkbox_widget and isinstance(checkbox_widget, CheckBoxWidget):
-                                    checkbox_widget.checkbox.setChecked(True)
-                                # Select and scroll to first moved task
-                                self.tasks_table.selectRow(row_idx)
-                                self.tasks_table.scrollToItem(self.tasks_table.item(row_idx, 0))
-                                break
-                        except (ValueError, TypeError):
-                            continue
+                        task_id = item.data(Qt.UserRole)
+                        if task_id is not None and task_id in moved_task_ids:
+                            # Restore checkbox state
+                            checkbox_widget = self.tasks_table.cellWidget(row_idx, 0)
+                            if checkbox_widget and isinstance(checkbox_widget, CheckBoxWidget):
+                                checkbox_widget.checkbox.setChecked(True)
+                            # Select and scroll to first moved task
+                            self.tasks_table.selectRow(row_idx)
+                            self.tasks_table.scrollToItem(self.tasks_table.item(row_idx, 0))
+                            break
 
     def _extract_row_data_from_table(self, row_idx):
         """Extract full row data from table for a given row index."""

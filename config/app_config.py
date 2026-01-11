@@ -275,8 +275,7 @@ class AppConfig:
                     TableColumnConfig("Name"),
                     TableColumnConfig("Start Date", validator=validate_display_date),
                     TableColumnConfig("Finish Date", validator=validate_display_date),
-                    TableColumnConfig("Swimlane Order", widget_type="text"),  # Read-only, calculated from swimlanes
-                    TableColumnConfig("Swimlane Name", widget_type="text"),  # Read-only, calculated from swimlanes
+                    TableColumnConfig("Lane", widget_type="text"),  # Read-only, calculated from swimlanes
                     TableColumnConfig("Label", widget_type="combo", combo_items=["No", "Yes"], default_value="Yes"),
                     TableColumnConfig("Placement", widget_type="combo", combo_items=["Inside", "Outside"]),
                     TableColumnConfig("Valid", widget_type="text", default_value="Yes")
@@ -300,7 +299,7 @@ class AppConfig:
                 key="swimlanes",
                 columns=[
                     TableColumnConfig("Select", widget_type="checkbox"),
-                    TableColumnConfig("Order", widget_type="text"),  # Read-only, calculated from row position
+                    TableColumnConfig("Lane", widget_type="text"),  # Read-only, calculated from row position
                     TableColumnConfig("ID", validator=lambda x: int(x) > 0 if x else False),
                     TableColumnConfig("Row Count", validator=lambda x: int(x) > 0 if x else False),
                     TableColumnConfig("Title")

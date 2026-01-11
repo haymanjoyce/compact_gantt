@@ -97,7 +97,7 @@ class SwimlanesTab(BaseTab):
         header = self.swimlanes_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.Fixed)  # Select
         self.swimlanes_table.setColumnWidth(0, 50)
-        header.setSectionResizeMode(1, QHeaderView.Fixed)  # Order
+        header.setSectionResizeMode(1, QHeaderView.Fixed)  # Lane
         self.swimlanes_table.setColumnWidth(1, 60)
         
         # Find Row Count, Title, and ID columns by name (after move)
@@ -281,8 +281,8 @@ class SwimlanesTab(BaseTab):
             self.swimlanes_table.blockSignals(False)
             self.swimlanes_table.setSortingEnabled(was_sorting)
         
-        # Refresh Order column after move
-        self._refresh_order_column()
+        # Refresh Lane column after move
+        self._refresh_lane_column()
         
         # Sync data to update project_data
         self._sync_data_if_not_initializing()
@@ -327,8 +327,8 @@ class SwimlanesTab(BaseTab):
             self.swimlanes_table.blockSignals(False)
             self.swimlanes_table.setSortingEnabled(was_sorting)
         
-        # Refresh Order column after move
-        self._refresh_order_column()
+        # Refresh Lane column after move
+        self._refresh_lane_column()
         
         # Sync data to update project_data
         self._sync_data_if_not_initializing()
@@ -376,25 +376,25 @@ class SwimlanesTab(BaseTab):
         checkbox2_new.checkbox.setChecked(checkbox1_state)
         self.swimlanes_table.setCellWidget(row2, 0, checkbox2_new)
 
-    def _refresh_order_column(self):
-        """Refresh the Order column for all rows based on their current positions."""
-        order_col = self._get_column_index("Order")
-        if order_col is None:
+    def _refresh_lane_column(self):
+        """Refresh the Lane column for all rows based on their current positions."""
+        lane_col = self._get_column_index("Lane")
+        if lane_col is None:
             return
         
         for row_idx in range(self.swimlanes_table.rowCount()):
-            order_value = row_idx + 1  # 1-based order
-            item = self.swimlanes_table.item(row_idx, order_col)
+            lane_value = row_idx + 1  # 1-based order
+            item = self.swimlanes_table.item(row_idx, lane_col)
             if item:
-                item.setText(str(order_value))
+                item.setText(str(lane_value))
                 # Ensure it's read-only
                 item.setFlags(item.flags() & ~Qt.ItemIsEditable)
                 item.setBackground(QBrush(self.app_config.general.read_only_bg_color))
             else:
-                item = NumericTableWidgetItem(str(order_value))
+                item = NumericTableWidgetItem(str(lane_value))
                 item.setFlags(item.flags() & ~Qt.ItemIsEditable)
                 item.setBackground(QBrush(self.app_config.general.read_only_bg_color))
-                self.swimlanes_table.setItem(row_idx, order_col, item)
+                self.swimlanes_table.setItem(row_idx, lane_col, item)
     
     def _connect_signals(self):
         self.swimlanes_table.itemChanged.connect(self._on_item_changed)
@@ -488,31 +488,31 @@ class SwimlanesTab(BaseTab):
         if row_count == 0 or self._selected_swimlane_id is None:
             self._clear_detail_form()
         
-        # Refresh Order column to ensure all rows have correct order values
-        self._refresh_order_column()
+        # Refresh Lane column to ensure all rows have correct lane values
+        self._refresh_lane_column()
 
     def _update_table_row_from_swimlane(self, row_idx: int, swimlane: Swimlane) -> None:
         """Populate a table row from a Swimlane object."""
         # Get column indices using key-based access
-        order_col = self._get_column_index("Order")
+        lane_col = self._get_column_index("Lane")
         id_col = self._get_column_index("ID")
         row_count_col = self._get_column_index("Row Count")
         title_col = self._get_column_index("Title")  # Changed from "Name"
         
-        # Update Order column (read-only, calculated from row position)
-        if order_col is not None:
-            order_value = row_idx + 1  # 1-based order
-            item = self.swimlanes_table.item(row_idx, order_col)
+        # Update Lane column (read-only, calculated from row position)
+        if lane_col is not None:
+            lane_value = row_idx + 1  # 1-based order
+            item = self.swimlanes_table.item(row_idx, lane_col)
             if item:
-                item.setText(str(order_value))
+                item.setText(str(lane_value))
                 # Ensure it's read-only even if item already exists
                 item.setFlags(item.flags() & ~Qt.ItemIsEditable)
                 item.setBackground(QBrush(self.app_config.general.read_only_bg_color))
             else:
-                item = NumericTableWidgetItem(str(order_value))
+                item = NumericTableWidgetItem(str(lane_value))
                 item.setFlags(item.flags() & ~Qt.ItemIsEditable)
                 item.setBackground(QBrush(self.app_config.general.read_only_bg_color))
-                self.swimlanes_table.setItem(row_idx, order_col, item)
+                self.swimlanes_table.setItem(row_idx, lane_col, item)
         
         # Update ID column
         if id_col is not None:
@@ -664,8 +664,8 @@ class SwimlanesTab(BaseTab):
                 logging.debug(f"_sync_data_impl: Final swimlane id={s.swimlane_id}, title={s.title}, label_position={s.label_position}")
             self.project_data.swimlanes = swimlanes
             
-            # Refresh Order column after sync (in case rows were added/removed)
-            self._refresh_order_column()
+            # Refresh Lane column after sync (in case rows were added/removed)
+            self._refresh_lane_column()
             
             # Emit data_updated signal so other tabs (like Tasks) can refresh swimlane-dependent columns
             self.data_updated.emit({})
