@@ -69,14 +69,30 @@ class PipesTab(BaseTab):
         # Add bottom border to header row and gridline styling
         self.pipes_table.setStyleSheet(self.app_config.general.table_stylesheet)
         
-        # Column sizing
+        # Column sizing - use key-based lookups instead of positional indices
         header = self.pipes_table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.Fixed)  # Select
-        self.pipes_table.setColumnWidth(0, 50)
-        header.setSectionResizeMode(1, QHeaderView.ResizeToContents)  # ID
-        header.setSectionResizeMode(2, QHeaderView.Fixed)  # Date
-        self.pipes_table.setColumnWidth(2, 110)  # Fixed width for date (dd/mm/yyyy format)
-        header.setSectionResizeMode(3, QHeaderView.Stretch)  # Name
+        
+        # Find columns by name and set their sizing
+        id_col = None
+        date_col = None
+        name_col = None
+        
+        for i in range(self.pipes_table.columnCount()):
+            header_text = self.pipes_table.horizontalHeaderItem(i).text()
+            if header_text == "ID":
+                id_col = i
+            elif header_text == "Date":
+                date_col = i
+            elif header_text == "Name":
+                name_col = i
+        
+        if id_col is not None:
+            header.setSectionResizeMode(id_col, QHeaderView.ResizeToContents)
+        if date_col is not None:
+            header.setSectionResizeMode(date_col, QHeaderView.Fixed)
+            self.pipes_table.setColumnWidth(date_col, 110)  # Fixed width for date (dd/mm/yyyy format)
+        if name_col is not None:
+            header.setSectionResizeMode(name_col, QHeaderView.Stretch)
         
         # Enable horizontal scroll bar
         self.pipes_table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)

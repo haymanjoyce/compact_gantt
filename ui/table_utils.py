@@ -168,15 +168,25 @@ def add_row(table, table_key, table_configs, parent, id_field_name, row_index=No
         table.setSortingEnabled(False)
         table.blockSignals(True)
 
-        # Find the ID column index using the provided id_field_name
+        # Find the ID column index using the provided id_field_name (key-based lookup)
         id_column = None
         for i in range(table.columnCount()):
-            if table.horizontalHeaderItem(i).text() == id_field_name:
+            header_item = table.horizontalHeaderItem(i)
+            if header_item and header_item.text() == id_field_name:
                 id_column = i
                 break
 
         if id_column is None:
-            logging.error(f"Could not find ID column: {id_field_name}")
+            available_columns = []
+            for i in range(table.columnCount()):
+                header_item = table.horizontalHeaderItem(i)
+                available_columns.append(header_item.text() if header_item else f"Column {i}")
+            error_msg = f"Could not find ID column '{id_field_name}' in table. Available columns: {available_columns}"
+            logging.error(error_msg)
+            from PyQt5.QtWidgets import QMessageBox
+            QMessageBox.critical(parent, "Error", error_msg)
+            table.blockSignals(False)
+            table.setSortingEnabled(was_sorting)
             return
 
         # Calculate next available ID
@@ -360,9 +370,11 @@ def add_row(table, table_key, table_configs, parent, id_field_name, row_index=No
         # Sync data
         parent._sync_data()
         
-        # Refresh Order column if parent has this method (for swimlanes table)
+        # Refresh Order/Lane column if parent has this method (for swimlanes table)
         if hasattr(parent, '_refresh_order_column'):
             parent._refresh_order_column()
+        elif hasattr(parent, '_refresh_lane_column'):
+            parent._refresh_lane_column()
         
         logging.debug(f"Row added successfully at index {row_index}")
 

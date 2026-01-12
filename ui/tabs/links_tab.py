@@ -69,16 +69,44 @@ class LinksTab(BaseTab):
         # Add bottom border to header row and gridline styling
         self.links_table.setStyleSheet(self.app_config.general.table_stylesheet)
         
-        # Column sizing
+        # Column sizing - use key-based lookups instead of positional indices
         header = self.links_table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.Fixed)  # Select
-        self.links_table.setColumnWidth(0, 50)
-        header.setSectionResizeMode(1, QHeaderView.ResizeToContents)  # ID
-        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)  # From Task ID
-        header.setSectionResizeMode(3, QHeaderView.Stretch)  # From Task Name
-        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)  # To Task ID
-        header.setSectionResizeMode(5, QHeaderView.Stretch)  # To Task Name
-        header.setSectionResizeMode(6, QHeaderView.ResizeToContents)  # Valid
+        
+        # Find columns by name and set their sizing
+        id_col = None
+        from_task_id_col = None
+        from_task_name_col = None
+        to_task_id_col = None
+        to_task_name_col = None
+        valid_col = None
+        
+        for i in range(self.links_table.columnCount()):
+            header_text = self.links_table.horizontalHeaderItem(i).text()
+            if header_text == "ID":
+                id_col = i
+            elif header_text == "From Task ID":
+                from_task_id_col = i
+            elif header_text == "From Task Name":
+                from_task_name_col = i
+            elif header_text == "To Task ID":
+                to_task_id_col = i
+            elif header_text == "To Task Name":
+                to_task_name_col = i
+            elif header_text == "Valid":
+                valid_col = i
+        
+        if id_col is not None:
+            header.setSectionResizeMode(id_col, QHeaderView.ResizeToContents)
+        if from_task_id_col is not None:
+            header.setSectionResizeMode(from_task_id_col, QHeaderView.ResizeToContents)
+        if from_task_name_col is not None:
+            header.setSectionResizeMode(from_task_name_col, QHeaderView.Stretch)
+        if to_task_id_col is not None:
+            header.setSectionResizeMode(to_task_id_col, QHeaderView.ResizeToContents)
+        if to_task_name_col is not None:
+            header.setSectionResizeMode(to_task_name_col, QHeaderView.Stretch)
+        if valid_col is not None:
+            header.setSectionResizeMode(valid_col, QHeaderView.ResizeToContents)
         
         # Enable horizontal scroll bar
         self.links_table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)

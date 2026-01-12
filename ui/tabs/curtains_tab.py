@@ -69,14 +69,34 @@ class CurtainsTab(BaseTab):
         # Add bottom border to header row and gridline styling
         self.curtains_table.setStyleSheet(self.app_config.general.table_stylesheet)
         
-        # Column sizing
+        # Column sizing - use key-based lookups instead of positional indices
         header = self.curtains_table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.Fixed)  # Select
-        self.curtains_table.setColumnWidth(0, 50)
-        header.setSectionResizeMode(1, QHeaderView.ResizeToContents)  # ID
-        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)  # Start Date
-        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)  # End Date
-        header.setSectionResizeMode(4, QHeaderView.Stretch)  # Name
+        
+        # Find columns by name and set their sizing
+        id_col = None
+        start_date_col = None
+        end_date_col = None
+        name_col = None
+        
+        for i in range(self.curtains_table.columnCount()):
+            header_text = self.curtains_table.horizontalHeaderItem(i).text()
+            if header_text == "ID":
+                id_col = i
+            elif header_text == "Start Date":
+                start_date_col = i
+            elif header_text == "End Date":
+                end_date_col = i
+            elif header_text == "Name":
+                name_col = i
+        
+        if id_col is not None:
+            header.setSectionResizeMode(id_col, QHeaderView.ResizeToContents)
+        if start_date_col is not None:
+            header.setSectionResizeMode(start_date_col, QHeaderView.ResizeToContents)
+        if end_date_col is not None:
+            header.setSectionResizeMode(end_date_col, QHeaderView.ResizeToContents)
+        if name_col is not None:
+            header.setSectionResizeMode(name_col, QHeaderView.Stretch)
         
         # Enable horizontal scroll bar
         self.curtains_table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)

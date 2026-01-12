@@ -139,20 +139,52 @@ class TasksTab(BaseTab):
         self.swimlane_delegate = SwimlaneDividerDelegate(self.tasks_table)
         self.tasks_table.setItemDelegate(self.swimlane_delegate)
         
-        # Column sizing
+        # Column sizing - use key-based lookups instead of positional indices
         header = self.tasks_table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.Fixed)  # Select
-        self.tasks_table.setColumnWidth(0, 50)
-        header.setSectionResizeMode(1, QHeaderView.Fixed)  # Lane
-        self.tasks_table.setColumnWidth(1, 60)
-        header.setSectionResizeMode(2, QHeaderView.Fixed)  # ID
-        self.tasks_table.setColumnWidth(2, 50)
-        header.setSectionResizeMode(3, QHeaderView.Fixed)  # Row
-        self.tasks_table.setColumnWidth(3, 50)
-        header.setSectionResizeMode(4, QHeaderView.Stretch)  # Name
-        header.setSectionResizeMode(5, QHeaderView.ResizeToContents)  # Start Date
-        header.setSectionResizeMode(6, QHeaderView.ResizeToContents)  # Finish Date
-        header.setSectionResizeMode(7, QHeaderView.ResizeToContents)  # Valid
+        
+        # Find columns by name and set their sizing
+        lane_col = None
+        id_col = None
+        row_col = None
+        name_col = None
+        start_date_col = None
+        finish_date_col = None
+        valid_col = None
+        
+        for i in range(self.tasks_table.columnCount()):
+            header_text = self.tasks_table.horizontalHeaderItem(i).text()
+            if header_text == "Lane":
+                lane_col = i
+            elif header_text == "ID":
+                id_col = i
+            elif header_text == "Row":
+                row_col = i
+            elif header_text == "Name":
+                name_col = i
+            elif header_text == "Start Date":
+                start_date_col = i
+            elif header_text == "Finish Date":
+                finish_date_col = i
+            elif header_text == "Valid":
+                valid_col = i
+        
+        if lane_col is not None:
+            header.setSectionResizeMode(lane_col, QHeaderView.Fixed)
+            self.tasks_table.setColumnWidth(lane_col, 60)
+        if id_col is not None:
+            header.setSectionResizeMode(id_col, QHeaderView.Fixed)
+            self.tasks_table.setColumnWidth(id_col, 50)
+        if row_col is not None:
+            header.setSectionResizeMode(row_col, QHeaderView.Fixed)
+            self.tasks_table.setColumnWidth(row_col, 50)
+        if name_col is not None:
+            header.setSectionResizeMode(name_col, QHeaderView.Stretch)
+        if start_date_col is not None:
+            header.setSectionResizeMode(start_date_col, QHeaderView.ResizeToContents)
+        if finish_date_col is not None:
+            header.setSectionResizeMode(finish_date_col, QHeaderView.ResizeToContents)
+        if valid_col is not None:
+            header.setSectionResizeMode(valid_col, QHeaderView.ResizeToContents)
 
         # Enable horizontal scroll bar
         self.tasks_table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
@@ -448,8 +480,10 @@ class TasksTab(BaseTab):
             id_col = self._get_column_index("ID")
             id_vis_col = self._reverse_column_mapping.get(id_col) if id_col is not None else None
             if id_vis_col is not None:
+                # Get selected row indices as a set for efficient lookup (key-based)
+                selected_row_indices = {index.row() for index in self.tasks_table.selectionModel().selectedRows()}
                 for row_idx in range(self.tasks_table.rowCount()):
-                    if self.tasks_table.item(row_idx, id_vis_col) and self.tasks_table.isRowSelected(row_idx):
+                    if self.tasks_table.item(row_idx, id_vis_col) and row_idx in selected_row_indices:
                         item = self.tasks_table.item(row_idx, id_vis_col)
                         try:
                             task_id = int(item.text())
