@@ -1,5 +1,5 @@
 from PyQt5.QtWidgets import (
-    QMainWindow, QVBoxLayout, QScrollArea, QPushButton, QHBoxLayout, QLabel, QApplication, QStatusBar, QWidget, QAction, QFileDialog, QMessageBox
+    QMainWindow, QVBoxLayout, QScrollArea, QPushButton, QHBoxLayout, QLabel, QApplication, QStatusBar, QWidget, QAction, QFileDialog, QMessageBox, QFrame
 )
 from PyQt5.QtSvg import QSvgRenderer
 from PyQt5.QtGui import QIcon, QPixmap, QPainter, QPalette
@@ -38,6 +38,7 @@ class SvgDisplay(QMainWindow):
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidget(self.svg_label)
         self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setFrameShape(QFrame.NoFrame)  # Remove default frame for consistent rendering
 
         # Create zoom control buttons with styling
         self.zoom_in_btn = QPushButton("Zoom In")
@@ -83,6 +84,7 @@ class SvgDisplay(QMainWindow):
         # Create central widget
         central_widget = QWidget()
         self.layout = QVBoxLayout(central_widget)
+        self.layout.setContentsMargins(8, 8, 8, 8)  # Add consistent padding around scroll area (left, top, right, bottom)
         self.layout.addWidget(self.scroll_area)  # Graphic first
         self.layout.addLayout(btn_layout)  # Buttons below the graphic
         self.setCentralWidget(central_widget)
@@ -152,10 +154,28 @@ class SvgDisplay(QMainWindow):
                 self._zoom = 1.0
                 self._fit_to_window = True
             
+            # Show window first to ensure viewport size is accurate
+            if not self.isVisible():
+                self.show()
+                QApplication.processEvents()  # Ensure layout is fully calculated
+            
+            # Ensure layout is processed before calculating zoom for consistent rendering
+            if self._fit_to_window and not preserve_zoom:
+                # Process events again to ensure layout is fully calculated after showing
+                QApplication.processEvents()
+                # Recalculate zoom with stable viewport size
+                area_size = self.scroll_area.viewport().size()
+                if self._svg_size.width() > 0 and self._svg_size.height() > 0:
+                    fit_scale = min(
+                        area_size.width() / self._svg_size.width(),
+                        area_size.height() / self._svg_size.height(),
+                        1.0
+                    )
+                    self._zoom = fit_scale
+            
             self.update_image()
             self._update_button_states()
             self._update_zoom_label()
-            self.show()
         else:
             print(f"SVG file not found: {absolute_path}")
 
@@ -176,13 +196,9 @@ class SvgDisplay(QMainWindow):
 
     def update_image(self):
         if self._fit_to_window:
-            # Fit SVG to window, but do not scale up beyond native size
-            area_size = self.scroll_area.viewport().size()
-            scale = min(
-                area_size.width() / self._svg_size.width(),
-                area_size.height() / self._svg_size.height(),
-                1.0  # Never scale up beyond native size
-            )
+            # Use stored zoom value (calculated in load_svg or resizeEvent) for consistency
+            # This avoids recalculating zoom every time, which can cause inconsistencies
+            scale = self._zoom
         else:
             scale = self._zoom
 
