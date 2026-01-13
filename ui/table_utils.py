@@ -151,8 +151,12 @@ def extract_table_data(table, include_widgets=True):
         data.append(row_data)
     return data
 
-def add_row(table, table_key, table_configs, parent, id_field_name, row_index=None):
-    """Add a row to a table with proper ID and sorting handling, using generic default value logic."""
+def add_row(table, table_key, table_configs, parent, id_field_name, row_index=None, default_row_number=None):
+    """Add a row to a table with proper ID and sorting handling, using generic default value logic.
+    
+    Args:
+        default_row_number: Optional default row number for tasks table (if None, defaults to 1)
+    """
     logging.debug(f"Starting add_row for {table_key}")
     try:
         config = table_configs.get(table_key)
@@ -270,8 +274,10 @@ def add_row(table, table_key, table_configs, parent, id_field_name, row_index=No
                 table.setCellWidget(row_index, col_idx, date_edit)
             # Numeric column - check by column name for tasks table (Row) - ID handled above
             elif header_text == "Row":
-                item = NumericTableWidgetItem("1")  # Default row number
-                item.setData(Qt.UserRole, 1)
+                # Use provided default_row_number if available (for tasks), otherwise default to 1
+                row_value = default_row_number if default_row_number is not None else 1
+                item = NumericTableWidgetItem(str(row_value))
+                item.setData(Qt.UserRole, row_value)
                 table.setItem(row_index, col_idx, item)
             # Numeric column - check by column name for swimlanes table (Row Count)
             elif header_text == "Row Count":
@@ -369,6 +375,36 @@ def add_row(table, table_key, table_configs, parent, id_field_name, row_index=No
 
         # Sync data
         parent._sync_data()
+        
+        # Tasks table specific: sort and select the new task
+        if table_key == "tasks" and hasattr(parent, '_sort_tasks_by_swimlane_and_row'):
+            # Store the new task ID before sorting
+            new_task_id = next_id
+            
+            # Sort the table to place new task in correct position
+            parent._sort_tasks_by_swimlane_and_row()
+            
+            # Find and select the new task after sorting
+            id_col = None
+            for i in range(table.columnCount()):
+                header_item = table.horizontalHeaderItem(i)
+                if header_item and header_item.text() == id_field_name:
+                    id_col = i
+                    break
+            
+            if id_col is not None:
+                for row_idx in range(table.rowCount()):
+                    item = table.item(row_idx, id_col)
+                    if item:
+                        try:
+                            task_id = int(item.text())
+                            if task_id == new_task_id:
+                                # Select the row and scroll to it
+                                table.selectRow(row_idx)
+                                table.scrollToItem(item)
+                                break
+                        except (ValueError, TypeError):
+                            continue
         
         # Refresh Order/Lane column if parent has this method (for swimlanes table)
         if hasattr(parent, '_refresh_order_column'):

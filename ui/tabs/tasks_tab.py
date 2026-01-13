@@ -76,7 +76,7 @@ class TasksTab(BaseTab):
         add_btn = QPushButton("Add Task")
         add_btn.setToolTip("Add a new task to the chart (Ctrl+N)")
         add_btn.setMinimumWidth(100)
-        add_btn.clicked.connect(lambda: add_row(self.tasks_table, "tasks", self.app_config.tables, self, "ID"))
+        add_btn.clicked.connect(self._add_task)
         
         remove_btn = QPushButton("Remove Task")
         remove_btn.setToolTip("Remove selected task(s) from the chart (Delete)")
@@ -1295,6 +1295,18 @@ class TasksTab(BaseTab):
     def _extract_table_data(self) -> List[List[str]]:
         # This is now handled in _sync_data_impl
         return []
+
+    def _add_task(self):
+        """Add a new task, using selected task's row_number as default if available."""
+        # Get the selected task's row_number if a task is selected
+        default_row_number = None
+        if self._selected_row is not None:
+            task = self._task_from_table_row(self._selected_row)
+            if task:
+                default_row_number = task.row_number
+        
+        # Call add_row with the default row number
+        add_row(self.tasks_table, "tasks", self.app_config.tables, self, "ID", default_row_number=default_row_number)
 
     def _duplicate_tasks(self):
         """Duplicate selected tasks with new IDs."""
