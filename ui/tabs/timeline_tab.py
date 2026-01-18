@@ -35,21 +35,25 @@ class TimelineTab(BaseTab):
         layout.setHorizontalSpacing(10)
         layout.setVerticalSpacing(5)
 
+        # Get date format from config (UI date config for data entry)
+        date_format = self.app_config.general.ui_date_config.get_qt_format()
+        date_format_display = self.app_config.general.ui_date_config.get_python_format().replace("%", "").lower()
+        
         # Start Date
         start_label = QLabel("Start Date:")
         start_label.setFixedWidth(label_width)
         self.start_date = QDateEdit()
         self.start_date.setCalendarPopup(True)
-        self.start_date.setDisplayFormat("dd/MM/yyyy")
-        self.start_date.setToolTip("Start date of the chart timeline (dd/mm/yyyy)")
+        self.start_date.setDisplayFormat(date_format)
+        self.start_date.setToolTip(f"Start date of the chart timeline ({date_format_display})")
 
         # Finish Date
         finish_label = QLabel("Finish Date:")
         finish_label.setFixedWidth(label_width)
         self.finish_date = QDateEdit()
         self.finish_date.setCalendarPopup(True)
-        self.finish_date.setDisplayFormat("dd/MM/yyyy")
-        self.finish_date.setToolTip("Finish date of the chart timeline (dd/mm/yyyy)")
+        self.finish_date.setDisplayFormat(date_format)
+        self.finish_date.setToolTip(f"Finish date of the chart timeline ({date_format_display})")
 
         layout.addWidget(start_label, 0, 0)
         layout.addWidget(self.start_date, 0, 1)

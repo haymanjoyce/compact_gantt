@@ -36,7 +36,7 @@ class CurtainsTab(BaseTab):
         add_btn = QPushButton("Add Curtain")
         add_btn.setToolTip("Add a new curtain")
         add_btn.setMinimumWidth(120)
-        add_btn.clicked.connect(lambda: add_row(self.curtains_table, "curtains", self.app_config.tables, self, "ID"))
+        add_btn.clicked.connect(lambda: add_row(self.curtains_table, "curtains", self.app_config.tables, self, "ID", date_config=self.app_config.general.ui_date_config))
         
         remove_btn = QPushButton("Remove Curtain")
         remove_btn.setToolTip("Remove selected curtain(s)")
@@ -365,7 +365,7 @@ class CurtainsTab(BaseTab):
                 date_widget.dateChanged.connect(self._sync_data_if_not_initializing)
             else:
                 # Create QDateEdit if it doesn't exist
-                date_widget = DateEditWidget()
+                date_widget = DateEditWidget(date_config=self.app_config.general.ui_date_config)
                 if curtain.start_date:
                     try:
                         start_dt = datetime.strptime(curtain.start_date, "%Y-%m-%d")
@@ -408,7 +408,7 @@ class CurtainsTab(BaseTab):
                 date_widget.dateChanged.connect(self._sync_data_if_not_initializing)
             else:
                 # Create QDateEdit if it doesn't exist
-                date_widget = DateEditWidget()
+                date_widget = DateEditWidget(date_config=self.app_config.general.ui_date_config)
                 if curtain.end_date:
                     try:
                         end_dt = datetime.strptime(curtain.end_date, "%Y-%m-%d")

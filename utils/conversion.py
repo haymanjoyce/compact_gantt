@@ -1,5 +1,6 @@
 from typing import Union, Optional
 from datetime import datetime
+from config.date_config import DateConfig
 
 def safe_int(value: Union[str, int, float, None], default: int = 0) -> int:
     """Safely convert a value to int, returning default if conversion fails."""
@@ -19,9 +20,9 @@ def safe_float(value: Union[str, int, float, None], default: float = 0.0) -> flo
     except (ValueError, TypeError):
         return default
 
-def normalize_display_date(date_str: str) -> str:
+def normalize_display_date(date_str: str, date_config: Optional[DateConfig] = None) -> str:
     """
-    Normalize a date string to dd/mm/yyyy format, handling flexible input formats.
+    Normalize a date string to display format, handling flexible input formats.
     
     Supports:
     - Single or double digit days/months: 1/1/25, 01/01/25, 1/01/2025
@@ -30,15 +31,20 @@ def normalize_display_date(date_str: str) -> str:
     
     Args:
         date_str: Date string in flexible d/m/yy or d/m/yyyy format
+        date_config: Optional DateConfig instance. If None, uses default dd/mm/yyyy format.
         
     Returns:
-        Date string in dd/mm/yyyy format
+        Date string in normalized display format (from date_config or default)
         
     Raises:
         ValueError: If the date cannot be normalized
     """
     if not date_str or not date_str.strip():
         return ""
+    
+    # Use default config if not provided (backward compatibility)
+    if date_config is None:
+        date_config = DateConfig()
     
     date_str = date_str.strip()
     parts = date_str.split('/')
@@ -65,23 +71,24 @@ def normalize_display_date(date_str: str) -> str:
         else:
             raise ValueError(f"Invalid year format. Expected 2 or 4 digits, got: {year_str}")
         
-        # Validate the normalized date by parsing it
+        # Validate the normalized date by parsing it with the config format
         normalized = f"{day_str}/{month_str}/{year_str}"
-        datetime.strptime(normalized, "%d/%m/%Y")  # Validate
+        datetime.strptime(normalized, date_config.get_python_format())  # Validate
         return normalized
         
     except (ValueError, IndexError) as e:
         raise ValueError(f"Invalid date format. Expected d/m/yyyy or d/m/yy, got: {date_str}") from e
 
-def display_to_internal_date(display_date: str) -> str:
+def display_to_internal_date(display_date: str, date_config: Optional[DateConfig] = None) -> str:
     """
     Convert date from flexible display format to yyyy-mm-dd internal format.
     
     Args:
         display_date: Date string in flexible d/m/yy or d/m/yyyy format
+        date_config: Optional DateConfig instance. If None, uses default dd/mm/yyyy format.
         
     Returns:
-        Date string in yyyy-mm-dd format
+        Date string in yyyy-mm-dd format (ISO format)
         
     Raises:
         ValueError: If the date format is invalid
@@ -89,25 +96,30 @@ def display_to_internal_date(display_date: str) -> str:
     if not display_date or not display_date.strip():
         return ""
     
+    # Use default config if not provided (backward compatibility)
+    if date_config is None:
+        date_config = DateConfig()
+    
     try:
-        # Normalize to dd/mm/yyyy format first
-        normalized = normalize_display_date(display_date)
-        # Parse normalized format
-        date_obj = datetime.strptime(normalized, "%d/%m/%Y")
-        # Return in yyyy-mm-dd format
-        return date_obj.strftime("%Y-%m-%d")
+        # Normalize to display format first
+        normalized = normalize_display_date(display_date, date_config)
+        # Parse normalized format using config
+        date_obj = datetime.strptime(normalized, date_config.get_python_format())
+        # Return in yyyy-mm-dd format (always ISO format for internal storage)
+        return date_obj.strftime(date_config.get_internal_format())
     except ValueError as e:
         raise ValueError(f"Invalid date format. Expected d/m/yyyy or d/m/yy, got: {display_date}") from e
 
-def internal_to_display_date(internal_date: str) -> str:
+def internal_to_display_date(internal_date: str, date_config: Optional[DateConfig] = None) -> str:
     """
-    Convert date from yyyy-mm-dd internal format to dd/mm/yyyy display format.
+    Convert date from yyyy-mm-dd internal format to display format.
     
     Args:
-        internal_date: Date string in yyyy-mm-dd format
+        internal_date: Date string in yyyy-mm-dd format (ISO format)
+        date_config: Optional DateConfig instance. If None, uses default dd/mm/yyyy format.
         
     Returns:
-        Date string in dd/mm/yyyy format
+        Date string in display format (from date_config or default)
         
     Raises:
         ValueError: If the date format is invalid
@@ -115,20 +127,25 @@ def internal_to_display_date(internal_date: str) -> str:
     if not internal_date or not internal_date.strip():
         return ""
     
+    # Use default config if not provided (backward compatibility)
+    if date_config is None:
+        date_config = DateConfig()
+    
     try:
-        # Parse yyyy-mm-dd format
-        date_obj = datetime.strptime(internal_date.strip(), "%Y-%m-%d")
-        # Return in dd/mm/yyyy format
-        return date_obj.strftime("%d/%m/%Y")
+        # Parse yyyy-mm-dd format (always ISO format for internal storage)
+        date_obj = datetime.strptime(internal_date.strip(), date_config.get_internal_format())
+        # Return in display format from config
+        return date_obj.strftime(date_config.get_python_format())
     except ValueError:
         raise ValueError(f"Invalid date format. Expected yyyy-mm-dd, got: {internal_date}")
 
-def is_valid_display_date(date_str: str) -> bool:
+def is_valid_display_date(date_str: str, date_config: Optional[DateConfig] = None) -> bool:
     """
     Check if a date string is in valid flexible date format.
     
     Args:
         date_str: Date string to validate
+        date_config: Optional DateConfig instance. If None, uses default dd/mm/yyyy format.
         
     Returns:
         True if valid, False otherwise
@@ -137,7 +154,7 @@ def is_valid_display_date(date_str: str) -> bool:
         return False
     
     try:
-        normalize_display_date(date_str)
+        normalize_display_date(date_str, date_config)
         return True
     except ValueError:
         return False

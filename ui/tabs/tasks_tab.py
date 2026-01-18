@@ -622,7 +622,7 @@ class TasksTab(BaseTab):
                     start_date_item = self.tasks_table.item(row_idx, start_date_vis_col)
                     if start_date_item and start_date_item.text().strip():
                         try:
-                            start_date_internal = display_to_internal_date(start_date_item.text())
+                            start_date_internal = display_to_internal_date(start_date_item.text(), self.app_config.general.ui_date_config)
                         except ValueError:
                             start_date_internal = ""
                             start_date_conversion_failed = True
@@ -640,7 +640,7 @@ class TasksTab(BaseTab):
                     finish_date_item = self.tasks_table.item(row_idx, finish_date_vis_col)
                     if finish_date_item and finish_date_item.text().strip():
                         try:
-                            finish_date_internal = display_to_internal_date(finish_date_item.text())
+                            finish_date_internal = display_to_internal_date(finish_date_item.text(), self.app_config.general.ui_date_config)
                         except ValueError:
                             finish_date_internal = ""
                             finish_date_conversion_failed = True
@@ -790,7 +790,7 @@ class TasksTab(BaseTab):
                     date_widget.dateChanged.connect(self._sync_data_if_not_initializing)
                 else:
                     # Create QDateEdit if it doesn't exist
-                    date_widget = DateEditWidget()
+                    date_widget = DateEditWidget(date_config=self.app_config.general.ui_date_config)
                     if task.start_date:
                         try:
                             start_dt = datetime.strptime(task.start_date, "%Y-%m-%d")
@@ -833,7 +833,7 @@ class TasksTab(BaseTab):
                     date_widget.dateChanged.connect(self._sync_data_if_not_initializing)
                 else:
                     # Create QDateEdit if it doesn't exist
-                    date_widget = DateEditWidget()
+                    date_widget = DateEditWidget(date_config=self.app_config.general.ui_date_config)
                     if task.finish_date:
                         try:
                             finish_dt = datetime.strptime(task.finish_date, "%Y-%m-%d")
@@ -1305,8 +1305,8 @@ class TasksTab(BaseTab):
             if task:
                 default_row_number = task.row_number
         
-        # Call add_row with the default row number
-        add_row(self.tasks_table, "tasks", self.app_config.tables, self, "ID", default_row_number=default_row_number)
+        # Call add_row with the default row number and date_config
+        add_row(self.tasks_table, "tasks", self.app_config.tables, self, "ID", default_row_number=default_row_number, date_config=self.app_config.general.ui_date_config)
 
     def _duplicate_tasks(self):
         """Duplicate selected tasks with new IDs."""

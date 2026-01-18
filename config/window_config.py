@@ -24,7 +24,7 @@ class WindowConfig:
     
     # Tab order (list of tab names in preferred order)
     tab_order: List[str] = field(default_factory=lambda: [
-        "Windows", "Layout", "Titles", "Timeline", "Tasks", "Links", 
+        "Preferences", "Layout", "Titles", "Timeline", "Tasks", "Links", 
         "Swimlanes", "Pipes", "Curtains", "Notes", "Typography"
     ])
 

@@ -1,31 +1,34 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QGridLayout, QGroupBox, QLineEdit, 
-                           QLabel, QMessageBox, QSpinBox)
+                           QLabel, QMessageBox, QSpinBox, QComboBox)
 from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtGui import QFont
 from typing import Dict, Any
 import logging
 from .base_tab import BaseTab
+from config.date_config import DATE_FORMAT_OPTIONS, DateConfig
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-class WindowsTab(BaseTab):
+class PreferencesTab(BaseTab):
     def setup_ui(self):
         layout = QVBoxLayout()
         LABEL_WIDTH = 150  # Consistent label width
 
-        # Data Entry Window Positioning Group
-        data_entry_group = self._create_positioning_group(
-            "Chart Data Window Positioning", 
+        # Data Entry Window Group (Positioning + Date Format)
+        data_entry_group = self._create_window_group(
+            "Chart Data Window", 
             "data_entry", 
-            LABEL_WIDTH
+            LABEL_WIDTH,
+            self.app_config.general.ui_date_config
         )
         layout.addWidget(data_entry_group)
 
-        # SVG Display Window Positioning Group
-        svg_display_group = self._create_positioning_group(
-            "Chart Display Window Positioning", 
+        # SVG Display Window Group (Positioning + Date Format)
+        svg_display_group = self._create_window_group(
+            "Chart Display Window", 
             "svg_display", 
-            LABEL_WIDTH
+            LABEL_WIDTH,
+            self.app_config.general.chart_date_config
         )
         layout.addWidget(svg_display_group)
 
@@ -34,8 +37,15 @@ class WindowsTab(BaseTab):
 
         self.setLayout(layout)
 
-    def _create_positioning_group(self, title: str, prefix: str, label_width: int) -> QGroupBox:
-        """Generic factory method to create positioning groups."""
+    def _create_window_group(self, title: str, prefix: str, label_width: int, date_config: DateConfig) -> QGroupBox:
+        """Create a group box with positioning and date format settings.
+        
+        Args:
+            title: Group box title
+            prefix: Prefix for widget names (e.g., "data_entry", "svg_display")
+            label_width: Fixed width for labels
+            date_config: DateConfig instance for initializing date format selection
+        """
         group = QGroupBox(title)
         layout = QGridLayout()
         layout.setHorizontalSpacing(10)
@@ -70,12 +80,39 @@ class WindowsTab(BaseTab):
         custom_y.setToolTip("Y coordinate in pixels (window top edge position)")
         setattr(self, f"{prefix}_custom_y", custom_y)
 
-        layout.addWidget(screen_label, 0, 0)
-        layout.addWidget(screen_spinbox, 0, 1)
-        layout.addWidget(x_label, 1, 0)
-        layout.addWidget(custom_x, 1, 1)
-        layout.addWidget(y_label, 2, 0)
-        layout.addWidget(custom_y, 2, 1)
+        # Date Format
+        date_format_label = QLabel("Date Format:")
+        date_format_label.setFixedWidth(label_width)
+        date_format_combo = QComboBox()
+        # Populate with format options from DATE_FORMAT_OPTIONS (key-based lookup)
+        format_names = list(DATE_FORMAT_OPTIONS.keys())
+        date_format_combo.addItems(format_names)
+        
+        # Set current selection based on date_config
+        current_format_name = date_config.get_format_name()
+        if current_format_name and current_format_name in format_names:
+            date_format_combo.setCurrentText(current_format_name)
+        else:
+            # Default to first format if no match found
+            date_format_combo.setCurrentIndex(0)
+        
+        date_format_combo.setToolTip("Date format for this window")
+        setattr(self, f"{prefix}_date_format_combo", date_format_combo)
+
+        # Layout widgets
+        row = 0
+        layout.addWidget(screen_label, row, 0)
+        layout.addWidget(screen_spinbox, row, 1)
+        row += 1
+        layout.addWidget(x_label, row, 0)
+        layout.addWidget(custom_x, row, 1)
+        row += 1
+        layout.addWidget(y_label, row, 0)
+        layout.addWidget(custom_y, row, 1)
+        row += 1
+        layout.addWidget(date_format_label, row, 0)
+        layout.addWidget(date_format_combo, row, 1)
+        
         layout.setColumnStretch(1, 1)
         group.setLayout(layout)
         return group
@@ -116,48 +153,81 @@ class WindowsTab(BaseTab):
         """Update screen specification labels for both positioning groups."""
         for prefix in ["data_entry", "svg_display"]:
             screen_spinbox = getattr(self, f"{prefix}_screen_spinbox")
-            screen_spec_label = getattr(self, f"{prefix}_screen_spec_label")
-            
-            screen_number = screen_spinbox.value()
-            spec = self._get_screen_specification(screen_number)
-            screen_spec_label.setText(spec)
+            if hasattr(self, f"{prefix}_screen_spec_label"):
+                screen_spec_label = getattr(self, f"{prefix}_screen_spec_label")
+                screen_number = screen_spinbox.value()
+                spec = self._get_screen_specification(screen_number)
+                screen_spec_label.setText(spec)
 
     def _connect_signals(self):
-        # Connect signals for both positioning groups
-        for prefix in ["data_entry", "svg_display"]:
+        # Connect signals for both window groups (key-based iteration)
+        window_groups = {
+            "data_entry": "ui_date_config",
+            "svg_display": "chart_date_config"
+        }
+        
+        for prefix, date_config_attr in window_groups.items():
             screen_spinbox = getattr(self, f"{prefix}_screen_spinbox")
             custom_x = getattr(self, f"{prefix}_custom_x")
             custom_y = getattr(self, f"{prefix}_custom_y")
+            date_format_combo = getattr(self, f"{prefix}_date_format_combo")
             
             screen_spinbox.valueChanged.connect(self._sync_data_if_not_initializing)
             custom_x.valueChanged.connect(self._sync_data_if_not_initializing)
             custom_y.valueChanged.connect(self._sync_data_if_not_initializing)
+            date_format_combo.currentTextChanged.connect(self._sync_data_if_not_initializing)
 
     def _load_initial_data_impl(self):
-        # Load window positioning settings for both groups
-        for prefix in ["data_entry", "svg_display"]:
+        # Load window positioning and date format settings for both groups (key-based)
+        window_groups = {
+            "data_entry": ("ui_date_config",),
+            "svg_display": ("chart_date_config",)
+        }
+        
+        for prefix, (date_config_attr,) in window_groups.items():
             screen_spinbox = getattr(self, f"{prefix}_screen_spinbox")
             custom_x = getattr(self, f"{prefix}_custom_x")
             custom_y = getattr(self, f"{prefix}_custom_y")
+            date_format_combo = getattr(self, f"{prefix}_date_format_combo")
             
+            # Load positioning settings
             # Convert from 0-based (internal) to 1-based (display)
             screen_value = getattr(self.app_config.general, f"{prefix}_screen") + 1
             screen_spinbox.setValue(screen_value)
             custom_x.setValue(getattr(self.app_config.general, f"{prefix}_x"))
             custom_y.setValue(getattr(self.app_config.general, f"{prefix}_y"))
+            
+            # Load date format setting
+            date_config = getattr(self.app_config.general, date_config_attr)
+            current_format_name = date_config.get_format_name()
+            if current_format_name and current_format_name in DATE_FORMAT_OPTIONS:
+                date_format_combo.setCurrentText(current_format_name)
 
     def _sync_data_impl(self):
-        # Update app config for both positioning groups
-        for prefix in ["data_entry", "svg_display"]:
+        # Update app config for both window groups (key-based)
+        window_groups = {
+            "data_entry": "ui_date_config",
+            "svg_display": "chart_date_config"
+        }
+        
+        for prefix, date_config_attr in window_groups.items():
             screen_spinbox = getattr(self, f"{prefix}_screen_spinbox")
             custom_x = getattr(self, f"{prefix}_custom_x")
             custom_y = getattr(self, f"{prefix}_custom_y")
+            date_format_combo = getattr(self, f"{prefix}_date_format_combo")
             
+            # Update positioning settings
             # Convert from 1-based (display) to 0-based (internal)
             screen_value = screen_spinbox.value() - 1
             setattr(self.app_config.general, f"{prefix}_screen", screen_value)
             setattr(self.app_config.general, f"{prefix}_x", custom_x.value())
             setattr(self.app_config.general, f"{prefix}_y", custom_y.value())
+            
+            # Update date format setting
+            selected_format_name = date_format_combo.currentText()
+            if selected_format_name in DATE_FORMAT_OPTIONS:
+                new_date_config = DateConfig.from_format_name(selected_format_name)
+                setattr(self.app_config.general, date_config_attr, new_date_config)
 
         # Save settings to persist between sessions
         self.app_config.save_settings()
@@ -171,4 +241,3 @@ class WindowsTab(BaseTab):
             'svg_display_x': self.app_config.general.svg_display_x,
             'svg_display_y': self.app_config.general.svg_display_y
         })
-

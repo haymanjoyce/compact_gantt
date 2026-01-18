@@ -2,8 +2,10 @@ from PyQt5.QtWidgets import QTableWidgetItem, QComboBox, QCheckBox, QWidget, QHB
 from PyQt5.QtCore import Qt, QDate
 from PyQt5.QtGui import QBrush, QColor
 from datetime import datetime
+from typing import Optional
 import logging
 from config.ui_config import UIConfig
+from config.date_config import DateConfig
 
 # Read-only cell background color (light gray) - centralized in UIConfig
 _ui_config = UIConfig()
@@ -37,6 +39,16 @@ class NumericTableWidgetItem(QTableWidgetItem):
         return super().__lt__(other)
 
 class DateTableWidgetItem(QTableWidgetItem):
+    def __init__(self, text: str = "", date_config: Optional[DateConfig] = None):
+        """Initialize DateTableWidgetItem with optional DateConfig.
+        
+        Args:
+            text: Initial text for the item
+            date_config: Optional DateConfig instance. If None, uses default.
+        """
+        super().__init__(text)
+        self._date_config = date_config or DateConfig()
+    
     def __lt__(self, other):
         """Compare items by date for proper chronological sorting."""
         self_data = self.data(Qt.UserRole)
@@ -50,13 +62,14 @@ class DateTableWidgetItem(QTableWidgetItem):
             except (TypeError, ValueError):
                 pass
         
-        # Fallback: try to parse text as dates (dd/mm/yyyy format)
+        # Fallback: try to parse text as dates using config format
         try:
             self_text = self.text().strip()
             other_text = other.text().strip() if other else ""
             if self_text and other_text:
-                self_date = datetime.strptime(self_text, "%d/%m/%Y")
-                other_date = datetime.strptime(other_text, "%d/%m/%Y")
+                date_format = self._date_config.get_python_format()
+                self_date = datetime.strptime(self_text, date_format)
+                other_date = datetime.strptime(other_text, date_format)
                 return self_date < other_date
         except (ValueError, AttributeError):
             pass
@@ -75,10 +88,17 @@ class CheckBoxWidget(QWidget):
 
 class DateEditWidget(QDateEdit):
     """QDateEdit widget for use in table cells with calendar popup."""
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, date_config: Optional[DateConfig] = None):
+        """Initialize DateEditWidget with optional DateConfig.
+        
+        Args:
+            parent: Parent widget
+            date_config: Optional DateConfig instance. If None, uses default.
+        """
         super().__init__(parent)
+        self._date_config = date_config or DateConfig()
         self.setCalendarPopup(True)
-        self.setDisplayFormat("dd/MM/yyyy")
+        self.setDisplayFormat(self._date_config.get_qt_format())
         self.setDate(QDate.currentDate())
 
 def highlight_table_errors(table, errors):
@@ -119,17 +139,22 @@ def highlight_table_errors(table, errors):
     
     table.blockSignals(False)
 
-def extract_table_data(table, include_widgets=True):
+def extract_table_data(table, include_widgets=True, date_config: Optional[DateConfig] = None):
     """
     Common function to extract data from table, skipping the checkbox column.
     
     Args:
         table: QTableWidget to extract data from
         include_widgets: Whether to handle widget cells (like QComboBox, QDateEdit)
+        date_config: Optional DateConfig instance. If None, uses default.
     
     Returns:
         List of lists containing table data
     """
+    # Use default config if not provided (backward compatibility)
+    if date_config is None:
+        date_config = DateConfig()
+    
     data = []
     for row in range(table.rowCount()):
         row_data = []
@@ -140,8 +165,9 @@ def extract_table_data(table, include_widgets=True):
                 if widget and isinstance(widget, QComboBox):
                     row_data.append(widget.currentText())
                 elif widget and isinstance(widget, QDateEdit):
-                    # Format date as dd/MM/yyyy for display
-                    row_data.append(widget.date().toString("dd/MM/yyyy"))
+                    # Format date using config format
+                    date_format = date_config.get_qt_format()
+                    row_data.append(widget.date().toString(date_format))
                 else:
                     item = table.item(row, col)
                     row_data.append(item.text() if item else "")
@@ -151,7 +177,7 @@ def extract_table_data(table, include_widgets=True):
         data.append(row_data)
     return data
 
-def add_row(table, table_key, table_configs, parent, id_field_name, row_index=None, default_row_number=None):
+def add_row(table, table_key, table_configs, parent, id_field_name, row_index=None, default_row_number=None, date_config: Optional[DateConfig] = None):
     """Add a row to a table with proper ID and sorting handling, using generic default value logic.
     
     Args:
@@ -261,7 +287,10 @@ def add_row(table, table_key, table_configs, parent, id_field_name, row_index=No
                 table.setCellWidget(row_index, col_idx, combo)
             # Date column - check by column name for tasks, pipes, and curtains tables
             elif header_text in ["Start Date", "Finish Date", "Date", "End Date"]:
-                date_edit = DateEditWidget()
+                # Use provided date_config or default
+                if date_config is None:
+                    date_config = DateConfig()
+                date_edit = DateEditWidget(date_config=date_config)
                 date_edit.setDate(QDate.currentDate())  # Default to today
                 # Connect signal to sync data when date changes
                 if hasattr(parent, '_sync_data_if_not_initializing'):

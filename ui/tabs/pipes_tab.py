@@ -36,7 +36,7 @@ class PipesTab(BaseTab):
         add_btn = QPushButton("Add Pipe")
         add_btn.setToolTip("Add a new pipe")
         add_btn.setMinimumWidth(120)
-        add_btn.clicked.connect(lambda: add_row(self.pipes_table, "pipes", self.app_config.tables, self, "ID"))
+        add_btn.clicked.connect(lambda: add_row(self.pipes_table, "pipes", self.app_config.tables, self, "ID", date_config=self.app_config.general.ui_date_config))
         
         remove_btn = QPushButton("Remove Pipe")
         remove_btn.setToolTip("Remove selected pipe(s)")
@@ -356,7 +356,7 @@ class PipesTab(BaseTab):
                     date_widget.dateChanged.connect(self._sync_data_if_not_initializing)
             else:
                 # Create QDateEdit if it doesn't exist
-                date_widget = DateEditWidget()
+                date_widget = DateEditWidget(date_config=self.app_config.general.ui_date_config)
                 if pipe.date:
                     try:
                         date_dt = datetime.strptime(pipe.date, "%Y-%m-%d")

@@ -14,7 +14,7 @@ from repositories.project_repository import ProjectRepository
 from repositories.excel_repository import ExcelRepository
 from models.project import ProjectData  # Import here to avoid circular import
 from ui.window_utils import move_window_according_to_preferences
-from .tabs.windows_tab import WindowsTab
+from .tabs.preferences_tab import PreferencesTab
 from .tabs.titles_tab import TitlesTab
 from .tabs.timeline_tab import TimelineTab
 from .tabs.swimlanes_tab import SwimlanesTab
@@ -117,8 +117,8 @@ class MainWindow(QMainWindow):
         self.status_bar.showMessage("Ready")
 
     def _create_all_tabs(self):
-        self.windows_tab = WindowsTab(self.project_data, self.app_config)
-        self.windows_tab.data_updated.connect(self._on_windows_updated)
+        self.preferences_tab = PreferencesTab(self.project_data, self.app_config)
+        self.preferences_tab.data_updated.connect(self._on_preferences_updated)
         self.layout_tab = LayoutTab(self.project_data, self.app_config)
         self.titles_tab = TitlesTab(self.project_data, self.app_config)
         self.timeline_tab = TimelineTab(self.project_data, self.app_config)
@@ -137,7 +137,7 @@ class MainWindow(QMainWindow):
         """Add all tabs to the tab widget in saved order (or default if no saved order)."""
         # Create a mapping of tab names to tab widgets for easy lookup
         self._tab_map = {
-            "Windows": self.windows_tab,
+            "Preferences": self.preferences_tab,
             "Layout": self.layout_tab,
             "Titles": self.titles_tab,
             "Timeline": self.timeline_tab,
@@ -410,8 +410,8 @@ class MainWindow(QMainWindow):
         # The emitting tab already synced its data; just emit to refresh the chart
         self.data_updated.emit(self.project_data.to_json())
 
-    def _on_windows_updated(self, data):
-        """Handle updates from windows tab"""
+    def _on_preferences_updated(self, data):
+        """Handle updates from preferences tab"""
         # Reposition data entry window if positioning preferences changed
         if any(key in data for key in ['data_entry_screen', 'data_entry_x', 'data_entry_y']):
             move_window_according_to_preferences(

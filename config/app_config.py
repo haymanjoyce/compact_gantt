@@ -11,15 +11,18 @@ from utils.conversion import internal_to_display_date, display_to_internal_date,
 from config.window_config import WindowConfig
 from config.chart_config import ChartConfig
 from config.ui_config import UIConfig
+from config.date_config import DateConfig
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 @dataclass
 class GeneralConfig:
-    """General configuration that composes window, chart, and UI configs for backward compatibility."""
+    """General configuration that composes window, chart, UI, and date configs for backward compatibility."""
     window: WindowConfig = field(default_factory=WindowConfig)
     chart: ChartConfig = field(default_factory=ChartConfig)
     ui: UIConfig = field(default_factory=UIConfig)
+    ui_date_config: DateConfig = field(default_factory=DateConfig)  # Date format for data entry UI (tables, date pickers, Excel)
+    chart_date_config: DateConfig = field(default_factory=DateConfig)  # Date format for chart display (task labels)
 
     # Backward compatibility properties - delegate to window and chart configs
     @property
@@ -257,12 +260,12 @@ class AppConfig:
         # Load settings first, before initializing tables
         self._load_settings()
         
-        # Define robust date validator function
+        # Define robust date validator function using DateConfig
         def validate_display_date(x):
-            """Validate date in dd/mm/yyyy format."""
+            """Validate date in configured display format."""
             if not x or not str(x).strip():
                 return False
-            return is_valid_display_date(str(x).strip())
+            return is_valid_display_date(str(x).strip(), self.general.ui_date_config)
 
         # Define table configurations
         self.tables = {

@@ -13,6 +13,7 @@ from models.curtain import Curtain
 from models.swimlane import Swimlane
 from models.note import Note
 from utils.conversion import internal_to_display_date, display_to_internal_date
+from config.date_config import DateConfig
 
 
 class ExcelRepository:
@@ -162,9 +163,10 @@ class ExcelRepository:
         ws.append(["Field", "Value"])
         self._format_header_row(ws, 1)
         
-        # Timeframe fields
-        ws.append(["Chart Start Date", internal_to_display_date(frame_config.chart_start_date)])
-        ws.append(["Chart End Date", internal_to_display_date(frame_config.chart_end_date)])
+        # Timeframe fields - use default DateConfig for Excel export
+        date_config = DateConfig()
+        ws.append(["Chart Start Date", internal_to_display_date(frame_config.chart_start_date, date_config)])
+        ws.append(["Chart End Date", internal_to_display_date(frame_config.chart_end_date, date_config)])
         
         # Scale fields
         ws.append(["Show Years", "Yes" if frame_config.show_years else "No"])
@@ -235,6 +237,9 @@ class ExcelRepository:
         """
         ws = wb.create_sheet("Tasks")
         
+        # Use default DateConfig for Excel export
+        date_config = DateConfig()
+        
         # Headers - only include fields that are visible/editable in UI
         headers = ["ID", "Row", "Name", "Start Date", "Finish Date", "Label Content", "Label Placement", "Label Offset", "Fill Color"]
         ws.append(headers)
@@ -248,8 +253,8 @@ class ExcelRepository:
                 task.task_id,
                 task.row_number,
                 task.task_name,
-                internal_to_display_date(task.start_date),
-                internal_to_display_date(task.finish_date),
+                internal_to_display_date(task.start_date, date_config),
+                internal_to_display_date(task.finish_date, date_config),
                 label_content,
                 task.label_placement,
                 int(task.label_horizontal_offset) if task.label_horizontal_offset else 0,
@@ -325,8 +330,11 @@ class ExcelRepository:
         ws.append(["ID", "Date", "Color", "Name"])
         self._format_header_row(ws, 1)
         
+        # Use default DateConfig for Excel export
+        date_config = DateConfig()
+        
         for pipe in pipes:
-            date_display = internal_to_display_date(pipe.date) if pipe.date else ""
+            date_display = internal_to_display_date(pipe.date, date_config) if pipe.date else ""
             ws.append([
                 pipe.pipe_id,
                 date_display,
@@ -340,9 +348,12 @@ class ExcelRepository:
         ws.append(["ID", "Start Date", "End Date", "Color", "Name"])
         self._format_header_row(ws, 1)
         
+        # Use default DateConfig for Excel export
+        date_config = DateConfig()
+        
         for curtain in curtains:
-            start_date_display = internal_to_display_date(curtain.start_date) if curtain.start_date else ""
-            end_date_display = internal_to_display_date(curtain.end_date) if curtain.end_date else ""
+            start_date_display = internal_to_display_date(curtain.start_date, date_config) if curtain.start_date else ""
+            end_date_display = internal_to_display_date(curtain.end_date, date_config) if curtain.end_date else ""
             ws.append([
                 curtain.curtain_id,
                 start_date_display,
@@ -355,6 +366,9 @@ class ExcelRepository:
         """Read Pipes worksheet and return list of Pipe objects."""
         pipes = []
         headers = {}
+        
+        # Use default DateConfig for Excel import
+        date_config = DateConfig()
         
         # Read header row
         header_row = ws[1]
@@ -378,7 +392,7 @@ class ExcelRepository:
                         if isinstance(value, datetime):
                             pipe_data["date"] = value.strftime("%Y-%m-%d")
                         else:
-                            pipe_data["date"] = display_to_internal_date(str(value))
+                            pipe_data["date"] = display_to_internal_date(str(value), date_config)
                     else:
                         pipe_data["date"] = ""
                 elif header == "Colour" or header == "Color":
@@ -398,6 +412,9 @@ class ExcelRepository:
         """Read Curtains worksheet and return list of Curtain objects."""
         curtains = []
         headers = {}
+        
+        # Use default DateConfig for Excel import
+        date_config = DateConfig()
         
         # Read header row
         header_row = ws[1]
@@ -421,7 +438,7 @@ class ExcelRepository:
                         if isinstance(value, datetime):
                             curtain_data["start_date"] = value.strftime("%Y-%m-%d")
                         else:
-                            curtain_data["start_date"] = display_to_internal_date(str(value))
+                            curtain_data["start_date"] = display_to_internal_date(str(value), date_config)
                     else:
                         curtain_data["start_date"] = ""
                 elif header == "End Date":
@@ -429,7 +446,7 @@ class ExcelRepository:
                         if isinstance(value, datetime):
                             curtain_data["end_date"] = value.strftime("%Y-%m-%d")
                         else:
-                            curtain_data["end_date"] = display_to_internal_date(str(value))
+                            curtain_data["end_date"] = display_to_internal_date(str(value), date_config)
                     else:
                         curtain_data["end_date"] = ""
                 elif header == "Colour" or header == "Color":
@@ -546,6 +563,8 @@ class ExcelRepository:
                 elif key in ["Chart Start Date", "Chart End Date"]:
                     # Convert from display format (dd/mm/yyyy) to internal format (yyyy-mm-dd)
                     # Handle both string dates and Excel date serial numbers
+                    # Use default DateConfig for Excel import
+                    date_config = DateConfig()
                     try:
                         if value:
                             if isinstance(value, datetime):
@@ -553,7 +572,7 @@ class ExcelRepository:
                                 value = value.strftime("%Y-%m-%d")
                             else:
                                 # String date - convert from display format
-                                value = display_to_internal_date(str(value))
+                                value = display_to_internal_date(str(value), date_config)
                     except (ValueError, AttributeError):
                         pass  # Keep original value if conversion fails
                 elif key in ["Header Text", "Footer Text"]:
@@ -656,6 +675,8 @@ class ExcelRepository:
                     elif header == "Start Date":
                         # Convert from display format to internal format
                         # Handle both string dates and Excel date serial numbers
+                        # Use default DateConfig for Excel import
+                        date_config = DateConfig()
                         try:
                             if value:
                                 if isinstance(value, datetime):
@@ -663,7 +684,7 @@ class ExcelRepository:
                                     task_data["start_date"] = value.strftime("%Y-%m-%d")
                                 else:
                                     # String date - convert from display format
-                                    task_data["start_date"] = display_to_internal_date(str(value))
+                                    task_data["start_date"] = display_to_internal_date(str(value), date_config)
                             else:
                                 task_data["start_date"] = ""
                         except (ValueError, AttributeError):
@@ -671,6 +692,8 @@ class ExcelRepository:
                     elif header == "Finish Date":
                         # Convert from display format to internal format
                         # Handle both string dates and Excel date serial numbers
+                        # Use default DateConfig for Excel import
+                        date_config = DateConfig()
                         try:
                             if value:
                                 if isinstance(value, datetime):
@@ -678,7 +701,7 @@ class ExcelRepository:
                                     task_data["finish_date"] = value.strftime("%Y-%m-%d")
                                 else:
                                     # String date - convert from display format
-                                    task_data["finish_date"] = display_to_internal_date(str(value))
+                                    task_data["finish_date"] = display_to_internal_date(str(value), date_config)
                             else:
                                 task_data["finish_date"] = ""
                         except (ValueError, AttributeError):

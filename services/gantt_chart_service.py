@@ -214,6 +214,9 @@ class GanttChartService(QObject):
         """
         from utils.conversion import internal_to_display_date
         
+        # Use chart_date_config for date formatting in chart labels
+        chart_date_config = self.config.general.chart_date_config
+        
         if label_content == "None":
             return ""
         elif label_content == "Name only":
@@ -222,11 +225,11 @@ class GanttChartService(QObject):
             if is_milestone:
                 # For milestones, show single date
                 date_str = start_date_str if start_date_str else finish_date_str
-                return internal_to_display_date(date_str) if date_str else ""
+                return internal_to_display_date(date_str, chart_date_config) if date_str else ""
             else:
                 # For tasks, show date range
-                start_display = internal_to_display_date(start_date_str) if start_date_str else ""
-                finish_display = internal_to_display_date(finish_date_str) if finish_date_str else ""
+                start_display = internal_to_display_date(start_date_str, chart_date_config) if start_date_str else ""
+                finish_display = internal_to_display_date(finish_date_str, chart_date_config) if finish_date_str else ""
                 if start_display and finish_display:
                     if start_display == finish_display:
                         return start_display
@@ -242,15 +245,15 @@ class GanttChartService(QObject):
             if is_milestone:
                 # For milestones: "Task Name (01/01/2025)"
                 date_str = start_date_str if start_date_str else finish_date_str
-                date_display = internal_to_display_date(date_str) if date_str else ""
+                date_display = internal_to_display_date(date_str, chart_date_config) if date_str else ""
                 if date_display:
                     return f"{task_name} ({date_display})"
                 else:
                     return task_name
             else:
                 # For tasks: "Task Name (01/01/2025 - 31/01/2025)"
-                start_display = internal_to_display_date(start_date_str) if start_date_str else ""
-                finish_display = internal_to_display_date(finish_date_str) if finish_date_str else ""
+                start_display = internal_to_display_date(start_date_str, chart_date_config) if start_date_str else ""
+                finish_display = internal_to_display_date(finish_date_str, chart_date_config) if finish_date_str else ""
                 if start_display and finish_display:
                     if start_display == finish_display:
                         return f"{task_name} ({start_display})"
