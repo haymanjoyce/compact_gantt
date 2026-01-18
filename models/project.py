@@ -10,8 +10,15 @@ from utils.conversion import safe_int, safe_float, display_to_internal_date, int
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class ProjectData:
-    def __init__(self):
-        app_config = AppConfig()
+    def __init__(self, app_config=None):
+        """Initialize ProjectData with optional AppConfig.
+        
+        Args:
+            app_config: Optional AppConfig instance. If None, creates a new instance for fallback.
+                       Should pass the shared instance from main() to ensure consistency.
+        """
+        if app_config is None:
+            app_config = AppConfig()  # Fallback only - prefer passing shared instance
         self.frame_config = FrameConfig(num_rows=app_config.general.tasks_rows)
         # Initialize chart_config from app_config (for typography and other chart settings)
         self.chart_config = ChartConfig(

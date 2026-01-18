@@ -136,7 +136,7 @@ def main():
     icon_path = Path(__file__).parent / "assets" / "favicon.ico"
     app.setWindowIcon(QIcon(str(icon_path)))
     app_config = AppConfig()  # Single instance
-    project_data = ProjectData()
+    project_data = ProjectData(app_config)  # Pass the shared instance
     gantt_chart_service = GanttChartService(app_config)  # Pass the shared instance
     svg_display = SvgDisplay(app_config)
     data_entry = MainWindow(project_data, svg_display, app_config)  # Pass project_data, svg_display, and app_config
