@@ -177,3 +177,10 @@ python tests/test_project_save_load.py
 - When creating new data entities, use `@dataclass` with named fields
 - When refactoring existing positional arrays, migrate to dataclasses
 - UI boundary code should work directly with dataclass objects, not positional lists
+
+## Copyright
+
+Copyright (c) 2014-2025 Richard Hayman-Joyce. All Rights Reserved.
+
+This software is provided free of charge but remains proprietary. See 
+LICENSE file for terms of use.
