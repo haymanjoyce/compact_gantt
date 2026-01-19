@@ -206,25 +206,6 @@ class CurtainsTab(BaseTab):
         self.curtains_table.itemChanged.connect(self._on_item_changed)
         self.curtains_table.selectionModel().selectionChanged.connect(self._on_table_selection_changed)
     
-    def _get_column_index(self, column_name: str) -> Optional[int]:
-        """Get the column index for a given column name."""
-        for idx, col_config in enumerate(self.table_config.columns):
-            if col_config.name == column_name:
-                return idx
-        return None
-    
-    def _get_column_name_from_item(self, item) -> Optional[str]:
-        """Get the column name (key) from a table item."""
-        if item is None:
-            return None
-        try:
-            col_idx = item.column()
-            if not isinstance(col_idx, int) or col_idx < 0 or col_idx >= len(self.table_config.columns):
-                return None
-            return self.table_config.columns[col_idx].name
-        except (IndexError, AttributeError):
-            return None
-    
     def _on_item_changed(self, item):
         """Handle item changes - update UserRole for numeric and date columns."""
         if item is None:
@@ -365,16 +346,8 @@ class CurtainsTab(BaseTab):
                 date_widget.dateChanged.connect(self._sync_data_if_not_initializing)
             else:
                 # Create QDateEdit if it doesn't exist
-                date_widget = DateEditWidget(date_config=self.app_config.general.ui_date_config)
-                if curtain.start_date:
-                    try:
-                        start_dt = datetime.strptime(curtain.start_date, "%Y-%m-%d")
-                        start_qdate = QDate(start_dt.year, start_dt.month, start_dt.day)
-                        date_widget.setDate(start_qdate)
-                    except ValueError:
-                        date_widget.setDate(QDate.currentDate())
-                else:
-                    date_widget.setDate(QDate.currentDate())
+                from ui.table_utils import create_date_widget
+                date_widget = create_date_widget(curtain.start_date if curtain.start_date else "", self.app_config.general.ui_date_config)
                 date_widget.dateChanged.connect(lambda date, w=date_widget: self._update_curtain_date_constraints(widget=w))
                 date_widget.dateChanged.connect(self._sync_data_if_not_initializing)
                 self.curtains_table.setCellWidget(row_idx, start_date_col, date_widget)
@@ -408,16 +381,8 @@ class CurtainsTab(BaseTab):
                 date_widget.dateChanged.connect(self._sync_data_if_not_initializing)
             else:
                 # Create QDateEdit if it doesn't exist
-                date_widget = DateEditWidget(date_config=self.app_config.general.ui_date_config)
-                if curtain.end_date:
-                    try:
-                        end_dt = datetime.strptime(curtain.end_date, "%Y-%m-%d")
-                        end_qdate = QDate(end_dt.year, end_dt.month, end_dt.day)
-                        date_widget.setDate(end_qdate)
-                    except ValueError:
-                        date_widget.setDate(QDate.currentDate())
-                else:
-                    date_widget.setDate(QDate.currentDate())
+                from ui.table_utils import create_date_widget
+                date_widget = create_date_widget(curtain.end_date if curtain.end_date else "", self.app_config.general.ui_date_config)
                 date_widget.dateChanged.connect(lambda date, w=date_widget: self._update_curtain_date_constraints(widget=w))
                 date_widget.dateChanged.connect(self._sync_data_if_not_initializing)
                 self.curtains_table.setCellWidget(row_idx, end_date_col, date_widget)
@@ -516,37 +481,16 @@ class CurtainsTab(BaseTab):
             if curtain_id <= 0:
                 return None
             
-            # Extract Start Date from QDateEdit widget or fallback to text item
-            start_date_widget = self.curtains_table.cellWidget(row_idx, start_date_col)
-            if start_date_widget and isinstance(start_date_widget, QDateEdit):
-                # Read from QDateEdit widget
-                start_qdate = start_date_widget.date()
-                start_date_internal = start_qdate.toString("yyyy-MM-dd")
-            else:
-                # Fallback to text-based item (for backward compatibility)
-                start_date_item = self.curtains_table.item(row_idx, start_date_col)
-                if not start_date_item or not start_date_item.text().strip():
-                    return None
-                try:
-                    start_date_internal = display_to_internal_date(start_date_item.text())
-                except ValueError:
-                    return None
+            # Extract Start Date from QDateEdit widget or fallback to text item (key-based)
+            from ui.table_utils import extract_date_from_cell
+            start_date_internal = extract_date_from_cell(self.curtains_table, row_idx, start_date_col, self.app_config.general.ui_date_config)
+            if not start_date_internal:
+                return None
             
-            # Extract End Date from QDateEdit widget or fallback to text item
-            end_date_widget = self.curtains_table.cellWidget(row_idx, end_date_col)
-            if end_date_widget and isinstance(end_date_widget, QDateEdit):
-                # Read from QDateEdit widget
-                end_qdate = end_date_widget.date()
-                end_date_internal = end_qdate.toString("yyyy-MM-dd")
-            else:
-                # Fallback to text-based item (for backward compatibility)
-                end_date_item = self.curtains_table.item(row_idx, end_date_col)
-                if not end_date_item or not end_date_item.text().strip():
-                    return None
-                try:
-                    end_date_internal = display_to_internal_date(end_date_item.text())
-                except ValueError:
-                    return None
+            # Extract End Date from QDateEdit widget or fallback to text item (key-based)
+            end_date_internal = extract_date_from_cell(self.curtains_table, row_idx, end_date_col, self.app_config.general.ui_date_config)
+            if not end_date_internal:
+                return None
             
             # Get Color from detail form if this row is selected, otherwise from existing curtain
             color = "red"

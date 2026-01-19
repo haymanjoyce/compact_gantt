@@ -101,6 +101,60 @@ class DateEditWidget(QDateEdit):
         self.setDisplayFormat(self._date_config.get_qt_format())
         self.setDate(QDate.currentDate())
 
+def create_date_widget(internal_date: str, date_config: DateConfig) -> DateEditWidget:
+    """Create a DateEditWidget from an internal date string (yyyy-mm-dd format).
+    
+    Args:
+        internal_date: Date string in yyyy-mm-dd format (ISO format)
+        date_config: DateConfig instance for date formatting
+        
+    Returns:
+        DateEditWidget with date set (or current date if invalid/empty)
+    """
+    from utils.conversion import display_to_internal_date
+    
+    widget = DateEditWidget(date_config=date_config)
+    if internal_date and internal_date.strip():
+        try:
+            date_dt = datetime.strptime(internal_date.strip(), "%Y-%m-%d")
+            date_qdate = QDate(date_dt.year, date_dt.month, date_dt.day)
+            widget.setDate(date_qdate)
+        except ValueError:
+            widget.setDate(QDate.currentDate())
+    else:
+        widget.setDate(QDate.currentDate())
+    return widget
+
+def extract_date_from_cell(table, row: int, col: int, date_config: DateConfig) -> Optional[str]:
+    """Extract date from QDateEdit widget or text item, returning internal format (yyyy-mm-dd).
+    
+    Uses key-based approach: checks for QDateEdit widget first, then falls back to text item.
+    
+    Args:
+        table: QTableWidget containing the cell
+        row: Row index (0-based)
+        col: Column index (0-based)
+        date_config: DateConfig instance for date parsing
+        
+    Returns:
+        Date string in yyyy-mm-dd format if found, None otherwise
+    """
+    from utils.conversion import display_to_internal_date
+    
+    # Try QDateEdit widget first (preferred method)
+    widget = table.cellWidget(row, col)
+    if widget and isinstance(widget, QDateEdit):
+        return widget.date().toString("yyyy-MM-dd")
+    
+    # Fallback to text item (for backward compatibility)
+    item = table.item(row, col)
+    if item and item.text().strip():
+        try:
+            return display_to_internal_date(item.text(), date_config)
+        except ValueError:
+            return None
+    return None
+
 def highlight_table_errors(table, errors):
     """
     Common function to highlight errors in table rows.

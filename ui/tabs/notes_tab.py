@@ -240,13 +240,6 @@ class NotesTab(BaseTab):
         self.notes_table.itemChanged.connect(self._on_item_changed)
         self.notes_table.selectionModel().selectionChanged.connect(self._on_table_selection_changed)
     
-    def _get_column_index(self, column_name: str) -> Optional[int]:
-        """Get the column index for a given column name."""
-        for idx, col_config in enumerate(self.table_config.columns):
-            if col_config.name == column_name:
-                return idx
-        return None
-    
     def _truncate_text(self, text: str, max_length: int = 80) -> str:
         """Truncate text to max_length and add ellipsis if needed."""
         if not text:
@@ -254,18 +247,6 @@ class NotesTab(BaseTab):
         if len(text) <= max_length:
             return text
         return text[:max_length - 3] + "..."
-    
-    def _get_column_name_from_item(self, item) -> Optional[str]:
-        """Get the column name (key) from a table item."""
-        if item is None:
-            return None
-        try:
-            col_idx = item.column()
-            if not isinstance(col_idx, int) or col_idx < 0 or col_idx >= len(self.table_config.columns):
-                return None
-            return self.table_config.columns[col_idx].name
-        except (IndexError, AttributeError):
-            return None
     
     def _on_item_changed(self, item):
         """Handle item changes - update UserRole for numeric columns."""

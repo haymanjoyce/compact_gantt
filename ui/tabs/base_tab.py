@@ -1,5 +1,6 @@
-from PyQt5.QtWidgets import QWidget, QMessageBox
-from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtWidgets import QWidget, QMessageBox, QTableWidget, QHeaderView, QSizePolicy
+from PyQt5.QtCore import Qt, pyqtSignal
+from typing import Optional
 import logging
 
 class BaseTab(QWidget):
@@ -16,6 +17,43 @@ class BaseTab(QWidget):
         self._load_initial_data()
         self._initializing = False
         self._connect_signals()
+    
+    def _get_column_index(self, column_name: str) -> Optional[int]:
+        """Get the column index for a given column name using key-based lookup.
+        
+        Args:
+            column_name: Name of the column to find (key-based, not index-based)
+            
+        Returns:
+            Column index if found, None otherwise
+        """
+        if not hasattr(self, 'table_config') or not self.table_config:
+            return None
+        for idx, col_config in enumerate(self.table_config.columns):
+            if col_config.name == column_name:
+                return idx
+        return None
+    
+    def _get_column_name_from_item(self, item) -> Optional[str]:
+        """Get the column name (key) from a table item using key-based lookup.
+        
+        Args:
+            item: QTableWidgetItem to get column name for
+            
+        Returns:
+            Column name if found, None otherwise
+        """
+        if item is None:
+            return None
+        if not hasattr(self, 'table_config') or not self.table_config:
+            return None
+        try:
+            col_idx = item.column()
+            if not isinstance(col_idx, int) or col_idx < 0 or col_idx >= len(self.table_config.columns):
+                return None
+            return self.table_config.columns[col_idx].name
+        except (IndexError, AttributeError):
+            return None
 
     def setup_ui(self):
         """Override this method to set up the UI for each tab."""
@@ -75,3 +113,20 @@ class BaseTab(QWidget):
         for widget in widgets:
             if widget is not None:
                 widget.setEnabled(enabled)
+    
+    def _setup_table_base(self, table: QTableWidget, selection_mode: int = QTableWidget.SingleSelection):
+        """Apply common table styling and behavior settings.
+        
+        Args:
+            table: QTableWidget to configure
+            selection_mode: Selection mode (QTableWidget.SingleSelection or QTableWidget.ExtendedSelection)
+        """
+        table.setAlternatingRowColors(False)
+        table.setSelectionBehavior(QTableWidget.SelectRows)
+        table.setSelectionMode(selection_mode)
+        table.setShowGrid(True)
+        table.verticalHeader().setVisible(False)
+        table.setStyleSheet(self.app_config.general.table_stylesheet)
+        table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        table.setSortingEnabled(True)
+        table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)

@@ -342,13 +342,6 @@ class TasksTab(BaseTab):
         self._item_changed_connection = self.tasks_table.itemChanged.connect(self._on_item_changed)
         self.tasks_table.selectionModel().selectionChanged.connect(self._on_table_selection_changed)
     
-    def _get_column_index(self, column_name: str) -> Optional[int]:
-        """Get the column index for a given column name (in actual column list, not visible)."""
-        for idx, col_config in enumerate(self.table_config.columns):
-            if col_config.name == column_name:
-                return idx
-        return None
-    
     def _get_swimlane_info_for_row(self, row_number: int) -> Tuple[Optional[int], Optional[str]]:
         """
         Get swimlane order and name for a given row number.
@@ -608,41 +601,36 @@ class TasksTab(BaseTab):
             if task_id <= 0:
                 return None
             
-            # Extract dates from QDateEdit widgets or fallback to text items
+            # Extract dates from QDateEdit widgets or fallback to text items (key-based)
+            from ui.table_utils import extract_date_from_cell
             start_date_internal = ""
             start_date_conversion_failed = False
             if start_date_vis_col is not None:
-                start_date_widget = self.tasks_table.cellWidget(row_idx, start_date_vis_col)
-                if start_date_widget and isinstance(start_date_widget, QDateEdit):
-                    # Read from QDateEdit widget
-                    start_qdate = start_date_widget.date()
-                    start_date_internal = start_qdate.toString("yyyy-MM-dd")
-                else:
-                    # Fallback to text-based item (for backward compatibility)
-                    start_date_item = self.tasks_table.item(row_idx, start_date_vis_col)
-                    if start_date_item and start_date_item.text().strip():
-                        try:
-                            start_date_internal = display_to_internal_date(start_date_item.text(), self.app_config.general.ui_date_config)
-                        except ValueError:
-                            start_date_internal = ""
+                # Get actual column index from visible column index
+                start_date_actual_col = self._column_mapping.get(start_date_vis_col)
+                if start_date_actual_col is not None:
+                    extracted = extract_date_from_cell(self.tasks_table, row_idx, start_date_vis_col, self.app_config.general.ui_date_config)
+                    if extracted:
+                        start_date_internal = extracted
+                    else:
+                        # Check if there's a text item that failed to parse (conversion failed)
+                        start_date_item = self.tasks_table.item(row_idx, start_date_vis_col)
+                        if start_date_item and start_date_item.text().strip():
                             start_date_conversion_failed = True
             
             finish_date_internal = ""
             finish_date_conversion_failed = False
             if finish_date_vis_col is not None:
-                finish_date_widget = self.tasks_table.cellWidget(row_idx, finish_date_vis_col)
-                if finish_date_widget and isinstance(finish_date_widget, QDateEdit):
-                    # Read from QDateEdit widget
-                    finish_qdate = finish_date_widget.date()
-                    finish_date_internal = finish_qdate.toString("yyyy-MM-dd")
-                else:
-                    # Fallback to text-based item (for backward compatibility)
-                    finish_date_item = self.tasks_table.item(row_idx, finish_date_vis_col)
-                    if finish_date_item and finish_date_item.text().strip():
-                        try:
-                            finish_date_internal = display_to_internal_date(finish_date_item.text(), self.app_config.general.ui_date_config)
-                        except ValueError:
-                            finish_date_internal = ""
+                # Get actual column index from visible column index
+                finish_date_actual_col = self._column_mapping.get(finish_date_vis_col)
+                if finish_date_actual_col is not None:
+                    extracted = extract_date_from_cell(self.tasks_table, row_idx, finish_date_vis_col, self.app_config.general.ui_date_config)
+                    if extracted:
+                        finish_date_internal = extracted
+                    else:
+                        # Check if there's a text item that failed to parse (conversion failed)
+                        finish_date_item = self.tasks_table.item(row_idx, finish_date_vis_col)
+                        if finish_date_item and finish_date_item.text().strip():
                             finish_date_conversion_failed = True
             
             # Auto-populate missing date field for milestones (if only one date is provided)
@@ -790,16 +778,8 @@ class TasksTab(BaseTab):
                     date_widget.dateChanged.connect(self._sync_data_if_not_initializing)
                 else:
                     # Create QDateEdit if it doesn't exist
-                    date_widget = DateEditWidget(date_config=self.app_config.general.ui_date_config)
-                    if task.start_date:
-                        try:
-                            start_dt = datetime.strptime(task.start_date, "%Y-%m-%d")
-                            start_qdate = QDate(start_dt.year, start_dt.month, start_dt.day)
-                            date_widget.setDate(start_qdate)
-                        except ValueError:
-                            date_widget.setDate(QDate.currentDate())
-                    else:
-                        date_widget.setDate(QDate.currentDate())
+                    from ui.table_utils import create_date_widget
+                    date_widget = create_date_widget(task.start_date if task.start_date else "", self.app_config.general.ui_date_config)
                 date_widget.dateChanged.connect(lambda date, w=date_widget: self._update_task_date_constraints(widget=w))
                 date_widget.dateChanged.connect(self._sync_data_if_not_initializing)
                 self.tasks_table.setCellWidget(row_idx, start_date_vis_col, date_widget)
@@ -833,16 +813,8 @@ class TasksTab(BaseTab):
                     date_widget.dateChanged.connect(self._sync_data_if_not_initializing)
                 else:
                     # Create QDateEdit if it doesn't exist
-                    date_widget = DateEditWidget(date_config=self.app_config.general.ui_date_config)
-                    if task.finish_date:
-                        try:
-                            finish_dt = datetime.strptime(task.finish_date, "%Y-%m-%d")
-                            finish_qdate = QDate(finish_dt.year, finish_dt.month, finish_dt.day)
-                            date_widget.setDate(finish_qdate)
-                        except ValueError:
-                            date_widget.setDate(QDate.currentDate())
-                    else:
-                        date_widget.setDate(QDate.currentDate())
+                    from ui.table_utils import create_date_widget
+                    date_widget = create_date_widget(task.finish_date if task.finish_date else "", self.app_config.general.ui_date_config)
                     date_widget.dateChanged.connect(lambda date, w=date_widget: self._update_task_date_constraints(widget=w))
                     date_widget.dateChanged.connect(self._sync_data_if_not_initializing)
                     self.tasks_table.setCellWidget(row_idx, finish_date_vis_col, date_widget)

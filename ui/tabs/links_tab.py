@@ -414,13 +414,6 @@ class LinksTab(BaseTab):
             return text
         return text[:max_length - 3] + "..."
     
-    def _get_column_index(self, column_name: str) -> Optional[int]:
-        """Get the column index for a given column name."""
-        for idx, col_config in enumerate(self.table_config.columns):
-            if col_config.name == column_name:
-                return idx
-        return None
-    
     def _link_from_table_row(self, row_idx: int) -> Optional[Link]:
         """
         Extract a Link object from a table row.

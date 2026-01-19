@@ -450,18 +450,6 @@ class SwimlanesTab(BaseTab):
                 return idx
         return None
     
-    def _get_column_name_from_item(self, item) -> Optional[str]:
-        """Get the column name (key) from a table item."""
-        if item is None:
-            return None
-        try:
-            col_idx = item.column()
-            if not isinstance(col_idx, int) or col_idx < 0 or col_idx >= len(self.table_config.columns):
-                return None
-            return self.table_config.columns[col_idx].name
-        except (IndexError, AttributeError):
-            return None
-    
     def _on_item_changed(self, item):
         """Handle item changes - update UserRole for numeric columns."""
         if item is None:

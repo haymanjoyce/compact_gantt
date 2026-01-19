@@ -59,15 +59,8 @@ class PipesTab(BaseTab):
         self.pipes_table = QTableWidget(0, len(headers))
         self.pipes_table.setHorizontalHeaderLabels(headers)
         
-        # Table styling
-        self.pipes_table.setAlternatingRowColors(False)
-        self.pipes_table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.pipes_table.setSelectionMode(QTableWidget.SingleSelection)
-        self.pipes_table.setShowGrid(True)
-        self.pipes_table.verticalHeader().setVisible(False)
-        
-        # Add bottom border to header row and gridline styling
-        self.pipes_table.setStyleSheet(self.app_config.general.table_stylesheet)
+        # Apply common table styling (key-based approach)
+        self._setup_table_base(self.pipes_table, QTableWidget.SingleSelection)
         
         # Column sizing - use key-based lookups instead of positional indices
         header = self.pipes_table.horizontalHeader()
@@ -93,13 +86,6 @@ class PipesTab(BaseTab):
             self.pipes_table.setColumnWidth(date_col, 110)  # Fixed width for date (dd/mm/yyyy format)
         if name_col is not None:
             header.setSectionResizeMode(name_col, QHeaderView.Stretch)
-        
-        # Enable horizontal scroll bar
-        self.pipes_table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        self.pipes_table.setSortingEnabled(True)
-        
-        # Set table size policy
-        self.pipes_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         
         table_group_layout.addLayout(toolbar)
         table_group_layout.addWidget(self.pipes_table)
@@ -201,25 +187,6 @@ class PipesTab(BaseTab):
     def _connect_signals(self):
         self.pipes_table.itemChanged.connect(self._on_item_changed)
         self.pipes_table.selectionModel().selectionChanged.connect(self._on_table_selection_changed)
-    
-    def _get_column_index(self, column_name: str) -> Optional[int]:
-        """Get the column index for a given column name."""
-        for idx, col_config in enumerate(self.table_config.columns):
-            if col_config.name == column_name:
-                return idx
-        return None
-    
-    def _get_column_name_from_item(self, item) -> Optional[str]:
-        """Get the column name (key) from a table item."""
-        if item is None:
-            return None
-        try:
-            col_idx = item.column()
-            if not isinstance(col_idx, int) or col_idx < 0 or col_idx >= len(self.table_config.columns):
-                return None
-            return self.table_config.columns[col_idx].name
-        except (IndexError, AttributeError):
-            return None
     
     def _on_item_changed(self, item):
         """Handle item changes - update UserRole for numeric and date columns."""
@@ -356,16 +323,8 @@ class PipesTab(BaseTab):
                     date_widget.dateChanged.connect(self._sync_data_if_not_initializing)
             else:
                 # Create QDateEdit if it doesn't exist
-                date_widget = DateEditWidget(date_config=self.app_config.general.ui_date_config)
-                if pipe.date:
-                    try:
-                        date_dt = datetime.strptime(pipe.date, "%Y-%m-%d")
-                        date_qdate = QDate(date_dt.year, date_dt.month, date_dt.day)
-                        date_widget.setDate(date_qdate)
-                    except ValueError:
-                        date_widget.setDate(QDate.currentDate())
-                else:
-                    date_widget.setDate(QDate.currentDate())
+                from ui.table_utils import create_date_widget
+                date_widget = create_date_widget(pipe.date if pipe.date else "", self.app_config.general.ui_date_config)
                 if hasattr(self, '_sync_data_if_not_initializing'):
                     date_widget.dateChanged.connect(self._sync_data_if_not_initializing)
                 self.pipes_table.setCellWidget(row_idx, date_col, date_widget)
@@ -397,22 +356,11 @@ class PipesTab(BaseTab):
             if pipe_id <= 0:
                 return None
             
-            # Extract Date from QDateEdit widget or fallback to text item
-            date_widget = self.pipes_table.cellWidget(row_idx, date_col)
-            if date_widget and isinstance(date_widget, QDateEdit):
-                # Read from QDateEdit widget
-                date_qdate = date_widget.date()
-                date_internal = date_qdate.toString("yyyy-MM-dd")
-            else:
-                # Fallback to text-based item (for backward compatibility)
-                date_item = self.pipes_table.item(row_idx, date_col)
-                if not date_item or not date_item.text().strip():
-                    return None
-                try:
-                    date_internal = display_to_internal_date(date_item.text())
-                except ValueError:
-                    # Invalid date format - return None to skip this row
-                    return None
+            # Extract Date from QDateEdit widget or fallback to text item (key-based)
+            from ui.table_utils import extract_date_from_cell
+            date_internal = extract_date_from_cell(self.pipes_table, row_idx, date_col, self.app_config.general.ui_date_config)
+            if not date_internal:
+                return None
             
             # Get Color from detail form if this row is selected, otherwise from existing pipe
             color = "red"
