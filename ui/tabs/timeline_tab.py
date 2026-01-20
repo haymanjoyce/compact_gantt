@@ -3,6 +3,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QGridLayout, QGroupBox, QLabe
 from PyQt5.QtCore import pyqtSignal, Qt, QDate
 from datetime import datetime, timedelta
 import logging
+from utils.conversion import parse_internal_date
 from .base_tab import BaseTab
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -146,17 +147,17 @@ class TimelineTab(BaseTab):
         
         # If finish_date doesn't exist, calculate default (30 days after start)
         if not finish_date_str:
-            try:
-                start_dt = datetime.strptime(start_date_str, "%Y-%m-%d")
+            start_dt = parse_internal_date(start_date_str)
+            if start_dt:
                 finish_dt = start_dt + timedelta(days=30)
                 finish_date_str = finish_dt.strftime("%Y-%m-%d")
-            except ValueError:
+            else:
                 finish_date_str = "2025-01-29"
         
         # Convert internal format (yyyy-mm-dd) to QDate
-        try:
-            start_dt = datetime.strptime(start_date_str, "%Y-%m-%d")
-            finish_dt = datetime.strptime(finish_date_str, "%Y-%m-%d")
+        start_dt = parse_internal_date(start_date_str)
+        finish_dt = parse_internal_date(finish_date_str)
+        if start_dt and finish_dt:
             start_qdate = QDate(start_dt.year, start_dt.month, start_dt.day)
             finish_qdate = QDate(finish_dt.year, finish_dt.month, finish_dt.day)
             
@@ -170,7 +171,7 @@ class TimelineTab(BaseTab):
             
             # Update constraints after setting dates
             self._update_date_constraints()
-        except ValueError:
+        else:
             # Fallback to defaults if parsing fails
             default_start = QDate(2024, 12, 30)
             default_finish = QDate(2025, 1, 29)

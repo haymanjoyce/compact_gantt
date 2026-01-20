@@ -6,12 +6,13 @@ from typing import Optional
 import logging
 from config.ui_config import UIConfig
 from config.date_config import DateConfig
+from utils.conversion import parse_internal_date
 
 # Read-only cell background color (light gray) - centralized in UIConfig
 _ui_config = UIConfig()
 READ_ONLY_BG = _ui_config.read_only_bg_color
 
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class NumericTableWidgetItem(QTableWidgetItem):
     def __lt__(self, other):
@@ -115,11 +116,11 @@ def create_date_widget(internal_date: str, date_config: DateConfig) -> DateEditW
     
     widget = DateEditWidget(date_config=date_config)
     if internal_date and internal_date.strip():
-        try:
-            date_dt = datetime.strptime(internal_date.strip(), "%Y-%m-%d")
+        date_dt = parse_internal_date(internal_date)
+        if date_dt:
             date_qdate = QDate(date_dt.year, date_dt.month, date_dt.day)
             widget.setDate(date_qdate)
-        except ValueError:
+        else:
             widget.setDate(QDate.currentDate())
     else:
         widget.setDate(QDate.currentDate())

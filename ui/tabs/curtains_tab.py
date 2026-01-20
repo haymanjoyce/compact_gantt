@@ -9,7 +9,7 @@ from datetime import datetime
 from ui.table_utils import NumericTableWidgetItem, add_row, remove_row, CheckBoxWidget, DateTableWidgetItem, DateEditWidget
 from .base_tab import BaseTab
 from models.curtain import Curtain
-from utils.conversion import safe_int, display_to_internal_date, internal_to_display_date, normalize_display_date
+from utils.conversion import safe_int, display_to_internal_date, internal_to_display_date, normalize_display_date, parse_internal_date
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -323,13 +323,13 @@ class CurtainsTab(BaseTab):
             if date_widget and isinstance(date_widget, QDateEdit):
                 # Update existing QDateEdit widget
                 if curtain.start_date:
-                    try:
-                        start_dt = datetime.strptime(curtain.start_date, "%Y-%m-%d")
+                    start_dt = parse_internal_date(curtain.start_date)
+                    if start_dt:
                         start_qdate = QDate(start_dt.year, start_dt.month, start_dt.day)
                         date_widget.blockSignals(True)
                         date_widget.setDate(start_qdate)
                         date_widget.blockSignals(False)
-                    except ValueError:
+                    else:
                         date_widget.blockSignals(True)
                         date_widget.setDate(QDate.currentDate())
                         date_widget.blockSignals(False)
@@ -358,13 +358,13 @@ class CurtainsTab(BaseTab):
             if date_widget and isinstance(date_widget, QDateEdit):
                 # Update existing QDateEdit widget
                 if curtain.end_date:
-                    try:
-                        end_dt = datetime.strptime(curtain.end_date, "%Y-%m-%d")
+                    end_dt = parse_internal_date(curtain.end_date)
+                    if end_dt:
                         end_qdate = QDate(end_dt.year, end_dt.month, end_dt.day)
                         date_widget.blockSignals(True)
                         date_widget.setDate(end_qdate)
                         date_widget.blockSignals(False)
-                    except ValueError:
+                    else:
                         date_widget.blockSignals(True)
                         date_widget.setDate(QDate.currentDate())
                         date_widget.blockSignals(False)

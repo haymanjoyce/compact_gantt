@@ -6,7 +6,7 @@ from PyQt5.QtGui import QBrush, QColor, QPainter, QPen
 from typing import List, Dict, Any, Optional, Set, Tuple
 from datetime import datetime
 import logging
-from utils.conversion import normalize_display_date, safe_int, display_to_internal_date, internal_to_display_date
+from utils.conversion import normalize_display_date, safe_int, display_to_internal_date, internal_to_display_date, parse_internal_date
 from models import Task
 
 from ui.table_utils import NumericTableWidgetItem, DateTableWidgetItem, DateEditWidget, add_row, remove_row, CheckBoxWidget, highlight_table_errors, extract_table_data
@@ -755,13 +755,13 @@ class TasksTab(BaseTab):
                 if date_widget and isinstance(date_widget, QDateEdit):
                     # Update existing QDateEdit widget
                     if task.start_date:
-                        try:
-                            start_dt = datetime.strptime(task.start_date, "%Y-%m-%d")
+                        start_dt = parse_internal_date(task.start_date)
+                        if start_dt:
                             start_qdate = QDate(start_dt.year, start_dt.month, start_dt.day)
                             date_widget.blockSignals(True)
                             date_widget.setDate(start_qdate)
                             date_widget.blockSignals(False)
-                        except ValueError:
+                        else:
                             date_widget.blockSignals(True)
                             date_widget.setDate(QDate.currentDate())
                             date_widget.blockSignals(False)
@@ -790,13 +790,13 @@ class TasksTab(BaseTab):
                 if date_widget and isinstance(date_widget, QDateEdit):
                     # Update existing QDateEdit widget
                     if task.finish_date:
-                        try:
-                            finish_dt = datetime.strptime(task.finish_date, "%Y-%m-%d")
+                        finish_dt = parse_internal_date(task.finish_date)
+                        if finish_dt:
                             finish_qdate = QDate(finish_dt.year, finish_dt.month, finish_dt.day)
                             date_widget.blockSignals(True)
                             date_widget.setDate(finish_qdate)
                             date_widget.blockSignals(False)
-                        except ValueError:
+                        else:
                             date_widget.blockSignals(True)
                             date_widget.setDate(QDate.currentDate())
                             date_widget.blockSignals(False)

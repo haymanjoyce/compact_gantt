@@ -13,7 +13,7 @@ from config.chart_config import ChartConfig
 from config.ui_config import UIConfig
 from config.date_config import DateConfig
 
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 @dataclass
 class GeneralConfig:

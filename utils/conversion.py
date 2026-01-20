@@ -177,3 +177,40 @@ def is_valid_internal_date(date_str: str) -> bool:
         return True
     except ValueError:
         return False
+
+def parse_internal_date(date_str: str) -> Optional[datetime]:
+    """
+    Safely parse an internal date string (yyyy-mm-dd format), returning None if invalid.
+    
+    This is a centralized function to replace all hardcoded datetime.strptime(..., "%Y-%m-%d") calls.
+    
+    Args:
+        date_str: Date string in yyyy-mm-dd format (internal format)
+        
+    Returns:
+        datetime object if valid, None otherwise
+    """
+    if not date_str or not date_str.strip():
+        return None
+    
+    try:
+        return datetime.strptime(date_str.strip(), "%Y-%m-%d")
+    except (ValueError, TypeError):
+        return None
+
+def compare_internal_dates(date1_str: str, date2_str: str) -> Optional[bool]:
+    """
+    Compare two internal date strings (yyyy-mm-dd format).
+    
+    Args:
+        date1_str: First date string in yyyy-mm-dd format
+        date2_str: Second date string in yyyy-mm-dd format
+        
+    Returns:
+        True if date1 < date2, False if date1 >= date2, None if either date is invalid
+    """
+    date1 = parse_internal_date(date1_str)
+    date2 = parse_internal_date(date2_str)
+    if date1 and date2:
+        return date1 < date2
+    return None

@@ -9,7 +9,7 @@ from datetime import datetime
 from ui.table_utils import NumericTableWidgetItem, add_row, remove_row, CheckBoxWidget, extract_table_data, highlight_table_errors
 from .base_tab import BaseTab
 from models.link import Link
-from utils.conversion import safe_int
+from utils.conversion import safe_int, parse_internal_date
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -623,11 +623,11 @@ class LinksTab(BaseTab):
                             to_start_date = to_task.start_date or to_task.finish_date
                             
                             if from_finish_date and to_start_date:
-                                try:
-                                    from_finish = datetime.strptime(from_finish_date, "%Y-%m-%d")
-                                    to_start = datetime.strptime(to_start_date, "%Y-%m-%d")
+                                from_finish = parse_internal_date(from_finish_date)
+                                to_start = parse_internal_date(to_start_date)
+                                if from_finish and to_start:
                                     link.valid = "No" if to_start < from_finish else "Yes"
-                                except (ValueError, TypeError):
+                                else:
                                     link.valid = "No"
                             else:
                                 link.valid = "No"

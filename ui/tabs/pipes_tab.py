@@ -9,7 +9,7 @@ from datetime import datetime
 from ui.table_utils import NumericTableWidgetItem, add_row, remove_row, CheckBoxWidget, DateTableWidgetItem, DateEditWidget
 from .base_tab import BaseTab
 from models.pipe import Pipe
-from utils.conversion import safe_int, display_to_internal_date, internal_to_display_date, normalize_display_date
+from utils.conversion import safe_int, display_to_internal_date, internal_to_display_date, normalize_display_date, parse_internal_date
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -300,13 +300,13 @@ class PipesTab(BaseTab):
             if date_widget and isinstance(date_widget, QDateEdit):
                 # Update existing QDateEdit widget
                 if pipe.date:
-                    try:
-                        date_dt = datetime.strptime(pipe.date, "%Y-%m-%d")
+                    date_dt = parse_internal_date(pipe.date)
+                    if date_dt:
                         date_qdate = QDate(date_dt.year, date_dt.month, date_dt.day)
                         date_widget.blockSignals(True)
                         date_widget.setDate(date_qdate)
                         date_widget.blockSignals(False)
-                    except ValueError:
+                    else:
                         date_widget.blockSignals(True)
                         date_widget.setDate(QDate.currentDate())
                         date_widget.blockSignals(False)

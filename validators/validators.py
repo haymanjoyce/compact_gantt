@@ -1,7 +1,7 @@
 from typing import List, Set, Dict, Any
 from datetime import datetime
 from models import Task
-from utils.conversion import is_valid_internal_date
+from utils.conversion import is_valid_internal_date, parse_internal_date, compare_internal_dates
 
 
 class DataValidator:
@@ -19,14 +19,8 @@ class DataValidator:
         
         # Check if finish date is earlier than start date (only if both dates are valid)
         if is_valid_internal_date(task.start_date) and is_valid_internal_date(task.finish_date):
-            try:
-                start = datetime.strptime(task.start_date, "%Y-%m-%d")
-                finish = datetime.strptime(task.finish_date, "%Y-%m-%d")
-                if finish < start:
-                    errors.append("Finish date must be on or after start date")
-            except (ValueError, TypeError):
-                # Date parsing failed - format validation should have caught this, but handle gracefully
-                pass
+            if compare_internal_dates(task.finish_date, task.start_date) is False:
+                errors.append("Finish date must be on or after start date")
         
         if task.row_number <= 0:
             errors.append("Row number must be positive")

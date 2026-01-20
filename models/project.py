@@ -5,7 +5,7 @@ from datetime import datetime
 import logging
 from config.app_config import AppConfig
 from config.chart_config import ChartConfig
-from utils.conversion import safe_int, safe_float, display_to_internal_date, internal_to_display_date
+from utils.conversion import safe_int, safe_float, display_to_internal_date, internal_to_display_date, parse_internal_date
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -211,11 +211,11 @@ class ProjectData:
                     to_start_date = to_task.start_date or to_task.finish_date
                     
                     if from_finish_date and to_start_date:
-                        try:
-                            from_finish = datetime.strptime(from_finish_date, "%Y-%m-%d")
-                            to_start = datetime.strptime(to_start_date, "%Y-%m-%d")
+                        from_finish = parse_internal_date(from_finish_date)
+                        to_start = parse_internal_date(to_start_date)
+                        if from_finish and to_start:
                             link.valid = "No" if to_start < from_finish else "Yes"
-                        except (ValueError, TypeError):
+                        else:
                             link.valid = "No"
                     else:
                         link.valid = "No"
@@ -291,11 +291,11 @@ class ProjectData:
                         to_start_date = to_task.start_date or to_task.finish_date
                         
                         if from_finish_date and to_start_date:
-                            try:
-                                from_finish = datetime.strptime(from_finish_date, "%Y-%m-%d")
-                                to_start = datetime.strptime(to_start_date, "%Y-%m-%d")
+                            from_finish = parse_internal_date(from_finish_date)
+                            to_start = parse_internal_date(to_start_date)
+                            if from_finish and to_start:
                                 link.valid = "No" if to_start < from_finish else "Yes"
-                            except (ValueError, TypeError):
+                            else:
                                 link.valid = "No"
                         else:
                             link.valid = "No"

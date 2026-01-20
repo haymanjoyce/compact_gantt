@@ -7,6 +7,7 @@ from PyQt5.QtGui import QFont, QFontMetrics
 from config.app_config import AppConfig
 import logging
 from models.link import Link
+from models.task import Task
 from utils.conversion import is_valid_internal_date
 from models.pipe import Pipe
 from models.curtain import Curtain
@@ -70,6 +71,25 @@ class GanttChartService(QObject):
             return datetime.strptime(date_str.strip(), fmt)
         except (ValueError, TypeError):
             return None
+    
+    def _convert_to_model_object(self, data, model_class):
+        """Convert data to model object, handling both dict and object inputs.
+        
+        Args:
+            data: Either a dict or an instance of model_class
+            model_class: The model class (e.g., Pipe, Curtain, Swimlane, Task, Link, Note)
+            
+        Returns:
+            Instance of model_class
+        """
+        if isinstance(data, dict):
+            return model_class.from_dict(data)
+        elif isinstance(data, model_class):
+            return data
+        else:
+            # Unexpected type - try to convert anyway
+            logging.warning(f"Unexpected data type for {model_class.__name__}: {type(data)}")
+            return model_class.from_dict(data) if hasattr(model_class, 'from_dict') else data
 
     def render_outer_frame(self):
         width = self._get_frame_config("outer_width", self.config.general.outer_width)
@@ -704,10 +724,7 @@ class GanttChartService(QObject):
         
         for pipe_data in pipes_data:
             # Convert dict to Pipe object if needed
-            if isinstance(pipe_data, dict):
-                pipe = Pipe.from_dict(pipe_data)
-            else:
-                pipe = pipe_data
+            pipe = self._convert_to_model_object(pipe_data, Pipe)
             
             # Validate date
             if not is_valid_internal_date(pipe.date):
@@ -762,10 +779,7 @@ class GanttChartService(QObject):
         # Convert dicts to Swimlane objects if needed
         swimlanes = []
         for swimlane_data in swimlanes_data:
-            if isinstance(swimlane_data, dict):
-                swimlanes.append(Swimlane.from_dict(swimlane_data))
-            else:
-                swimlanes.append(swimlane_data)
+            swimlanes.append(self._convert_to_model_object(swimlane_data, Swimlane))
         
         return swimlanes
     
@@ -961,10 +975,7 @@ class GanttChartService(QObject):
         
         for curtain_data in curtains_data:
             # Convert dict to Curtain object if needed
-            if isinstance(curtain_data, dict):
-                curtain = Curtain.from_dict(curtain_data)
-            else:
-                curtain = curtain_data
+            curtain = self._convert_to_model_object(curtain_data, Curtain)
             
             # Validate dates
             if not is_valid_internal_date(curtain.start_date) or not is_valid_internal_date(curtain.end_date):
@@ -1060,39 +1071,36 @@ class GanttChartService(QObject):
         links_data = self.data.get("links", [])
         
         for link_item in links_data:
-            if isinstance(link_item, dict):
-                link = Link.from_dict(link_item)
-                # Calculate valid status using key-based lookups
-                from_task_dict = task_map.get(link.from_task_id)
-                to_task_dict = task_map.get(link.to_task_id)
+            link = self._convert_to_model_object(link_item, Link)
+            # Calculate valid status using key-based lookups
+            from_task_dict = task_map.get(link.from_task_id)
+            to_task_dict = task_map.get(link.to_task_id)
+            
+            if from_task_dict and to_task_dict:
+                # Extract dates using key-based lookups
+                if isinstance(from_task_dict, dict):
+                    from_finish_date = from_task_dict.get("finish_date") or from_task_dict.get("start_date")
+                else:
+                    from_finish_date = getattr(from_task_dict, "finish_date", None) or getattr(from_task_dict, "start_date", None)
                 
-                if from_task_dict and to_task_dict:
-                    # Extract dates using key-based lookups
-                    if isinstance(from_task_dict, dict):
-                        from_finish_date = from_task_dict.get("finish_date") or from_task_dict.get("start_date")
-                    else:
-                        from_finish_date = getattr(from_task_dict, "finish_date", None) or getattr(from_task_dict, "start_date", None)
-                    
-                    if isinstance(to_task_dict, dict):
-                        to_start_date = to_task_dict.get("start_date") or to_task_dict.get("finish_date")
-                    else:
-                        to_start_date = getattr(to_task_dict, "start_date", None) or getattr(to_task_dict, "finish_date", None)
-                    
-                    if from_finish_date and to_start_date:
-                        from_finish = self._parse_internal_date(from_finish_date)
-                        to_start = self._parse_internal_date(to_start_date)
-                        if from_finish and to_start:
-                            link.valid = "No" if to_start < from_finish else "Yes"
-                        else:
-                            link.valid = "No"
+                if isinstance(to_task_dict, dict):
+                    to_start_date = to_task_dict.get("start_date") or to_task_dict.get("finish_date")
+                else:
+                    to_start_date = getattr(to_task_dict, "start_date", None) or getattr(to_task_dict, "finish_date", None)
+                
+                if from_finish_date and to_start_date:
+                    from_finish = self._parse_internal_date(from_finish_date)
+                    to_start = self._parse_internal_date(to_start_date)
+                    if from_finish and to_start:
+                        link.valid = "No" if to_start < from_finish else "Yes"
                     else:
                         link.valid = "No"
                 else:
                     link.valid = "No"
-                
-                links.append(link)
-            elif hasattr(link_item, 'link_id'):  # Already a Link object
-                links.append(link_item)
+            else:
+                link.valid = "No"
+            
+            links.append(link)
             # Skip legacy list format
         
         return links
@@ -2080,10 +2088,7 @@ class GanttChartService(QObject):
         
         for note_data in notes:
             # Convert dict to Note object if needed
-            if isinstance(note_data, dict):
-                note = Note.from_dict(note_data)
-            else:
-                note = note_data
+            note = self._convert_to_model_object(note_data, Note)
             
             if not note or not note.text:
                 continue
