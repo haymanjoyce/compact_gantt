@@ -213,6 +213,12 @@ class TimelineTab(BaseTab):
         self.project_data.frame_config.show_months = self.show_months.isChecked()
         self.project_data.frame_config.show_weeks = self.show_weeks.isChecked()
         self.project_data.frame_config.show_days = self.show_days.isChecked()
+
+        # Update Vertical Gridlines
+        self.project_data.frame_config.vertical_gridline_years = self.vertical_gridline_years.isChecked()
+        self.project_data.frame_config.vertical_gridline_months = self.vertical_gridline_months.isChecked()
+        self.project_data.frame_config.vertical_gridline_weeks = self.vertical_gridline_weeks.isChecked()
+        self.project_data.frame_config.vertical_gridline_days = self.vertical_gridline_days.isChecked()
     
     def _refresh_date_widgets(self):
         """Refresh date widgets with current date format from config."""
@@ -241,12 +247,6 @@ class TimelineTab(BaseTab):
         
         # Update constraints after format change
         self._update_date_constraints()
-
-        # Update Vertical Gridlines
-        self.project_data.frame_config.vertical_gridline_years = self.vertical_gridline_years.isChecked()
-        self.project_data.frame_config.vertical_gridline_months = self.vertical_gridline_months.isChecked()
-        self.project_data.frame_config.vertical_gridline_weeks = self.vertical_gridline_weeks.isChecked()
-        self.project_data.frame_config.vertical_gridline_days = self.vertical_gridline_days.isChecked()
 
         # Removed data_updated.emit() for consistency with Layout tab - user must click "Update Chart"
 
