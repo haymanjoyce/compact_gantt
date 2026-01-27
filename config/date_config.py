@@ -62,22 +62,36 @@ class DateConfig:
         Returns:
             Python strftime format string (e.g., "%m", "%b", "%d/%m/%Y")
         """
-        # Mapping of Qt format patterns to Python format
-        # Order matters: longer patterns must come before shorter ones
+        # Use numeric placeholders to avoid double-replacement
+        # Placeholders don't contain d, M, or y, so they won't match during replacement
+        # First pass: replace Qt patterns with numeric placeholders
         replacements = [
-            ("yyyy", "%Y"),  # 4-digit year (must come before yy)
-            ("yy", "%y"),    # 2-digit year
-            ("MMMM", "%B"),  # Full month name (must come before MMM)
-            ("MMM", "%b"),   # Abbreviated month name (must come before MM)
-            ("MM", "%m"),    # 2-digit month (must come before M)
-            ("M", "%m"),     # 1-digit month
-            ("dd", "%d"),    # 2-digit day (must come before d)
-            ("d", "%d"),     # 1-digit day
+            ("yyyy", "~0~"),  # 4-digit year (must come before yy)
+            ("yy", "~1~"),    # 2-digit year
+            ("MMMM", "~2~"),   # Full month name (must come before MMM)
+            ("MMM", "~3~"),   # Abbreviated month name (must come before MM)
+            ("MM", "~4~"),    # 2-digit month (must come before M)
+            ("M", "~4~"),     # 1-digit month (same placeholder as MM)
+            ("dd", "~5~"),    # 2-digit day (must come before d)
+            ("d", "~5~"),     # 1-digit day (same placeholder as dd)
         ]
         
         python_format = qt_format
-        for qt_pattern, py_pattern in replacements:
-            python_format = python_format.replace(qt_pattern, py_pattern)
+        for qt_pattern, placeholder in replacements:
+            python_format = python_format.replace(qt_pattern, placeholder)
+        
+        # Second pass: replace placeholders with Python format codes
+        placeholder_to_python = {
+            "~0~": "%Y",  # 4-digit year
+            "~1~": "%y",  # 2-digit year
+            "~2~": "%B",  # Full month name
+            "~3~": "%b",  # Abbreviated month name
+            "~4~": "%m",  # Month number
+            "~5~": "%d",  # Day
+        }
+        
+        for placeholder, py_pattern in placeholder_to_python.items():
+            python_format = python_format.replace(placeholder, py_pattern)
         
         return python_format
     
