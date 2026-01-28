@@ -1261,35 +1261,98 @@ class TasksTab(BaseTab):
                     id_col = self._get_column_index("ID")
                     id_vis_col = self._reverse_column_mapping.get(id_col) if id_col is not None else None
                     
+                    # Log column mapping for debugging
+                    logging.debug(f"_update_valid_column_only: ID column - actual index: {id_col}, visible index: {id_vis_col}")
+                    logging.debug(f"_update_valid_column_only: Column mapping: {self._reverse_column_mapping}")
+                    if id_vis_col is not None:
+                        # Verify what column header is at the visible index
+                        header_item = self.tasks_table.horizontalHeaderItem(id_vis_col)
+                        header_text = header_item.text() if header_item else "None"
+                        logging.debug(f"_update_valid_column_only: Header at visible column {id_vis_col}: '{header_text}'")
+                    
                     if id_vis_col is None:
+                        logging.error("_update_valid_column_only: Could not find ID column visible index")
                         return
                     
                     # Build used_ids set from all tasks for validation
                     used_ids: Set[int] = set(task.task_id for task in self.project_data.tasks)
+                    logging.debug(f"_update_valid_column_only: Found {len(used_ids)} tasks in project_data. Task IDs: {sorted(used_ids)}")
                     
                     # For each table row, find the corresponding task by task_id
                     for row_idx in range(self.tasks_table.rowCount()):
                         # Extract task_id from ID column
                         id_item = self.tasks_table.item(row_idx, id_vis_col)
                         if not id_item:
+                            logging.debug(f"_update_valid_column_only: Row {row_idx}: No ID item found at visible column {id_vis_col}")
+                            # Set Valid to "No" - missing ID
+                            valid_status = "No"
+                            item = self.tasks_table.item(row_idx, valid_col_vis_idx)
+                            if item:
+                                item.setText(valid_status)
+                            else:
+                                item = QTableWidgetItem(valid_status)
+                                item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                                item.setBackground(QBrush(self.app_config.general.read_only_bg_color))
+                                self.tasks_table.setItem(row_idx, valid_col_vis_idx, item)
                             continue
                         
                         try:
                             task_id = safe_int(id_item.text())
                             if task_id <= 0:
+                                logging.debug(f"_update_valid_column_only: Row {row_idx}: Invalid task_id '{id_item.text()}' (must be > 0)")
+                                # Set Valid to "No" - invalid ID
+                                valid_status = "No"
+                                item = self.tasks_table.item(row_idx, valid_col_vis_idx)
+                                if item:
+                                    item.setText(valid_status)
+                                else:
+                                    item = QTableWidgetItem(valid_status)
+                                    item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                                    item.setBackground(QBrush(self.app_config.general.read_only_bg_color))
+                                    self.tasks_table.setItem(row_idx, valid_col_vis_idx, item)
                                 continue
-                        except (ValueError, TypeError):
+                        except (ValueError, TypeError) as e:
+                            logging.debug(f"_update_valid_column_only: Row {row_idx}: Failed to parse task_id '{id_item.text()}': {e}")
+                            # Set Valid to "No" - parse error
+                            valid_status = "No"
+                            item = self.tasks_table.item(row_idx, valid_col_vis_idx)
+                            if item:
+                                item.setText(valid_status)
+                            else:
+                                item = QTableWidgetItem(valid_status)
+                                item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                                item.setBackground(QBrush(self.app_config.general.read_only_bg_color))
+                                self.tasks_table.setItem(row_idx, valid_col_vis_idx, item)
                             continue
+                        
+                        # Log the extracted task_id and verify column mapping
+                        logging.debug(f"_update_valid_column_only: Row {row_idx}: Extracted task_id={task_id} from visible column {id_vis_col} (actual column index: {id_col})")
                         
                         # Find the task in project_data by task_id
                         task = task_map.get(task_id)
                         if not task:
+                            logging.warning(f"_update_valid_column_only: Row {row_idx}: Task with task_id={task_id} not found in project_data.tasks. Available task_ids: {sorted(task_map.keys())}")
+                            # Set Valid to "No" - task not found
+                            valid_status = "No"
+                            item = self.tasks_table.item(row_idx, valid_col_vis_idx)
+                            if item:
+                                item.setText(valid_status)
+                            else:
+                                item = QTableWidgetItem(valid_status)
+                                item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                                item.setBackground(QBrush(self.app_config.general.read_only_bg_color))
+                                self.tasks_table.setItem(row_idx, valid_col_vis_idx, item)
                             continue
                         
                         # Calculate valid status (exclude current task from used_ids for uniqueness check)
                         task_used_ids = used_ids - {task.task_id}
                         row_errors = self.project_data.validator.validate_task(task, task_used_ids)
                         valid_status = "No" if row_errors else "Yes"
+                        
+                        if row_errors:
+                            logging.debug(f"_update_valid_column_only: Row {row_idx}: Task {task_id} validation failed: {row_errors}")
+                        else:
+                            logging.debug(f"_update_valid_column_only: Row {row_idx}: Task {task_id} validation passed")
                         
                         # Update the Valid cell
                         item = self.tasks_table.item(row_idx, valid_col_vis_idx)
