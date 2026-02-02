@@ -19,6 +19,7 @@ class ProjectData:
         """
         if app_config is None:
             app_config = AppConfig()  # Fallback only - prefer passing shared instance
+        self.app_config = app_config
         self.frame_config = FrameConfig(num_rows=app_config.general.tasks_rows)
         # Initialize chart_config from app_config (for typography and other chart settings)
         self.chart_config = ChartConfig(
@@ -252,11 +253,18 @@ class ProjectData:
             # Validate each task
             used_ids: Set[int] = set()
             for task in tasks:
-                row_errors = self.validator.validate_task(task, used_ids)
+                # Temporary debug: log exactly what is being validated
+                logging.warning(
+                    f"update_tasks: task_id={task.task_id} start_date={repr(task.start_date)} "
+                    f"finish_date={repr(task.finish_date)} row_number={task.row_number}"
+                )
+                row_errors = self.validator.validate_task(
+                    task, used_ids, self.app_config.general.ui_date_config
+                )
                 if row_errors:
                     errors.extend([f"Task {task.task_id}: {err}" for err in row_errors])
                 if not row_errors:
-                    used_ids.add(task.task_id)
+                    used_ids.add(safe_int(task.task_id))
             
             # Update tasks list
             self.tasks = tasks

@@ -1,6 +1,20 @@
 from dataclasses import dataclass
 from typing import Dict, Any, Optional
-from utils.conversion import safe_int, safe_float
+from config.date_config import DateConfig
+from utils.conversion import safe_int, safe_float, is_valid_internal_date, display_to_internal_date
+
+
+def _date_to_internal(date_str: str, date_config: Optional[DateConfig] = None) -> str:
+    """Convert date to internal format (yyyy-mm-dd). If already internal or empty, return as-is."""
+    if not date_str or not date_str.strip():
+        return date_str
+    if is_valid_internal_date(date_str):
+        return date_str
+    config = date_config or DateConfig()
+    try:
+        return display_to_internal_date(date_str.strip(), config)
+    except ValueError:
+        return date_str
 
 
 @dataclass
@@ -22,13 +36,10 @@ class Task:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Task':
-        # Don't auto-populate dates when loading from JSON
-        # Auto-population should only happen in the UI when user enters data
-        # This preserves invalid dates (empty strings) so they remain visible as empty fields
-        start_date = data.get("start_date", "")
-        finish_date = data.get("finish_date", "")
-        
-        # Removed auto-population logic - dates are loaded as-is from JSON
+        # Load dates and convert to internal format (yyyy-mm-dd) when in display format
+        # so validation and chart logic work consistently
+        start_date = _date_to_internal(data.get("start_date", ""))
+        finish_date = _date_to_internal(data.get("finish_date", ""))
         
         # Backward compatibility: migrate label_hide to label_content
         label_content = data.get("label_content")
@@ -47,7 +58,7 @@ class Task:
             task_name=data.get("task_name", ""),
             start_date=start_date,
             finish_date=finish_date,
-            row_number=safe_int(data.get("row_number"), default=0),
+            row_number=safe_int(data.get("row_number"), default=1),
             is_milestone=data.get("is_milestone", False),
             label_placement=data.get("label_placement", "Outside"),
             label_hide=data.get("label_hide", "Yes"),  # Keep for backward compatibility

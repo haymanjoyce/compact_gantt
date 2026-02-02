@@ -656,6 +656,17 @@ class TasksTab(BaseTab):
                         if finish_date_item and finish_date_item.text().strip():
                             finish_date_conversion_failed = True
             
+            # Fallback: read directly from QDateEdit when extract_date_from_cell returned None
+            # (e.g. newly added row where widget may not be reported yet by cellWidget in some Qt builds)
+            if not start_date_internal and start_date_vis_col is not None:
+                widget = self.tasks_table.cellWidget(row_idx, start_date_vis_col)
+                if widget and isinstance(widget, QDateEdit):
+                    start_date_internal = widget.date().toString("yyyy-MM-dd")
+            if not finish_date_internal and finish_date_vis_col is not None:
+                widget = self.tasks_table.cellWidget(row_idx, finish_date_vis_col)
+                if widget and isinstance(widget, QDateEdit):
+                    finish_date_internal = widget.date().toString("yyyy-MM-dd")
+            
             # Auto-populate missing date field for milestones (if only one date is provided)
             # Only auto-populate if the field was actually empty (not if conversion failed)
             if start_date_internal and not finish_date_internal and not finish_date_conversion_failed:
@@ -858,9 +869,12 @@ class TasksTab(BaseTab):
             
             # Update Valid column (calculate valid status)
             if valid_vis_col is not None:
-                used_ids = {t.task_id for t in self.project_data.tasks if t.task_id != task.task_id}
-                row_errors = self.project_data.validator.validate_task(task, used_ids)
+                used_ids = {safe_int(t.task_id) for t in self.project_data.tasks if t.task_id != task.task_id}
+                row_errors = self.project_data.validator.validate_task(
+                    task, used_ids, self.app_config.general.ui_date_config
+                )
                 valid_status = "No" if row_errors else "Yes"
+                logging.warning(f"_update_table_row_from_task: row_idx={row_idx} task_id={task.task_id} row_errors={row_errors} -> valid_status={valid_status}")
                 
                 item = self.tasks_table.item(row_idx, valid_vis_col)
                 if item:
@@ -1346,8 +1360,17 @@ class TasksTab(BaseTab):
                         
                         # Calculate valid status (exclude current task from used_ids for uniqueness check)
                         task_used_ids = used_ids - {safe_int(task.task_id)}
-                        row_errors = self.project_data.validator.validate_task(task, task_used_ids)
+                        # Temporary debug: log exactly what is being validated
+                        logging.warning(
+                            f"_update_valid_column_only: Row {row_idx} task_id={task.task_id} "
+                            f"start_date={repr(task.start_date)} finish_date={repr(task.finish_date)} "
+                            f"row_number={task.row_number}"
+                        )
+                        row_errors = self.project_data.validator.validate_task(
+                            task, task_used_ids, self.app_config.general.ui_date_config
+                        )
                         valid_status = "No" if row_errors else "Yes"
+                        logging.warning(f"_update_valid_column_only: Row {row_idx} task_id={task_id} row_errors={row_errors} -> valid_status={valid_status}")
                         
                         if row_errors:
                             logging.debug(f"_update_valid_column_only: Row {row_idx}: Task {task_id} validation failed: {row_errors}")

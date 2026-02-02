@@ -1,29 +1,55 @@
-from typing import List, Set, Dict, Any
+from typing import List, Set, Dict, Any, Optional
 from datetime import datetime
 from models import Task
-from utils.conversion import is_valid_internal_date, parse_internal_date, compare_internal_dates, safe_int
+from config.date_config import DateConfig
+from utils.conversion import (
+    is_valid_internal_date,
+    parse_internal_date,
+    compare_internal_dates,
+    safe_int,
+    display_to_internal_date,
+)
+
+
+def _to_internal_date(date_str: str, date_config: Optional[DateConfig] = None) -> str:
+    """Convert date to internal format (yyyy-mm-dd). If already internal, return as-is; else try display format."""
+    if not date_str or not date_str.strip():
+        return date_str
+    if is_valid_internal_date(date_str):
+        return date_str
+    config = date_config or DateConfig()
+    try:
+        return display_to_internal_date(date_str.strip(), config)
+    except ValueError:
+        return date_str
 
 
 class DataValidator:
     @staticmethod
-    def validate_task(task: Task, used_ids: Set[int]) -> List[str]:
+    def validate_task(
+        task: Task, used_ids: Set[int], date_config: Optional[DateConfig] = None
+    ) -> List[str]:
         errors = []
         # Normalize task_id and row_number to int to handle legacy data with string values
         task_id = safe_int(task.task_id)
         row_number = safe_int(task.row_number)
+        # Normalize dates to internal format (yyyy-mm-dd) using date_config when not already internal
+        start_date = _to_internal_date(task.start_date, date_config)
+        finish_date = _to_internal_date(task.finish_date, date_config)
         
         if task_id <= 0:
             errors.append("Task ID must be positive")
         if task_id in used_ids:
             errors.append("Task ID must be unique")
-        if not is_valid_internal_date(task.start_date):
+        if not is_valid_internal_date(start_date):
             errors.append("Invalid start date format (should be yyyy-mm-dd)")
-        if not is_valid_internal_date(task.finish_date):
+        if not is_valid_internal_date(finish_date):
             errors.append("Invalid finish date format (should be yyyy-mm-dd)")
         
         # Check if finish date is earlier than start date (only if both dates are valid)
-        if is_valid_internal_date(task.start_date) and is_valid_internal_date(task.finish_date):
-            if compare_internal_dates(task.finish_date, task.start_date) is False:
+        # compare_internal_dates(finish, start) is True when finish < start (invalid)
+        if is_valid_internal_date(start_date) and is_valid_internal_date(finish_date):
+            if compare_internal_dates(finish_date, start_date) is True:
                 errors.append("Finish date must be on or after start date")
         
         if row_number <= 0:
