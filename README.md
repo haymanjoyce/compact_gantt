@@ -182,9 +182,12 @@ python tests/test_project_save_load.py
 - When refactoring existing positional arrays, migrate to dataclasses
 - UI boundary code should work directly with dataclass objects, not positional lists
 
+## Licenses
+
+This application is licensed under the GNU General Public License v3. See [LICENSE](LICENSE).
+
+It uses [PyQt5](https://www.riverbankcomputing.com/software/pyqt/), which is also licensed under the GPL v3 by Riverbank Computing Limited.
+
 ## Copyright
 
-Copyright (c) 2014-2025 Richard Hayman-Joyce. All Rights Reserved.
-
-This software is provided free of charge but remains proprietary. See 
-LICENSE file for terms of use.
+Copyright (C) 2014-2025 Richard Hayman-Joyce.
