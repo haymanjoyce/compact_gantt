@@ -108,6 +108,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.0] - 2026-02-02
+
+### Added
+- ROADMAP.md for refactor, features, and bugs backlog
+
+### Changed
+- Relicensed project under GPL v3 for PyQt compliance (was proprietary)
+- LICENSE, COPYRIGHT, and README updated; PyQt5 acknowledgment added
+
+### Fixed
+- Valid column now shows 'Yes' for valid tasks (validator compared dates incorrectly: was erroring when finish >= start instead of when finish < start)
+- Removed temporary debug logging from Valid column flow (update_tasks, _update_valid_column_only, _update_table_row_from_task)
+
+---
+
 ## [Unreleased]
 
 ### Planned
@@ -118,4 +133,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+[1.1.0]: https://github.com/richardhaymanjoyce/compact_gantt/releases/tag/v1.1.0
 [1.0.0]: https://github.com/richardhaymanjoyce/compact_gantt/releases/tag/v1.0.0

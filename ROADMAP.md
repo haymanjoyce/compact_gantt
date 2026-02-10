@@ -1,6 +1,8 @@
 # Roadmap
 
-Notes on what to work on next.
+Notes on what to work on next. Resume from here when picking up development again.
+
+*Last updated: 2026-02-02. Development paused; repo left in a clean state.*
 
 ## REFACTOR
 
