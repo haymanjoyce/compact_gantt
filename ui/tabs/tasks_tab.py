@@ -914,7 +914,7 @@ class TasksTab(BaseTab):
                 if (self.tasks_table.cellWidget(r, start_date_vis_col) == widget or
                     self.tasks_table.cellWidget(r, finish_date_vis_col) == widget):
                     row_idx = r
-                break
+                    break
             if row_idx is None:
                 return
         
