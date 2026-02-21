@@ -46,37 +46,7 @@ class ProjectData:
         self.validator = DataValidator()
 
     def to_json(self) -> Dict[str, Any]:
-        for t in self.tasks:
-            assert hasattr(t, "__dict__"), f"Non-class instance in self.tasks: {t} ({type(t)})"
-        
-        # Serialize tasks with only necessary fields (exclude redundant defaults)
-        tasks_data = []
-        for task in self.tasks:
-            task_dict = {
-                "task_id": task.task_id,
-                "task_name": task.task_name,
-                "start_date": task.start_date,
-                "finish_date": task.finish_date,
-                "row_number": task.row_number,
-                "label_placement": task.label_placement,
-                "label_hide": task.label_hide,  # Keep for backward compatibility
-                "label_content": task.label_content,
-            }
-            # Only save is_milestone if it's explicitly True (auto-detected from dates otherwise)
-            if task.is_milestone:
-                task_dict["is_milestone"] = True
-            # Only save non-default values to reduce JSON size
-            if task.label_alignment != "Centre":
-                task_dict["label_alignment"] = task.label_alignment
-            if task.label_horizontal_offset != 1.0:
-                task_dict["label_horizontal_offset"] = task.label_horizontal_offset
-            if task.label_text_colour != "black":
-                task_dict["label_text_colour"] = task.label_text_colour
-            if task.fill_color != "blue":
-                task_dict["fill_color"] = task.fill_color
-            if task.date_format:
-                task_dict["date_format"] = task.date_format
-            tasks_data.append(task_dict)
+        tasks_data = [task.to_dict() for task in self.tasks]
         
         # FrameConfig: save all fields (all are necessary)
         # Convert Link objects to dictionaries for JSON (Valid field is excluded as it's calculated)

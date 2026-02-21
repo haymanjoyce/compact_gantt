@@ -25,7 +25,7 @@ class Task:
     finish_date: str
     row_number: int
     is_milestone: bool = False
-    label_placement: str = "Outside"
+    label_placement: str = "Inside"
     label_hide: str = "Yes"  # Deprecated: kept for backward compatibility, use label_content instead
     label_content: str = "Name only"  # Options: "None", "Name only", "Date only", "Name and Date"
     label_alignment: str = "Centre"  # Default to Centre (always used for inside labels)
@@ -60,7 +60,7 @@ class Task:
             finish_date=finish_date,
             row_number=safe_int(data.get("row_number"), default=1),
             is_milestone=data.get("is_milestone", False),
-            label_placement=data.get("label_placement", "Outside"),
+            label_placement=data.get("label_placement", "Inside"),
             label_hide=data.get("label_hide", "Yes"),  # Keep for backward compatibility
             label_content=label_content,
             label_alignment=data.get("label_alignment", "Centre"),
@@ -68,4 +68,31 @@ class Task:
             label_text_colour=data.get("label_text_colour", "black"),
             fill_color=data.get("fill_color", "blue"),
             date_format=data.get("date_format")  # Optional task-specific date format
-        ) 
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert Task to dictionary (for JSON serialization)."""
+        result: Dict[str, Any] = {
+            "task_id": self.task_id,
+            "task_name": self.task_name,
+            "start_date": self.start_date,
+            "finish_date": self.finish_date,
+            "row_number": self.row_number,
+            "label_placement": self.label_placement,
+            "label_hide": self.label_hide,  # Keep for backward compatibility
+            "label_content": self.label_content,
+        }
+        # Only save non-default optional values to reduce JSON size
+        if self.is_milestone:
+            result["is_milestone"] = True
+        if self.label_alignment != "Centre":
+            result["label_alignment"] = self.label_alignment
+        if self.label_horizontal_offset != 0.0:
+            result["label_horizontal_offset"] = self.label_horizontal_offset
+        if self.label_text_colour != "black":
+            result["label_text_colour"] = self.label_text_colour
+        if self.fill_color != "blue":
+            result["fill_color"] = self.fill_color
+        if self.date_format:
+            result["date_format"] = self.date_format
+        return result

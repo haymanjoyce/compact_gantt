@@ -312,11 +312,23 @@ class TasksTab(BaseTab):
     def _populate_detail_form(self, row: int):
         """Populate detail form with data from selected task."""
         self._updating_form = True
-        
+
         try:
-            # Get Task object directly from project_data
-            if row < len(self.project_data.tasks):
-                task = self.project_data.tasks[row]
+            # Look up task by task_id from the ID column rather than by positional
+            # index, since the table display order may differ from project_data.tasks.
+            task = None
+            id_col = self._get_column_index("ID")
+            id_vis_col = self._reverse_column_mapping.get(id_col) if id_col is not None else None
+            if id_vis_col is not None:
+                id_item = self.tasks_table.item(row, id_vis_col)
+                if id_item:
+                    try:
+                        task_id = int(id_item.text())
+                        task = next((t for t in self.project_data.tasks if t.task_id == task_id), None)
+                    except (ValueError, TypeError):
+                        pass
+
+            if task is not None:
                 self.detail_label_content.setCurrentText(task.label_content if task.label_content else "Name only")
                 self.detail_placement.setCurrentText(task.label_placement if task.label_placement else "Inside")
                 self.detail_offset.setValue(int(task.label_horizontal_offset) if task.label_horizontal_offset is not None else 0)
@@ -329,7 +341,7 @@ class TasksTab(BaseTab):
                 # Enable detail form widgets when a valid task is selected
                 self._set_detail_form_enabled(self._detail_form_widgets, True)
             else:
-                # Use defaults if task doesn't exist
+                # Use defaults if task cannot be found
                 self.detail_label_content.setCurrentText("Name only")
                 self.detail_placement.setCurrentText("Inside")
                 self.detail_offset.setValue(0)
@@ -990,7 +1002,7 @@ class TasksTab(BaseTab):
             if col_name in ["Start Date", "Finish Date"]:
                 # Check if this is actually a QDateEdit widget (shouldn't trigger itemChanged)
                 # But handle gracefully if it does
-                date_widget = self.tasks_table.cellWidget(row, actual_col_idx)
+                date_widget = self.tasks_table.cellWidget(row, col)
                 if isinstance(date_widget, QDateEdit):
                     # QDateEdit handles its own changes, skip processing
                     return
@@ -1041,16 +1053,16 @@ class TasksTab(BaseTab):
                     logging.error(f"_on_item_changed: Error parsing date: {e}", exc_info=True)
                     item.setData(Qt.UserRole, None)
             # Update UserRole for numeric columns (ID, Row)
-            elif actual_col_idx == 1:  # Task ID
+            elif col_name == "ID":
                 # Ensure Task ID is read-only with gray background
                 item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-                item.setBackground(QBrush(self.app_config.general.read_only_bg_color))  # Gray background
+                item.setBackground(QBrush(self.app_config.general.read_only_bg_color))
                 try:
                     val_str = item.text().strip()
                     item.setData(Qt.UserRole, int(val_str) if val_str else 0)
                 except (ValueError, AttributeError):
                     item.setData(Qt.UserRole, 0)
-            elif actual_col_idx == 2:  # Row number
+            elif col_name == "Row":
                 try:
                     val_str = item.text().strip()
                     item.setData(Qt.UserRole, int(val_str) if val_str else 1)
@@ -1390,10 +1402,6 @@ class TasksTab(BaseTab):
         except Exception as e:
             logging.error(f"_update_valid_column_only: Error: {e}", exc_info=True)
 
-    def _extract_table_data(self) -> List[List[str]]:
-        # This is now handled in _sync_data_impl
-        return []
-
     def _add_task(self):
         """Add a new task, using selected task's row_number as default if available."""
         # Get the selected task's row_number if a task is selected
@@ -1641,79 +1649,20 @@ class TasksTab(BaseTab):
         # Keep selection on moved tasks - find the new row index after sorting
         if moved_tasks:
             moved_task_ids = {task.task_id for _, task in moved_tasks}
-            name_col = self._get_column_index("Name")
-            name_vis_col = self._reverse_column_mapping.get(name_col) if name_col is not None else None
-            
-            if name_vis_col is not None:
-                for row_idx in range(self.tasks_table.rowCount()):
-                    item = self.tasks_table.item(row_idx, name_vis_col)
-                    if item:
-                        task_id = item.data(Qt.UserRole)
-                        if task_id is not None and task_id in moved_task_ids:
-                            # Restore checkbox state
-                            checkbox_widget = self.tasks_table.cellWidget(row_idx, 0)
-                            if checkbox_widget and isinstance(checkbox_widget, CheckBoxWidget):
-                                checkbox_widget.checkbox.setChecked(True)
-                            # Select and scroll to first moved task
-                            self.tasks_table.selectRow(row_idx)
-                            self.tasks_table.scrollToItem(self.tasks_table.item(row_idx, 0))
-                            break
+            id_col = self._get_column_index("ID")
+            id_vis_col = self._reverse_column_mapping.get(id_col) if id_col is not None else None
 
-    def _extract_row_data_from_table(self, row_idx):
-        """Extract full row data from table for a given row index."""
-        headers = [col.name for col in self.table_config.columns]
-        row_data_column_map = {
-            "ID": 0,
-            "Row": 1,
-            "Name": 2,
-            "Start Date": 3,
-            "Finish Date": 4,
-            "Label": 5,
-            "Placement": 6,
-            "Valid": 7
-        }
-        
-        full_row = []
-        # Reconstruct row data from visible columns (skip checkbox column)
-        for actual_col_idx in range(1, len(headers)):  # Skip Select column (index 0)
-            col_name = headers[actual_col_idx]
-            
-            if actual_col_idx in self._reverse_column_mapping:
-                # Visible column - get from table
-                vis_col_idx = self._reverse_column_mapping[actual_col_idx]
-                item = self.tasks_table.item(row_idx, vis_col_idx)
-                widget = self.tasks_table.cellWidget(row_idx, vis_col_idx)
-                
-                if widget and isinstance(widget, QComboBox):
-                    full_row.append(widget.currentText())
-                elif item:
-                    full_row.append(item.text())
-                else:
-                    full_row.append("")
-            else:
-                # Hidden column (Label, Placement) - get from detail form if this is selected row
-                if row_idx == self._selected_row:
-                    if col_name == "Label":
-                        full_row.append(self.detail_label.currentText())
-                    elif col_name == "Placement":
-                        full_row.append(self.detail_placement.currentText())
-                    else:
-                        full_row.append("")
-                else:
-                    # Get from stored data
-                    table_data = self.project_data.get_table_data("tasks")
-                    if row_idx < len(table_data):
-                        stored_row = table_data[row_idx]
-                        if col_name in row_data_column_map:
-                            value_idx = row_data_column_map[col_name]
-                            if value_idx < len(stored_row):
-                                full_row.append(stored_row[value_idx])
-                            else:
-                                full_row.append("")
-                        else:
-                            full_row.append("")
-                    else:
-                        full_row.append("")
-        
-        return full_row
- 
+            if id_vis_col is not None:
+                for row_idx in range(self.tasks_table.rowCount()):
+                    item = self.tasks_table.item(row_idx, id_vis_col)
+                    if item:
+                        try:
+                            task_id = int(item.text())
+                            if task_id in moved_task_ids:
+                                # Select and scroll to first moved task
+                                self.tasks_table.selectRow(row_idx)
+                                self.tasks_table.scrollToItem(self.tasks_table.item(row_idx, id_vis_col))
+                                break
+                        except (ValueError, TypeError):
+                            continue
+

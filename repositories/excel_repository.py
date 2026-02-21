@@ -466,27 +466,20 @@ class ExcelRepository:
     def _read_swimlanes_sheet(self, ws) -> List[Swimlane]:
         """Read Swimlanes worksheet and return list of Swimlane objects."""
         swimlanes = []
-        headers = {}
-        
-        # Read header row
-        header_row = ws[1]
-        for idx, cell in enumerate(header_row):
-            if cell.value:
-                headers[cell.value] = idx
-        
+
+        # Read header row once into a list for O(1) column-index lookup
+        header_row_values = [c.value for c in ws[1]]
+
         # Read data rows
         for row in ws.iter_rows(min_row=2, values_only=False):
             if not any(cell.value for cell in row):
                 continue
-            
+
             swimlane_data = {}
             for idx, cell in enumerate(row):
-                # Get header by column index
-                header = None
-                header_row_values = [c.value for c in ws[1]]
-                if idx < len(header_row_values):
-                    header = header_row_values[idx]
-                
+                if idx >= len(header_row_values):
+                    break
+                header = header_row_values[idx]
                 value = cell.value
                 if header == "ID":
                     swimlane_data["swimlane_id"] = int(value) if value else 0
@@ -502,14 +495,14 @@ class ExcelRepository:
                     swimlane_data["first_row"] = int(value) if value else 0
                 elif header == "Last Row":
                     swimlane_data["last_row"] = int(value) if value else 0
-            
+
             if swimlane_data.get("swimlane_id"):
                 try:
                     # Swimlane.from_dict() handles backward compatibility for first_row/last_row
                     swimlanes.append(Swimlane.from_dict(swimlane_data))
                 except (ValueError, KeyError) as e:
                     logging.warning(f"Skipping invalid swimlane row: {e}")
-        
+
         return swimlanes
     
     def _create_notes_sheet(self, wb: Workbook, notes: List[Note]) -> None:
