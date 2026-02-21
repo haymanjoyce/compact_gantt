@@ -191,10 +191,22 @@ class SwimlanesTab(BaseTab):
     def _populate_detail_form(self, row: int):
         """Populate detail form with data from selected swimlane."""
         self._updating_form = True
-        
+
         try:
-            if row < len(self.project_data.swimlanes):
-                swimlane = self.project_data.swimlanes[row]
+            # Look up swimlane by ID from the ID column rather than by positional
+            # index, so the correct swimlane is always found regardless of list order.
+            swimlane = None
+            id_col = self._get_column_index("ID")
+            if id_col is not None:
+                id_item = self.swimlanes_table.item(row, id_col)
+                if id_item:
+                    try:
+                        swimlane_id = int(id_item.text())
+                        swimlane = next((s for s in self.project_data.swimlanes if s.swimlane_id == swimlane_id), None)
+                    except (ValueError, TypeError):
+                        pass
+
+            if swimlane is not None:
                 label_position = swimlane.label_position if hasattr(swimlane, 'label_position') else "Bottom Right"
                 self.detail_label_position.setCurrentText(label_position)
                 # Enable detail form widgets when a valid swimlane is selected
