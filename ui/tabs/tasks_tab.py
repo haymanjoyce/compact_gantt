@@ -56,21 +56,23 @@ class TasksTab(BaseTab):
         duplicate_btn.setMinimumWidth(100)
         duplicate_btn.clicked.connect(self._duplicate_tasks)
         
-        move_up_btn = QPushButton("Move Up")
-        move_up_btn.setToolTip("Move selected task(s) up by one row")
-        move_up_btn.setMinimumWidth(100)
-        move_up_btn.clicked.connect(self._move_up)
-        
-        move_down_btn = QPushButton("Move Down")
-        move_down_btn.setToolTip("Move selected task(s) down by one row")
-        move_down_btn.setMinimumWidth(100)
-        move_down_btn.clicked.connect(self._move_down)
-        
+        self.move_up_btn = QPushButton("Move Up")
+        self.move_up_btn.setToolTip("Move selected task up by one chart row (within its swimlane)")
+        self.move_up_btn.setMinimumWidth(100)
+        self.move_up_btn.setEnabled(False)  # Disabled until a task at a movable position is selected
+        self.move_up_btn.clicked.connect(self._move_up)
+
+        self.move_down_btn = QPushButton("Move Down")
+        self.move_down_btn.setToolTip("Move selected task down by one chart row (within its swimlane)")
+        self.move_down_btn.setMinimumWidth(100)
+        self.move_down_btn.setEnabled(False)  # Disabled until a task at a movable position is selected
+        self.move_down_btn.clicked.connect(self._move_down)
+
         toolbar.addWidget(self.add_btn)
         toolbar.addWidget(remove_btn)
         toolbar.addWidget(duplicate_btn)
-        toolbar.addWidget(move_up_btn)
-        toolbar.addWidget(move_down_btn)
+        toolbar.addWidget(self.move_up_btn)
+        toolbar.addWidget(self.move_down_btn)
         toolbar.addStretch()  # Push buttons to the left
         
         # Create group box for table
@@ -265,6 +267,21 @@ class TasksTab(BaseTab):
         if hasattr(self, 'add_btn'):
             self.add_btn.setEnabled(add_enabled)
 
+        # Update Move Up / Move Down button states based on swimlane boundary
+        if hasattr(self, 'move_up_btn') and hasattr(self, 'move_down_btn'):
+            if len(selected_rows) == 1 and not self._is_header_row(selected_rows[0].row()):
+                task = self._task_from_table_row(selected_rows[0].row())
+                if task:
+                    first_row, last_row = self._get_swimlane_bounds_for_task(task)
+                    self.move_up_btn.setEnabled(first_row is not None and task.row_number > first_row)
+                    self.move_down_btn.setEnabled(last_row is not None and task.row_number < last_row)
+                else:
+                    self.move_up_btn.setEnabled(False)
+                    self.move_down_btn.setEnabled(False)
+            else:
+                self.move_up_btn.setEnabled(False)
+                self.move_down_btn.setEnabled(False)
+
         if not selected_rows:
             self._selected_row = None
             self._selected_task_id = None
@@ -411,6 +428,22 @@ class TasksTab(BaseTab):
         # Row number is outside all swimlanes
         return (None, None)
     
+    def _get_swimlane_bounds_for_task(self, task: Task) -> Tuple[Optional[int], Optional[int]]:
+        """Return (first_row, last_row) of the swimlane that contains task.
+
+        Returns (None, None) if the task is an orphan (outside all swimlane row ranges).
+        The range is derived from cumulative row_count values, matching _get_swimlane_info_for_row.
+        """
+        if not self.project_data.swimlanes:
+            return (None, None)
+        current_first_row = 1
+        for swimlane in self.project_data.swimlanes:
+            last_row = current_first_row + swimlane.row_count - 1
+            if current_first_row <= task.row_number <= last_row:
+                return (current_first_row, last_row)
+            current_first_row += swimlane.row_count
+        return (None, None)
+
     def _is_header_row(self, row_idx: int) -> bool:
         """Return True if the given table row is a swimlane header row."""
         item = self.tasks_table.item(row_idx, 0)
@@ -1480,8 +1513,9 @@ class TasksTab(BaseTab):
                 if task is None:
                     continue
 
-                # Check if already at minimum row
-                if task.row_number <= 1:
+                # Block if at the top of the swimlane (or orphan)
+                first_row, last_row = self._get_swimlane_bounds_for_task(task)
+                if first_row is None or task.row_number <= first_row:
                     continue
 
                 # Decrease row_number by 1
@@ -1498,7 +1532,7 @@ class TasksTab(BaseTab):
                 moved_tasks.append((row_idx, task))
 
             if not moved_tasks:
-                QMessageBox.information(self, "Cannot Move", "Selected task(s) are already at the top (row 1).")
+                QMessageBox.information(self, "Cannot Move", "Selected task(s) are already at the top of their swimlane.")
                 return
 
             # Refresh swimlane columns for moved tasks
@@ -1562,7 +1596,12 @@ class TasksTab(BaseTab):
                 if task is None:
                     continue
 
-                # Increase row_number by 1 (no upper limit)
+                # Block if at the bottom of the swimlane (or orphan)
+                first_row, last_row = self._get_swimlane_bounds_for_task(task)
+                if last_row is None or task.row_number >= last_row:
+                    continue
+
+                # Increase row_number by 1
                 new_row_number = task.row_number + 1
 
                 # Update the row number in the table
