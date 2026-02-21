@@ -304,7 +304,7 @@ class AppConfig:
                 columns=[
                     TableColumnConfig("Lane", widget_type="text"),  # Read-only, calculated from row position
                     TableColumnConfig("ID", validator=lambda x: int(x) > 0 if x else False),
-                    TableColumnConfig("Row Count", validator=lambda x: int(x) > 0 if x else False),
+                    TableColumnConfig("Minimum Row Count", validator=lambda x: int(x) > 0 if x else False),
                     TableColumnConfig("Title")
                 ],
                 min_rows=0

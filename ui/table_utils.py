@@ -362,9 +362,9 @@ def add_row(table, table_key, table_configs, parent, id_field_name, row_index=No
                 item = NumericTableWidgetItem(str(row_value))
                 item.setData(Qt.UserRole, row_value)
                 table.setItem(row_index, col_idx, item)
-            # Numeric column - check by column name for swimlanes table (Row Count)
-            elif header_text == "Row Count":
-                item = NumericTableWidgetItem("1")  # Default row count
+            # Numeric column - check by column name for swimlanes table (Minimum Row Count)
+            elif header_text == "Minimum Row Count":
+                item = NumericTableWidgetItem("1")  # Default minimum row count
                 item.setData(Qt.UserRole, 1)
                 table.setItem(row_index, col_idx, item)
             # Numeric columns for notes (X, Y, Width, Height) - use QSpinBox widgets
