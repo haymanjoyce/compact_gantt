@@ -145,6 +145,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.0] - 2026-02-22
+
+### Changed
+
+- **Swimlanes tab — column layout**
+  - ID column moved left of Title (standard convention)
+  - "Row Count" renamed to "Minimum Row Count" and moved right of Title
+  - Lane Order column hidden in UI (retained in Excel)
+
+- **Swimlanes tab — delete with cascade**
+  - Deleting a swimlane now shows a confirmation popup listing the swimlane name and number of child tasks before proceeding
+  - All child tasks are deleted along with the swimlane (irreversible once confirmed)
+
+- **Swimlanes tab — new swimlane default**
+  - A new swimlane is created with one default task so the Add Task workflow is immediately available
+  - Minimum Row Count defaults to 1 on creation
+
+- **Tasks tab — swimlane header rows**
+  - Swimlane groups are now divided by non-editable, greyed-out, bold header rows displaying the swimlane name
+  - Header rows are non-selectable and rendered dynamically from the swimlane list
+
+- **Tasks tab — column changes**
+  - "Row" column renamed to "Chart Row" (UI only; Excel schema unchanged)
+  - Lane ID column hidden (swimlane membership now visually communicated by header rows; retained in Excel)
+
+- **Tasks tab — Add Task constraints**
+  - Add Task button disabled when no task row is selected
+  - New task inherits Chart Row, Start Date, and Finish Date from the selected task
+  - New task is inserted immediately below the selected task after sort
+
+- **Tasks tab — Move Up / Move Down constraints**
+  - Move Up and Move Down buttons disabled when the selected task is already at the top or bottom of its swimlane
+  - Tasks cannot be moved past a swimlane header boundary
+
+- **Tasks tab — Duplicate**
+  - Duplicated task is inserted immediately below the original after sort
+  - All fields inherited including Chart Row and swimlane membership
+
 ## [Unreleased]
 
 ### Planned
