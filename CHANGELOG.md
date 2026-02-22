@@ -183,6 +183,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Duplicated task is inserted immediately below the original after sort
   - All fields inherited including Chart Row and swimlane membership
 
+## [1.2.1] - 2026-02-22
+
+### Changed
+
+- **Swimlanes tab**: "Minimum Row Count" column renamed to "Chart Row Count"
+- **Tasks tab**: "Show IDs on chart" checkbox moved from Links tab to Tasks tab toolbar
+- **Tasks tab — Move Up / Move Down**: now operate chart-relative with no swimlane boundary constraint; Move Up is blocked only at chart row 1, Move Down has no upper limit
+
+### Fixed
+
+- Tasks tab: Move Up / Move Down buttons now correctly enable when multiple task rows are selected
+- Tasks tab: Duplicate task now copies all fields to the new task (fill colour, label settings, date format were previously lost); appends " [Duplicate]" to the duplicated task name
+
+---
+
 ## [Unreleased]
 
 ### Planned
@@ -193,6 +208,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+[1.2.1]: https://github.com/richardhaymanjoyce/compact_gantt/releases/tag/v1.2.1
 [1.1.2]: https://github.com/richardhaymanjoyce/compact_gantt/releases/tag/v1.1.2
 [1.1.1]: https://github.com/richardhaymanjoyce/compact_gantt/releases/tag/v1.1.1
 [1.1.0]: https://github.com/richardhaymanjoyce/compact_gantt/releases/tag/v1.1.0

@@ -2,7 +2,7 @@
 
 Notes on what to work on next. Resume from here when picking up development again.
 
-*Last updated: 2026-01-28. Development paused; repo left in a clean state.*
+*Last updated: 2026-02-22.*
 
 ## REFACTOR
 
@@ -21,4 +21,4 @@ Notes on what to work on next. Resume from here when picking up development agai
 
 ## BUGS
 
-- Some task data (e.g., colours, name position) seem to change when I perform certain operations (e.g. moving a task); check they are not losing association with task ID
+- Task colours/name position may change during move operations; check they are not losing association with task ID
