@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import (QWidget, QTableWidget, QVBoxLayout, QPushButton,
                            QHBoxLayout, QComboBox, QHeaderView, QTableWidgetItem,
-                           QMessageBox, QGroupBox, QSizePolicy, QLabel, QGridLayout, QLineEdit, QSpinBox, QDateEdit)
+                           QMessageBox, QGroupBox, QSizePolicy, QLabel, QGridLayout, QLineEdit, QSpinBox, QDateEdit, QCheckBox)
 from PyQt5.QtCore import Qt, pyqtSignal, QDate
 from PyQt5.QtGui import QBrush, QColor, QFont
 from typing import List, Dict, Any, Optional, Set, Tuple
@@ -68,11 +68,17 @@ class TasksTab(BaseTab):
         self.move_down_btn.setEnabled(False)  # Disabled until a task at a movable position is selected
         self.move_down_btn.clicked.connect(self._move_down)
 
+        self.show_ids_checkbox = QCheckBox("Show IDs on chart")
+        self.show_ids_checkbox.setChecked(self.app_config.general.show_ids_on_chart)
+        self.show_ids_checkbox.setToolTip("Display task/milestone IDs on the chart")
+        self.show_ids_checkbox.toggled.connect(self._on_show_ids_toggled)
+
         toolbar.addWidget(self.add_btn)
         toolbar.addWidget(remove_btn)
         toolbar.addWidget(duplicate_btn)
         toolbar.addWidget(self.move_up_btn)
         toolbar.addWidget(self.move_down_btn)
+        toolbar.addWidget(self.show_ids_checkbox)
         toolbar.addStretch()  # Push buttons to the left
         
         # Create group box for table
@@ -1080,6 +1086,9 @@ class TasksTab(BaseTab):
 
     def _load_initial_data_impl(self):
         """Load initial data into the table using Task objects directly."""
+        # Sync checkbox from config
+        self.show_ids_checkbox.setChecked(self.app_config.general.show_ids_on_chart)
+
         # Get Task objects directly from project_data
         tasks = self.project_data.tasks
         row_count = len(tasks)
@@ -1120,7 +1129,10 @@ class TasksTab(BaseTab):
             # Avoid emitting during initialization to prevent recursive updates
             if self._initializing:
                 return
-            
+
+            # Persist checkbox state into config
+            self.app_config.general.show_ids_on_chart = self.show_ids_checkbox.isChecked()
+
             # Extract Task objects from table rows
             tasks = []
             for row_idx in range(self.tasks_table.rowCount()):
@@ -1139,6 +1151,13 @@ class TasksTab(BaseTab):
     def _sync_data_if_not_initializing(self):
         if not self._initializing:
             self._sync_data()
+
+    def _on_show_ids_toggled(self, checked: bool):
+        """Handle toggle for showing IDs on chart."""
+        if self._initializing:
+            return
+        self.app_config.general.show_ids_on_chart = checked
+        self.data_updated.emit({"chart_config_changed": True})
     
     def _ensure_read_only_styling(self):
         """Ensure all read-only cells (ID, Valid, Lane) have proper styling."""
