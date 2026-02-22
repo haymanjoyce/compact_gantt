@@ -1486,7 +1486,13 @@ class TasksTab(BaseTab):
         for _, new_task in tasks_to_duplicate:
             self.project_data.tasks.append(new_task)
 
-        # Sync data to update project_data, then re-sort to restore header rows
+        # _sync_data() reads the table top-to-bottom and replaces project_data.tasks
+        # with that order, so each duplicate is immediately after its original in the list.
+        # _sort_tasks_by_swimlane_and_row() then sorts by (swimlane_order, row_number,
+        # finish_date). Each duplicate copies its original's row_number and finish_date,
+        # giving it an identical sort key. Python's stable sort preserves the relative
+        # order of equal-key items, so the duplicate always ends up directly below the
+        # original in the final table. Header rows are re-inserted by the sort call.
         self._sync_data()
         self._sort_tasks_by_swimlane_and_row()
     
