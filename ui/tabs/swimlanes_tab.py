@@ -73,11 +73,11 @@ class SwimlanesTab(BaseTab):
         self.swimlanes_table = QTableWidget(0, len(headers))
         self.swimlanes_table.setHorizontalHeaderLabels(headers)
         
-        # Reorder visual columns: Lane (hidden) | ID | Title | Minimum Row Count
-        # Config logical order: Lane(0), ID(1), Minimum Row Count(2), Title(3)
-        # Move Title from visual position 3 to 2, pushing Minimum Row Count to visual 3
+        # Reorder visual columns: Lane (hidden) | ID | Title | Chart Row Count
+        # Config logical order: Lane(0), ID(1), Chart Row Count(2), Title(3)
+        # Move Title from visual position 3 to 2, pushing Chart Row Count to visual 3
         title_col = headers.index("Title") if "Title" in headers else None
-        min_row_count_col = headers.index("Minimum Row Count") if "Minimum Row Count" in headers else None
+        min_row_count_col = headers.index("Chart Row Count") if "Chart Row Count" in headers else None
         header = self.swimlanes_table.horizontalHeader()
         if title_col is not None and min_row_count_col is not None:
             header.moveSection(title_col, min_row_count_col)
@@ -96,7 +96,7 @@ class SwimlanesTab(BaseTab):
         # Add bottom border to header row and gridline styling
         self.swimlanes_table.setStyleSheet(self.app_config.general.table_stylesheet)
         
-        # Column sizing — Lane is hidden; ID, Title, Minimum Row Count sized by logical index
+        # Column sizing — Lane is hidden; ID, Title, Chart Row Count sized by logical index
         header = self.swimlanes_table.horizontalHeader()
         for i in range(self.swimlanes_table.columnCount()):
             col_name = self.swimlanes_table.horizontalHeaderItem(i).text()
@@ -104,7 +104,7 @@ class SwimlanesTab(BaseTab):
                 header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
             elif col_name == "Title":
                 header.setSectionResizeMode(i, QHeaderView.Stretch)
-            elif col_name == "Minimum Row Count":
+            elif col_name == "Chart Row Count":
                 header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
         
         # Enable horizontal scroll bar
@@ -601,8 +601,8 @@ class SwimlanesTab(BaseTab):
             if col_name == "ID":
                 return
             
-            # Update UserRole for numeric columns (ID, Minimum Row Count)
-            if col_name in ["ID", "Minimum Row Count"]:
+            # Update UserRole for numeric columns (ID, Chart Row Count)
+            if col_name in ["ID", "Chart Row Count"]:
                 try:
                     val_str = item.text().strip()
                     item.setData(Qt.UserRole, int(val_str) if val_str else 0)
@@ -652,7 +652,7 @@ class SwimlanesTab(BaseTab):
         # Get column indices using key-based access
         lane_col = self._get_column_index("Lane")
         id_col = self._get_column_index("ID")
-        row_count_col = self._get_column_index("Minimum Row Count")
+        row_count_col = self._get_column_index("Chart Row Count")
         title_col = self._get_column_index("Title")
         
         # Update Lane column (read-only, calculated from row position)
@@ -709,7 +709,7 @@ class SwimlanesTab(BaseTab):
         try:
             # Get column indices using key-based access
             id_col = self._get_column_index("ID")
-            row_count_col = self._get_column_index("Minimum Row Count")
+            row_count_col = self._get_column_index("Chart Row Count")
             title_col = self._get_column_index("Title")
             
             if id_col is None or row_count_col is None:
