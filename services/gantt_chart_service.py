@@ -1039,6 +1039,43 @@ class GanttChartService(QObject):
             # Move to next swimlane's starting position
             current_first_row += swimlane.row_count
 
+    def render_swimlane_backgrounds(self, x, row_y, width, row_frame_height, num_rows):
+        """Render coloured background rectangles behind each swimlane.
+
+        Drawn after the row-frame border but before gridlines, so gridlines
+        and task bars appear on top of the tint.
+
+        Args:
+            x: The absolute x position of the timeline (in pixels)
+            row_y: The absolute y position of the row frame (in pixels)
+            width: The width of the timeline (in pixels)
+            row_frame_height: The height of the row frame (in pixels)
+            num_rows: The number of rows in the chart
+        """
+        swimlanes = self._extract_swimlanes()
+        if not swimlanes:
+            return
+
+        row_height = row_frame_height / num_rows if num_rows > 0 else row_frame_height
+        current_first_row = 1  # 1-based
+
+        for swimlane in swimlanes:
+            first_row, last_row, is_valid = self._calculate_swimlane_row_positions(
+                swimlane, current_first_row, num_rows
+            )
+
+            if is_valid and getattr(swimlane, 'background_color', ''):
+                bg_y = row_y + (first_row - 1) * row_height
+                bg_height = (last_row - first_row + 1) * row_height
+                self.dwg.add(self.dwg.rect(
+                    insert=(x, bg_y),
+                    size=(width, bg_height),
+                    fill=swimlane.background_color,
+                    stroke="none",
+                ))
+
+            current_first_row += swimlane.row_count
+
     def render_curtains(self, x, row_y, width, row_frame_height, start_date, end_date):
         """Render curtains (two vertical lines with hatched pattern between them).
         
@@ -2003,7 +2040,10 @@ class GanttChartService(QObject):
         
         # Render row frame borders
         self._render_row_frame_borders(x, row_y, width, row_frame_height, scale_configs)
-        
+
+        # Render swimlane background tints (behind gridlines and task bars)
+        self.render_swimlane_backgrounds(x, row_y, width, row_frame_height, num_rows)
+
         # Render horizontal gridlines
         self._render_horizontal_gridlines(x, row_y, width, row_frame_height, num_rows)
         

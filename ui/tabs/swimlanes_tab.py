@@ -24,6 +24,7 @@ class SwimlanesTab(BaseTab):
         self._selected_swimlane_id = None  # Track selected swimlane ID for detail form matching
         self._updating_form = False  # Prevent circular updates
         self.detail_label_position = None  # Will be initialized in setup_ui
+        self.detail_background_color = None  # Will be initialized in setup_ui
         self._detail_form_widgets = []  # Will be populated in _create_detail_form
         super().__init__(project_data, app_config)
 
@@ -149,12 +150,26 @@ class SwimlanesTab(BaseTab):
         self.detail_label_position.currentTextChanged.connect(self._on_detail_form_changed)
         # Disable by default - will be enabled when a swimlane is selected
         self.detail_label_position.setEnabled(False)
-        
+
+        # Background Color
+        bg_color_label = QLabel("Background Color:")
+        bg_color_label.setFixedWidth(LABEL_WIDTH)
+        self.detail_background_color = QComboBox()
+        self.detail_background_color.addItems([
+            "None", "lightyellow", "lightblue", "lightgreen",
+            "lightsalmon", "lavender", "lightcyan", "peachpuff", "lightgray"
+        ])
+        self.detail_background_color.setToolTip("Background colour tint for the swimlane")
+        self.detail_background_color.currentTextChanged.connect(self._on_detail_form_changed)
+        self.detail_background_color.setEnabled(False)
+
         # Store list of detail form widgets for easy enable/disable
-        self._detail_form_widgets = [self.detail_label_position]
-        
+        self._detail_form_widgets = [self.detail_label_position, self.detail_background_color]
+
         layout.addWidget(position_label, 0, 0)
         layout.addWidget(self.detail_label_position, 0, 1)
+        layout.addWidget(bg_color_label, 1, 0)
+        layout.addWidget(self.detail_background_color, 1, 1)
         layout.setColumnStretch(1, 1)
         
         group.setLayout(layout)
@@ -189,10 +204,13 @@ class SwimlanesTab(BaseTab):
             if swimlane is not None:
                 label_position = swimlane.label_position if hasattr(swimlane, 'label_position') else "Bottom Right"
                 self.detail_label_position.setCurrentText(label_position)
+                bg_color = swimlane.background_color if hasattr(swimlane, 'background_color') else ""
+                self.detail_background_color.setCurrentText(bg_color if bg_color else "None")
                 # Enable detail form widgets when a valid swimlane is selected
                 self._set_detail_form_enabled(self._detail_form_widgets, True)
             else:
                 self.detail_label_position.setCurrentText("Bottom Right")
+                self.detail_background_color.setCurrentText("None")
                 self._set_detail_form_enabled(self._detail_form_widgets, False)
         finally:
             self._updating_form = False
@@ -202,6 +220,7 @@ class SwimlanesTab(BaseTab):
         self._updating_form = True
         try:
             self.detail_label_position.setCurrentText("Bottom Right")
+            self.detail_background_color.setCurrentText("None")
             # Disable detail form widgets when no swimlane is selected
             self._set_detail_form_enabled(self._detail_form_widgets, False)
         finally:
@@ -738,28 +757,33 @@ class SwimlanesTab(BaseTab):
                 if title_item:
                     title = title_item.text().strip()
             
-            # Get label_position from detail form if this swimlane ID matches the selected one
-            # Otherwise, get from existing Swimlane object
-            # Use key-based matching by ID instead of row index for reliability
+            # Get label_position and background_color from detail form if this swimlane ID
+            # matches the selected one; otherwise get from existing Swimlane object.
+            # Use key-based matching by ID instead of row index for reliability.
             label_position = "Bottom Right"
-            
+            background_color = ""
+
             # Check if this swimlane's ID matches the one in the detail form
-            if (self._selected_swimlane_id is not None and 
+            if (self._selected_swimlane_id is not None and
                 swimlane_id == self._selected_swimlane_id and
-                hasattr(self, 'detail_label_position') and 
+                hasattr(self, 'detail_label_position') and
                 self.detail_label_position):
                 label_position = self.detail_label_position.currentText()
+                bg_text = self.detail_background_color.currentText() if hasattr(self, 'detail_background_color') else "None"
+                background_color = "" if bg_text == "None" else bg_text
             else:
                 # Get from existing swimlane (key-based lookup by ID)
                 existing_swimlane = next((s for s in self.project_data.swimlanes if s.swimlane_id == swimlane_id), None)
                 if existing_swimlane:
                     label_position = existing_swimlane.label_position if hasattr(existing_swimlane, 'label_position') else "Bottom Right"
-            
+                    background_color = existing_swimlane.background_color if hasattr(existing_swimlane, 'background_color') else ""
+
             return Swimlane(
                 swimlane_id=swimlane_id,
                 row_count=row_count,
                 title=title,
-                label_position=label_position
+                label_position=label_position,
+                background_color=background_color,
             )
         except (ValueError, AttributeError, Exception) as e:
             logging.error(f"Error extracting swimlane from table row {row_idx}: {e}")
