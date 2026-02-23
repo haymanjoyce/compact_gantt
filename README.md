@@ -2,7 +2,7 @@
 
 ![Version](https://img.shields.io/badge/version-1.4.0-blue.svg)
 
-A PyQt5-based tool for creating compact Gantt charts with SVG output, Excel/JSON import/export, transparent PNG export, and comprehensive customization options.
+A PyQt5-based tool for creating compact Gantt charts with SVG output, Excel import/export, transparent PNG export, and comprehensive customization options.
 
 > **Note:** The version badge is automatically synced from `version.py` (single source of truth). Run `python update_readme_version.py` after updating the version.
 
@@ -42,9 +42,7 @@ A PyQt5-based tool for creating compact Gantt charts with SVG output, Excel/JSON
   - Customizable positioning and formatting
 
 - **Data Management**
-  - Import/export project data as JSON
-  - Import/export project data as Excel (XLSX)
-  - Save and load project configurations
+  - Save and load project data as Excel (XLSX)
   - Data validation with error highlighting
   - Single-instance application (prevents multiple instances)
 
@@ -93,7 +91,7 @@ python main.py
 4. **Click "Update Chart"** to generate the SVG chart
 5. **Export your chart**:
    - Use File menu in the chart display window to save as PNG (transparent) or JPEG (opaque)
-   - Use File menu in the data entry window to save project as JSON or Excel
+   - Use File menu in the data entry window to save or open project as Excel
 
 ## Tabs Overview
 
@@ -114,8 +112,8 @@ Tabs are organized in a content-first logical grouping:
 ## Keyboard Shortcuts
 
 ### Data Entry Window
-- **Ctrl+S**: Save project to JSON
-- **Ctrl+O**: Load project from JSON
+- **Ctrl+S**: Save project (Excel)
+- **Ctrl+O**: Open project (Excel)
 - **Ctrl+N**: Add new task (in Tasks tab)
 - **Delete**: Remove selected task(s) (in Tasks tab)
 
@@ -150,7 +148,6 @@ python tests/test_project_save_load.py
   - `task.py` - Task model
   - `frame.py` - Frame configuration
 - `repositories/` - File I/O
-  - `project_repository.py` - JSON save/load
   - `excel_repository.py` - Excel import/export
 - `config/` - Configuration
   - `app_config.py` - Application configuration
