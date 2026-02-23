@@ -19,6 +19,3 @@ Notes on what to work on next. Resume from here when picking up development agai
 - Improve pipe and curtain labels
 - Drop JSON files altogether (or automate)
 
-## BUGS
-
-- Task colours/name position may change during move operations; check they are not losing association with task ID
