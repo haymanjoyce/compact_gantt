@@ -5,6 +5,26 @@ All notable changes to Compact Gantt will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-02-23
+
+### Added
+- **Per-swimlane background colour** — set a colour tint on any swimlane via the
+  Swimlane Properties detail form; tint renders behind gridlines and task bars.
+  Persists in both JSON and Excel (new `Background Color` column in Swimlanes sheet).
+
+### Changed
+- **Excel column names aligned to UI labels** — Tasks sheet `Row` → `Chart Row`;
+  Swimlanes sheet `Row Count` → `Chart Row Count`. Old names still accepted on import
+  for backward compatibility with existing files.
+
+### Fixed
+- Blank `fill_color` field on a task no longer produces an invalid SVG `fill=""`
+  attribute; falls back to the default blue.
+- `label_placement` renderer fallback corrected from `"Outside"` to `"Inside"` to
+  match the Task model default.
+
+---
+
 ## [1.0.0] - 2025-01-21
 
 ### Added

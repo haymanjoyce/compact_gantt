@@ -1,6 +1,6 @@
 # Compact Gantt
 
-![Version](https://img.shields.io/badge/version-1.2.1-blue.svg)
+![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)
 
 A PyQt5-based tool for creating compact Gantt charts with SVG output, Excel/JSON import/export, transparent PNG export, and comprehensive customization options.
 
