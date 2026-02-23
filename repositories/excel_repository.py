@@ -311,18 +311,20 @@ class ExcelRepository:
     def _create_swimlanes_sheet(self, wb: Workbook, swimlanes: List[Swimlane]) -> None:
         """Create Swimlanes worksheet."""
         ws = wb.create_sheet("Swimlanes")
-        ws.append(["ID", "Chart Row Count", "Title", "Label Position"])
+        ws.append(["ID", "Chart Row Count", "Title", "Label Position", "Background Color"])
         self._format_header_row(ws, 1)
-        
+
         for swimlane in swimlanes:
             # Use title if available, fall back to name for backward compatibility
             title = swimlane.title if hasattr(swimlane, 'title') else (swimlane.name if hasattr(swimlane, 'name') else "")
             label_position = swimlane.label_position if hasattr(swimlane, 'label_position') else "Bottom Right"
+            background_color = swimlane.background_color if hasattr(swimlane, 'background_color') else ""
             ws.append([
                 swimlane.swimlane_id,
                 swimlane.row_count,
                 title if title else "",
-                label_position
+                label_position,
+                background_color if background_color else ""
             ])
     
     def _create_pipes_sheet(self, wb: Workbook, pipes: List[Pipe]) -> None:
@@ -490,6 +492,8 @@ class ExcelRepository:
                     swimlane_data["title"] = str(value) if value else ""
                 elif header == "Label Position":
                     swimlane_data["label_position"] = str(value) if value else "Bottom Right"
+                elif header == "Background Color":
+                    swimlane_data["background_color"] = str(value) if value else ""
                 # Backward compatibility: support old First Row/Last Row format
                 elif header == "First Row":
                     swimlane_data["first_row"] = int(value) if value else 0
