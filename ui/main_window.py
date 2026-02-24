@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QMainWindow, QTabWidget, QFileDialog, QMessageBox, QWidget, QPushButton, QVBoxLayout, QHBoxLayout
+from PyQt5.QtWidgets import QMainWindow, QTabWidget, QFileDialog, QMessageBox, QWidget, QPushButton, QVBoxLayout, QHBoxLayout, QFrame
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import pyqtSignal, QDate
 import logging
@@ -58,27 +58,6 @@ class MainWindow(QMainWindow):
         central_widget = QWidget()
         main_layout = QVBoxLayout(central_widget)
 
-        # Top toolbar: project file actions
-        self.open_btn = QPushButton("Open Project")
-        self.save_btn = QPushButton("Save Project")
-        self.open_btn.setShortcut("Ctrl+O")
-        self.save_btn.setShortcut("Ctrl+S")
-        self.open_btn.setToolTip("Open project from Excel (Ctrl+O)")
-        self.save_btn.setToolTip("Save project to Excel (Ctrl+S)")
-        self.open_btn.clicked.connect(self.load_from_excel)
-        self.save_btn.clicked.connect(self.save_to_excel)
-        btn_style = "QPushButton { padding: 8px; }"
-        self.open_btn.setStyleSheet(btn_style)
-        self.save_btn.setStyleSheet(btn_style)
-
-        file_toolbar = QHBoxLayout()
-        file_toolbar.setSpacing(8)
-        file_toolbar.setContentsMargins(0, 0, 0, 4)
-        file_toolbar.addWidget(self.open_btn)
-        file_toolbar.addWidget(self.save_btn)
-        file_toolbar.addStretch()
-        main_layout.addLayout(file_toolbar)
-
         # Create and setup tab widget
         self.tab_widget = QTabWidget()
         self.tab_widget.setMovable(True)  # Enable drag-and-drop tab reordering
@@ -92,15 +71,35 @@ class MainWindow(QMainWindow):
         self.tab_widget.tabBar().blockSignals(False)
         main_layout.addWidget(self.tab_widget)
 
-        # Create Update Image button at the bottom
+        # Bottom action bar
+        btn_style = "QPushButton { padding: 8px; }"
+
         self.update_image_button = QPushButton("Update Chart")
-        self.update_image_button.setStyleSheet("""
-            QPushButton {
-                padding: 8px;
-            }
-        """)
+        self.update_image_button.setStyleSheet(btn_style)
         self.update_image_button.clicked.connect(self._emit_data_updated)
-        main_layout.addWidget(self.update_image_button)
+
+        self.open_btn = QPushButton("Open Project")
+        self.save_btn = QPushButton("Save Project")
+        self.open_btn.setShortcut("Ctrl+O")
+        self.save_btn.setShortcut("Ctrl+S")
+        self.open_btn.setToolTip("Open project from Excel (Ctrl+O)")
+        self.save_btn.setToolTip("Save project to Excel (Ctrl+S)")
+        self.open_btn.clicked.connect(self.load_from_excel)
+        self.save_btn.clicked.connect(self.save_to_excel)
+        self.open_btn.setStyleSheet(btn_style)
+        self.save_btn.setStyleSheet(btn_style)
+
+        divider = QFrame()
+        divider.setFrameShape(QFrame.VLine)
+        divider.setFrameShadow(QFrame.Sunken)
+
+        bottom_bar = QHBoxLayout()
+        bottom_bar.setSpacing(8)
+        bottom_bar.addWidget(self.update_image_button, 1)  # stretch → wider
+        bottom_bar.addWidget(divider)
+        bottom_bar.addWidget(self.open_btn)
+        bottom_bar.addWidget(self.save_btn)
+        main_layout.addLayout(bottom_bar)
 
         self.setCentralWidget(central_widget)
         # Create and style the status bar to match SVG display

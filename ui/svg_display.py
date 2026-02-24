@@ -88,28 +88,27 @@ class SvgDisplay(QMainWindow):
         self.save_png_btn.setStyleSheet(button_style)
         self.save_jpeg_btn.setStyleSheet(button_style)
 
-        export_layout = QHBoxLayout()
-        export_layout.setSpacing(8)
-        export_layout.setContentsMargins(0, 0, 0, 4)
-        export_layout.addWidget(self.save_png_btn)
-        export_layout.addWidget(self.save_jpeg_btn)
-        export_layout.addStretch()
+        divider = QFrame()
+        divider.setFrameShape(QFrame.VLine)
+        divider.setFrameShadow(QFrame.Sunken)
 
-        # Bottom view-control buttons
+        # Bottom bar: view controls │ export buttons
         btn_layout = QHBoxLayout()
         btn_layout.setSpacing(8)
         btn_layout.setContentsMargins(0, 4, 0, 0)
         btn_layout.addWidget(self.zoom_in_btn)
         btn_layout.addWidget(self.zoom_out_btn)
         btn_layout.addWidget(self.fit_btn)
+        btn_layout.addWidget(divider)
+        btn_layout.addWidget(self.save_png_btn)
+        btn_layout.addWidget(self.save_jpeg_btn)
 
         # Create central widget
         central_widget = QWidget()
         self.layout = QVBoxLayout(central_widget)
         self.layout.setContentsMargins(8, 8, 8, 8)
-        self.layout.addLayout(export_layout)   # Export buttons at top
-        self.layout.addWidget(self.scroll_area)  # Chart image in middle
-        self.layout.addLayout(btn_layout)        # View controls at bottom
+        self.layout.addWidget(self.scroll_area)  # Chart image
+        self.layout.addLayout(btn_layout)        # All controls at bottom
         self.setCentralWidget(central_widget)
         
         # Create status bar using reserved area (like MainWindow)
