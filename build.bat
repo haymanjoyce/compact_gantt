@@ -3,8 +3,8 @@ echo Building Compact Gantt executable...
 echo.
 
 REM Check if venv exists
-if not exist ".venv\Scripts\pyinstaller.exe" (
-    echo PyInstaller not found in .venv. Please run: .venv\Scripts\pip install pyinstaller
+if not exist ".venv\Scripts\python.exe" (
+    echo .venv not found. Please create it and install dependencies first.
     pause
     exit /b 1
 )
@@ -15,7 +15,7 @@ if exist "dist" rmdir /s /q "dist"
 
 REM Build the executable
 echo Running PyInstaller...
-.venv\Scripts\pyinstaller compactgantt.spec
+.venv\Scripts\python -m PyInstaller compactgantt.spec
 
 if errorlevel 1 (
     echo.
